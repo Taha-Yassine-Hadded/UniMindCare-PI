@@ -8,9 +8,14 @@ services:
       - "5000:5000"
     depends_on:
       - mongo
+      - keycloak
     environment:
       MONGO_URI: mongodb://mongo:27017/Pi-2025
-      FRONTEND_URL: http://frontend:3000
+      SESSION_SECRET: 17d6b5674a49997fb296f9d1f8dfcfaf80b42c2714416d758b487f16168d70cf
+      KEYCLOAK_REALM: unimindcare
+      KEYCLOAK_URL : http://keycloak:8080/auth
+      KEYCLOAK_CLIENT_ID: unimindcare-client
+      FRONTEND_URI: http://frontend:3000
   
   frontend:
     container_name: frontend
@@ -22,7 +27,7 @@ services:
     depends_on:
       - backend
     environment:
-      BACKEND_URL: http://backend:5000
+      BACKEND_URI: http://backend:5000
 
   mongo:
     image: mongo:6.0
@@ -32,5 +37,21 @@ services:
     volumes:
       - mongo-data:/data/db
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.1.1
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak/import:/opt/keycloak/import
+    command:
+      - start-dev
+      - --import-realm
+
 volumes:
+  keycloak-data:
   mongo-data:

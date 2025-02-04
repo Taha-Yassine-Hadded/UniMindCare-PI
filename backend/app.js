@@ -3,14 +3,19 @@ var createError = require('http-errors');
 var path = require('path');
 var logger = require('morgan');
 const express = require('express');
+const cors = require('cors');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const Keycloak = require('keycloak-connect');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 
 // Initialize Express app
 var app = express();
+
+app.use(cors());
 
 // view engine setup
 app.set('view engine', 'pug');
@@ -27,11 +32,35 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
 // MongoDB connection
-const MONGO_URI = process.env.MONGO_URI;
 mongoose
-  .connect(MONGO_URI)
+  .connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));
+
+
+// Session configuration (required for Keycloak)
+const memoryStore = new session.MemoryStore();
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'super-secret-key',
+    resave: false,
+    saveUninitialized: true,
+    store: memoryStore,
+  })
+);
+
+
+// Keycloak setup
+const keycloakConfig = {
+  'realm': process.env.KEYCLOAK_REALM,
+  'auth-server-url': process.env.KEYCLOAK_URI,
+  'resource': process.env.KEYCLOAK_CLIENT_ID,
+  'ssl-required': 'external',
+  'confidential-port': 0,
+  'public-client': true,
+};
+const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
+app.use(keycloak.middleware());
 
 
 // catch 404 and forward to error handler
