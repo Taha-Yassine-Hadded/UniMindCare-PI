@@ -43,9 +43,9 @@ jobs:
       # Step 5: Run Docker Compose for integration testing
       - name: Start Services with Docker Compose
         run: |
-          docker-compose -f docker-compose.dev.yml up -d
+          docker compose -f docker-compose.dev.yml up -d
           sleep 10
-          docker-compose -f docker-compose.dev.yml logs
+          docker compose -f docker-compose.dev.yml logs
 
       # Step 6: Run integration tests (example: test backend API)
       - name: Run Integration Tests
@@ -56,4 +56,4 @@ jobs:
       # Step 7: Clean up Docker
       - name: Stop Services
         if: always()  # Always run, even if previous steps fail
-        run: docker-compose -f docker-compose.dev.yml down
+        run: docker compose -f docker-compose.dev.yml down
