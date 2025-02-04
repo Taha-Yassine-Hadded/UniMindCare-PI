@@ -1,0 +1,37 @@
+services:
+  frontend:
+    image: frontend-dev
+    build: ./frontend  # Build the frontend Docker image
+    ports:
+      - "3000:3000"    # Map to Vite dev server port
+    volumes:
+      - ./frontend:/app  # Mount code for hot-reload
+      - /app/node_modules  # Isolate dependencies
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
+
+  backend:
+    image: backend-dev
+    build: ./backend  # Build the backend Docker image
+    ports:
+      - "5000:5000"    # Expose backend port
+    volumes:
+      - ./backend:/app  # Mount code for hot-reload
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - MONGO_URI=mongodb://mongo:27017/Pi-2025  # Use MongoDB service
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db  # Persist MongoDB data
+
+volumes:
+  mongo-data:
