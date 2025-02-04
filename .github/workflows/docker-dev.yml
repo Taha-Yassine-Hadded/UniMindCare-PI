@@ -38,7 +38,7 @@ jobs:
         working-directory: ./backend
         run: |
           docker build -t backend-dev .
-          docker run -d --name backend-dev-container -e MONGO_URI=mongodb://mongo:27017/mydatabase backend-dev
+          docker run -d --name backend-dev-container -e MONGO_URI=mongodb://mongo:27017/Pi-2025 backend-dev
           docker logs backend-dev-container
 
       # Step 5: Clean up containers
