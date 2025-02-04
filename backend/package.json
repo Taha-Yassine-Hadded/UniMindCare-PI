@@ -7,12 +7,12 @@
     "test": "jest",
     "test:integration": "jest test/integration.test.js",
     "lint": "eslint ."
-
   },
   "dependencies": {
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "dotenv": "^16.4.7",
+    "eslint": "^9.19.0",
     "express": "^4.21.2",
     "http-errors": "~1.6.3",
     "jest": "^29.7.0",
