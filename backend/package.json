@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node ./bin/www",
     "test": "jest",
-    "test:integration": "jest test"
+    "test:integration": "jest test/integration.test.js",
+    "lint": "eslint ."
+
   },
   "dependencies": {
     "cookie-parser": "~1.4.4",
