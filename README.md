@@ -13,15 +13,15 @@ UniMindCare is a web application designed to enhance students' well-being and ps
 - **Containerization & CI/CD**: Docker, GitHub Actions
 - **Testing**: Jest (Unit Testing), ESLint (Linting)
 
-⚙️ **Getting Started**
+## 🚀 Getting Started
 
 **Prerequisites**
 
 Make sure you have the following installed:
 
-- Docker Desktop
+- Docker Desktop installed & running 🐳
 - Node.js & npm
-- Git
+- `.env` file in `/backend` folder (contact team for template) 🔑
 
 🛠️ **Installation & Setup**
 
