@@ -95,4 +95,4 @@ Give a ⭐ if you like this project and want to see it grow!
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-Made with ❤️ by the UniMindCare Team at ESPRIT University
+Made with ❤️ by the NexGenCoders Team at ESPRIT University
