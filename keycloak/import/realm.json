@@ -46,6 +46,15 @@
   "roles": {
     "realm": [
       {
+        "id": "3cc7b622-e7bb-4135-a489-c119b40769eb",
+        "name": "PSYCHOLOGIST",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "455994cf-a8db-4ffd-972b-e27d962beec2",
+        "attributes": {}
+      },
+      {
         "id": "1e619cb4-4491-4fd5-aa64-ae7400237e91",
         "name": "uma_authorization",
         "description": "${role_uma_authorization}",
@@ -58,6 +67,24 @@
         "id": "71a9e460-96dd-4882-96fe-d57f6b4427b3",
         "name": "offline_access",
         "description": "${role_offline-access}",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "455994cf-a8db-4ffd-972b-e27d962beec2",
+        "attributes": {}
+      },
+      {
+        "id": "f3b68ee4-ad3a-4fb4-bff1-7b54870d91c4",
+        "name": "ADMIN",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "455994cf-a8db-4ffd-972b-e27d962beec2",
+        "attributes": {}
+      },
+      {
+        "id": "3a8cec4c-3e09-485b-b90b-2d9e9c28d743",
+        "name": "TEACHER",
+        "description": "",
         "composite": false,
         "clientRole": false,
         "containerId": "455994cf-a8db-4ffd-972b-e27d962beec2",
@@ -85,8 +112,8 @@
         "attributes": {}
       },
       {
-        "id": "587dc7b4-a6ab-45d0-b1c2-c93df8e58145",
-        "name": "admin",
+        "id": "991a6627-9710-429d-889b-e7f617fd8884",
+        "name": "STUDENT",
         "description": "",
         "composite": false,
         "clientRole": false,
@@ -194,18 +221,18 @@
                 "view-users",
                 "view-clients",
                 "manage-identity-providers",
-                "manage-realm",
                 "manage-events",
+                "manage-realm",
                 "view-authorization",
                 "manage-authorization",
                 "create-client",
                 "impersonation",
                 "query-clients",
-                "view-identity-providers",
                 "query-users",
+                "view-identity-providers",
                 "manage-clients",
-                "view-events",
                 "query-groups",
+                "view-events",
                 "manage-users",
                 "view-realm",
                 "query-realms"
@@ -442,8 +469,8 @@
   "otpPolicyCodeReusable": false,
   "otpSupportedApplications": [
     "totpAppMicrosoftAuthenticatorName",
-    "totpAppGoogleName",
-    "totpAppFreeOTPName"
+    "totpAppFreeOTPName",
+    "totpAppGoogleName"
   ],
   "webAuthnPolicyRpEntityName": "keycloak",
   "webAuthnPolicySignatureAlgorithms": [
@@ -608,7 +635,9 @@
       "publicClient": true,
       "frontchannelLogout": false,
       "protocol": "openid-connect",
-      "attributes": {},
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": 0,
@@ -646,7 +675,9 @@
       "publicClient": false,
       "frontchannelLogout": false,
       "protocol": "openid-connect",
-      "attributes": {},
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": 0,
@@ -684,7 +715,9 @@
       "publicClient": false,
       "frontchannelLogout": false,
       "protocol": "openid-connect",
-      "attributes": {},
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": 0,
@@ -801,8 +834,8 @@
         "backchannel.logout.url": "http://localhost:5000/api/auth/logout",
         "frontchannel.logout.url": "http://localhost:3000/logout",
         "post.logout.redirect.uris": "http://localhost:5000",
-        "oauth2.device.authorization.grant.enabled": "true",
         "display.on.consent.screen": "false",
+        "oauth2.device.authorization.grant.enabled": "true",
         "backchannel.logout.revoke.offline.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
@@ -1224,7 +1257,8 @@
           "consentRequired": false,
           "config": {
             "id.token.claim": "true",
-            "access.token.claim": "true"
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
           }
         }
       ]
@@ -1247,6 +1281,7 @@
           "consentRequired": false,
           "config": {
             "multivalued": "true",
+            "userinfo.token.claim": "true",
             "user.attribute": "foo",
             "id.token.claim": "true",
             "access.token.claim": "true",
@@ -1433,14 +1468,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-full-name-mapper",
-            "saml-role-list-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "saml-user-property-mapper",
-            "oidc-usermodel-property-mapper",
             "oidc-address-mapper",
+            "saml-role-list-mapper",
+            "oidc-usermodel-property-mapper",
+            "oidc-usermodel-attribute-mapper",
             "saml-user-attribute-mapper",
-            "oidc-sha256-pairwise-sub-mapper"
+            "oidc-full-name-mapper",
+            "oidc-sha256-pairwise-sub-mapper",
+            "saml-user-property-mapper"
           ]
         }
       },
@@ -1461,13 +1496,13 @@
         "config": {
           "allowed-protocol-mapper-types": [
             "saml-user-property-mapper",
-            "oidc-address-mapper",
-            "oidc-sha256-pairwise-sub-mapper",
             "saml-user-attribute-mapper",
+            "oidc-sha256-pairwise-sub-mapper",
+            "oidc-full-name-mapper",
+            "saml-role-list-mapper",
             "oidc-usermodel-property-mapper",
             "oidc-usermodel-attribute-mapper",
-            "saml-role-list-mapper",
-            "oidc-full-name-mapper"
+            "oidc-address-mapper"
           ]
         }
       }
@@ -2218,8 +2253,12 @@
     "cibaExpiresIn": "120",
     "cibaAuthRequestedUserHint": "login_hint",
     "oauth2DeviceCodeLifespan": "600",
+    "clientOfflineSessionMaxLifespan": "0",
     "oauth2DevicePollingInterval": "5",
+    "clientSessionIdleTimeout": "0",
     "parRequestUriLifespan": "60",
+    "clientSessionMaxLifespan": "0",
+    "clientOfflineSessionIdleTimeout": "0",
     "cibaInterval": "5",
     "realmReusableOtpCode": "false"
   },
