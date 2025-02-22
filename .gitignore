@@ -15,7 +15,7 @@ node_modules/
 /build/
 
 # Ignore environment variables
-.env
+#.env
 .env.local
 .env.development
 .env.production
