@@ -52,5 +52,5 @@ frontend/dist/
 frontend/node_modules/
 
 # Ignore backend-specific files (if any)
-backend/.env
+# backend/.env
 backend/node_modules/
