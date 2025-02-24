@@ -1,0 +1,59 @@
+name: Development CI Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint-test-and-integrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Lint and test frontend
+      - name: Lint/Test Frontend
+        working-directory: ./frontend
+        run: |
+          npm install
+          npm run lint
+          npm run test
+
+      # Step 3: Lint and test backend
+      - name: Lint/Test Backend
+        working-directory: ./backend
+        run: |
+          npm install
+          npm run lint
+          npm run test
+
+      # Step 4: Build Docker images (dev mode)
+      - name: Build Frontend Docker Image
+        working-directory: ./frontend
+        run: docker build -t frontend-dev .
+
+      - name: Build Backend Docker Image
+        working-directory: ./backend
+        run: docker build -t backend-dev .
+
+      # Step 5: Run Docker Compose for integration testing
+      - name: Start Services with Docker Compose
+        run: |
+          docker compose -f docker-compose.dev.yml up -d
+          sleep 10
+          docker compose -f docker-compose.dev.yml logs
+
+      # Step 6: Run integration tests (example: test backend API)
+      - name: Run Integration Tests
+        working-directory: ./backend
+        run: |
+          npm run test:integration
+
+      # Step 7: Clean up Docker
+      - name: Stop Services
+        if: always()  # Always run, even if previous steps fail
+        run: docker compose -f docker-compose.dev.yml down
