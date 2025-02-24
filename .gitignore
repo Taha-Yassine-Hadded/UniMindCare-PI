@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Ignore node_modules for both frontend and backend
+node_modules/
+
+# Ignore build directories
+/dist/
+/build/
+
+# Ignore environment variables
+#.env
+.env.local
+.env.development
+.env.production
+
+# Ignore IDE/editor files
+.vscode/
+.idea/
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+logs/
+
+# Ignore dependency directories
+*/node_modules/
+
+# Ignore npm/yarn cache
+.npm
+.yarn
+.yarnrc
+.pnpm-store
+
+# Ignore package-lock files (optional, depending on your preference)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ignore frontend-specific files (if any)
+frontend/.env
+frontend/dist/
+frontend/node_modules/
+
+# Ignore backend-specific files (if any)
+# backend/.env
+backend/node_modules/
