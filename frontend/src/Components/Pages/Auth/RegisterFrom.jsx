@@ -1,0 +1,154 @@
+import { useState } from "react";
+import { Form, FormGroup, Input, Label, Row, Col } from "reactstrap";
+import { Btn, H4, P } from "../../../AbstractElements";
+import { useNavigate } from "react-router-dom";
+
+const RegisterFrom = () => {
+  const [formData, setFormData] = useState({
+    Name: "",
+    Identifiant: "",
+    Email: "",
+    Password: "",
+    Classe: "",
+    Role: "student",
+    PhoneNumber: "",
+    imageUrl: ""
+  });
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files[0]) {
+      console.log("Fichier sélectionné:", e.target.files[0]);
+      setFormData({ ...formData, imageFile: e.target.files[0] });
+    }
+  };
+  
+  
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess(false);
+  
+    if (!formData.Email.endsWith("@esprit.tn")) {
+      setError("L'email doit être au format @esprit.tn");
+      return;
+    }
+  
+    const formDataToSend = new FormData();
+    Object.keys(formData).forEach((key) => {
+      if (key !== "imageFile" && formData[key] !== "") {
+        formDataToSend.append(key, formData[key]);
+      }
+    });
+  
+    // Vérifiez si une image est envoyée, sinon envoyez imageUrl vide
+    formDataToSend.append("imageUrl", formData.imageFile ? formData.imageFile.name : "");
+  
+    try {
+      const response = await fetch("http://localhost:5000/register", {
+        method: "POST",
+        headers: { "Accept": "application/json" },
+        body: formDataToSend,
+      });
+  
+      if (!response.ok) {
+        const message = await response.text();
+        console.error("Erreur serveur:", message);
+        setError(message);
+      } else {
+        setSuccess(true);
+        setFormData({
+          Name: "",
+          Identifiant: "",
+          Email: "",
+          Password: "",
+          Classe: "",
+          Role: "student",
+          PhoneNumber: "",
+          imageFile: null,
+          imageUrl: "",
+        });
+        {success && <p className="text-success">Inscription réussie! Vérifiez votre email pour activer votre compte.</p>}
+
+        //setTimeout(() => navigate("/login"), 2000);
+      }
+    } catch (err) {
+      console.error("Erreur serveur:", err);
+      setError("Erreur serveur. Veuillez réessayer.");
+    }
+  };
+  
+  
+
+  return (
+    <div className="login-main">
+      <Form className="theme-form login-form" onSubmit={handleSubmit}>
+        <div className="login-header text-center">
+          <H4>Créer votre compte</H4>
+          <P>Remplissez vos informations personnelles</P>
+        </div>
+        
+        {error && <p className="text-danger">{error}</p>}
+        {success && <p className="text-success">Inscription réussie! Redirection...</p>}
+
+
+        <FormGroup>
+          <Label>Nom complet</Label>
+          <Input type="text" name="Name" required value={formData.Name} onChange={handleChange} placeholder="Nom complet" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Identifiant</Label>
+          <Input type="text" name="Identifiant" required value={formData.Identifiant} onChange={handleChange} placeholder="Identifiant unique" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Email</Label>
+          <Input type="email" name="Email" required value={formData.Email} onChange={handleChange} placeholder="ex: user@esprit.tn" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Mot de passe</Label>
+          <Input type="password" name="Password" required value={formData.Password} onChange={handleChange} placeholder="********" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Classe</Label>
+          <Input type="text" name="Classe" value={formData.Classe} onChange={handleChange} placeholder="ex: 3ème année" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Rôle</Label>
+          <Input type="select" name="Role" value={formData.Role} onChange={handleChange}>
+            <option value="student">Étudiant</option>
+            <option value="teacher">Enseignant</option>
+          </Input>
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Numéro de téléphone</Label>
+          <Input type="tel" name="PhoneNumber" value={formData.PhoneNumber} onChange={handleChange} placeholder="ex: +216 12 345 678" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Image de profil</Label>
+          <Input type="file" name="imageFile" onChange={handleFileChange} accept="image/*" />
+        </FormGroup>
+
+        <FormGroup>
+          <Btn attrBtn={{ color: "primary", className: "w-100", type: "submit" }}>Créer un compte</Btn>
+        </FormGroup>
+      </Form>
+    </div>
+  );
+};
+
+export default RegisterFrom;
