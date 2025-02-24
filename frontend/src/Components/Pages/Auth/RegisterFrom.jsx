@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, FormGroup, Input, Label, Row, Col } from "reactstrap";
 import { Btn, H4, P } from "../../../AbstractElements";
 import { useNavigate } from "react-router-dom";
+import Swal from 'sweetalert2';
 
 const RegisterFrom = () => {
   const [formData, setFormData] = useState({
@@ -76,9 +77,17 @@ const RegisterFrom = () => {
           imageFile: null,
           imageUrl: "",
         });
-        {success && <p className="text-success">Inscription réussie! Vérifiez votre email pour activer votre compte.</p>}
+        // ✅ Affichage d'une alerte SweetAlert2
+      Swal.fire({
+        title: "Inscription réussie !",
+        text: "Un email de vérification a été envoyé. Vous allez être redirigé vers la page de connexion.",
+        icon: "success",
+        timer: 5000,
+        showConfirmButton: false
+      });
 
-        //setTimeout(() => navigate("/login"), 2000);
+      // ✅ Redirection après un délai de 3 secondes
+      setTimeout(() => navigate("/login"), 3000);
       }
     } catch (err) {
       console.error("Erreur serveur:", err);
