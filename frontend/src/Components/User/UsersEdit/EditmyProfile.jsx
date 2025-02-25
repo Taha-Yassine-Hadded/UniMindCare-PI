@@ -25,7 +25,7 @@ const EditMyProfile = () => {
 useEffect(() => {
   const fetchUserData = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/users/${identifiant}`, {
+      const response = await fetch(`http://localhost:5000/api/users/${identifiant}`, {
         method: 'GET',
         headers: authHeader()
       });
@@ -86,7 +86,7 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/users/${identifiant}`, {
+      const response = await fetch(`http://localhost:5000/api/users/${identifiant}`, {
         method: 'PUT',
         headers: authHeader(),
         body: JSON.stringify({

@@ -1,47 +1,135 @@
-import {  useState } from 'react';
-import { Col, Container, Row, TabContent, TabPane } from 'reactstrap';
-import NavAuth from '../../../Auth/Nav';
-import AuthTab from '../../../Auth/Tabs/AuthTab';
-import { Image } from '../../../AbstractElements';
-import { Link } from 'react-router-dom';
-import LoginTab from '../../../Auth/Tabs/LoginTab';
- import imgg from '../../../assets/images/login/login_bg.jpg';
-import { dynamicImage } from '../../../Services';
+import { useState, useEffect } from 'react';
+import { Col, Container, Row, Form, FormGroup, Label, Input, Button } from 'reactstrap';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import imgg from '../../../assets/images/login/login_bg.jpg';
 
 const LoginSample = () => {
-    const [selected, setSelected] = useState('jwt');
+    const navigate = useNavigate();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
+    const [error, setError] = useState('');
 
-    const callbackNav = ((select) => {
-        setSelected(select);
-    });
+    // Check if token is passed in URL on component mount (for Google login)
+    useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const token = queryParams.get('token');
+        
+        if (token) {
+            if (rememberMe) {
+                localStorage.setItem('token', token);  // Store token in localStorage
+            } else {
+                sessionStorage.setItem('token', token);  // Store token in sessionStorage
+            }
+            navigate('/tivo/dashboard/default');  // Redirect to the default dashboard
+        }
+    }, [navigate, rememberMe]);
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await axios.post('http://localhost:5000/users/signin', { email, password });
+            const token = response.data.token;
+
+            if (rememberMe) {
+                localStorage.setItem('token', token); 
+                // Store token in localStorage
+            } else {
+                sessionStorage.setItem('token', token);
+                // Store token in sessionStorage
+            }
+
+            setError('');  // Clear error message on successful login
+            navigate('/tivo/dashboard/default');  // Navigate to the default dashboard page after successful login
+
+        } catch (err) {
+            setError(err.response?.data?.message || 'Login failed');
+        }
+    };
+
+    const handleGoogleLogin = () => {
+        window.location.href = 'http://localhost:5000/users/auth/google';  // Redirect to Google authentication
+    };
+
+    const handleEmailChange = (e) => {
+        setEmail(e.target.value);
+        setError('');  // Clear error message when email changes
+    };
 
     return (
-            <Container fluid={true} className="p-0">
-                <Row className='mx-0'>
-                    <Col xs="12" className='px-0'>
-                        <div className="login-card auth-login" style={{
-                            backgroundImage: `url(${imgg})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center'
-                        }}>
-                            <div>
+        <section>
+            <Container className="p-0" fluid={true}>
+                <Row className="mx-0">
+                    <Col className="px-0" xl="12" style={{ backgroundImage: `url(${imgg})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', display: 'block' }}>
+                        <div className="login-card">
+                            <div className="logo-section text-center">
                                 <Link className="logo" to={`${process.env.PUBLIC_URL}/dashboard/default`}>
-                                    <Image attrImage={{ className: 'img-fluid', src: dynamicImage('logo/logo2.png'), alt: '' }} />
+                                    <img src={require('../../../assets/images/logo/logo2.png')} alt="Logo" className="img-fluid" />
                                 </Link>
                             </div>
                             <div className="login-main1 login-tab1 login-main">
-                                <NavAuth callbackNav={callbackNav} selected={selected} />
-                                <TabContent activeTab={selected} className="content-login">
-                                    <TabPane className="fade show" tabId={'jwt'}>
-                                        <LoginTab selected={selected} />
-                                    </TabPane>
-                                    <TabPane className="fade show" tabId="auth0">
-                                        <AuthTab />
-                                    </TabPane>
-                                </TabContent >
+                                <Form onSubmit={handleLogin} className="theme-form">
+                                    <FormGroup>
+                                        <Label for="email">Email</Label>
+                                        <Input
+                                            type="email"
+                                            id="email"
+                                            value={email}
+                                            onChange={handleEmailChange}
+                                            placeholder="Enter your email"
+                                            required
+                                        />
+                                    </FormGroup>
+                                    <FormGroup>
+                                        <Label for="password">Password</Label>
+                                        <Input
+                                            type="password"
+                                            id="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Enter your password"
+                                            required
+                                        />
+                                    </FormGroup>
+
+                                    {/* Remember Me & Forgot Password on the Same Line */}
+                                    <div className="d-flex justify-content-between align-items-center mb-3">
+                                        <FormGroup className="mb-0 d-flex align-items-center">
+                                            <Input
+                                                type="checkbox"
+                                                id="rememberMe"
+                                                checked={rememberMe}
+                                                onChange={(e) => setRememberMe(e.target.checked)}
+                                            />
+                                            <Label for="rememberMe" className="ms-2 mb-0">Remember Me</Label>
+                                        </FormGroup>
+                                        <Link to={`${process.env.PUBLIC_URL}/authentication/forget-pwd`} className="text-primary">Forgot Password?</Link>
+
+                                    </div>
+
+                                    {error && <p className="text-danger">{error}</p>}
+
+                                    {/* Buttons with Same Width as Input Fields */}
+                                    <Button type="submit" color="primary" className="w-100 mb-2">
+                                        Sign In
+                                    </Button>
+                                    <Button color="danger" className="w-100" onClick={handleGoogleLogin}>
+                                        Sign In with Google
+                                    </Button>
+
+                                    {/* Create Account Link */}
+                                    <div className="text-center mt-3">
+                                        <span>Don't have an account? </span>
+                                        <Link to={`${process.env.PUBLIC_URL}/authentication/register-simpleimg`} className="text-primary">Create Account</Link>
+                                    </div>
+                                </Form>
                             </div>
                         </div>
                     </Col>
                 </Row>
             </Container>
+        </section>
     );
 };
 

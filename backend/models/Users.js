@@ -16,9 +16,14 @@ const userSchema = new mongoose.Schema({
   },
   Password: { type: String, required: true },
   Classe: { type: String },
-  Role: { type: String },
+  Role: {
+    type: [String],
+    enum: ['student', 'admin', 'psychologist', 'teacher'],
+    required: true
+  }, 
   PhoneNumber: { type: String },
   imageUrl: { type: String },
+  verified: { type: Boolean, default: false },
   otp: { type: String },
   otpExpires: { type: Date }
 }, { 

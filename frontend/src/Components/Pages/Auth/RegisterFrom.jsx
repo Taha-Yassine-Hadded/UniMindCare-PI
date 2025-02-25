@@ -1,100 +1,175 @@
-import { Facebook, Instagram, Linkedin, Twitter } from "react-feather";
-import { Form, FormGroup, Input, InputGroup, Label, Row, Col } from "reactstrap";
-import { Btn, H4, H6, LI, P, UL } from "../../../AbstractElements";
-import { CreateAccount, EmailAddress, Password, PrivacyPolicy, SignIn, YourName } from "../../../Constant";
+import { useState } from "react";
+import { Form, FormGroup, Input, Label, Row, Col } from "reactstrap";
+import { Btn, H4, P } from "../../../AbstractElements";
 import { useNavigate } from "react-router-dom";
+import Swal from 'sweetalert2';
 
 const RegisterFrom = () => {
+  const [formData, setFormData] = useState({
+    Name: "",
+    Identifiant: "",
+    Email: "",
+    Password: "",
+    Classe: "",
+    Role: "student",
+    PhoneNumber: "",
+    imageUrl: ""
+  });
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
-  const handleFaceIDRegistration = () => {
-    navigate(`${process.env.PUBLIC_URL}/authentication/register-faceid`);
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  const handleFileChange = (e) => {
+    if (e.target.files[0]) {
+      console.log("Fichier sélectionné:", e.target.files[0]);
+      setFormData({ ...formData, imageFile: e.target.files[0] });
+    }
+  };
+  
+const [isClasseDisabled, setIsClasseDisabled] = useState(false);
+
+const handleRoleChange = (e) => {
+  const selectedRole = e.target.value;
+  setFormData({ ...formData, Role: selectedRole });
+
+  // Désactiver ou masquer la classe si c'est un enseignant ou psychiatre
+  setIsClasseDisabled(selectedRole === "teacher" || selectedRole === "psychiatre");
+};
+
+  
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess(false);
+  
+    if (!formData.Email.endsWith("@esprit.tn")) {
+      setError("L'email doit être au format @esprit.tn");
+      return;
+    }
+  
+    const formDataToSend = new FormData();
+    Object.keys(formData).forEach((key) => {
+      if (key !== "imageFile" && formData[key] !== "") {
+        formDataToSend.append(key, formData[key]);
+      }
+    });
+  
+    // Vérifiez si une image est envoyée, sinon envoyez imageUrl vide
+    formDataToSend.append("imageUrl", formData.imageFile ? formData.imageFile.name : "");
+  
+    try {
+      const response = await fetch("http://localhost:5000/register", {
+        method: "POST",
+        headers: { "Accept": "application/json" },
+        body: formDataToSend,
+      });
+  
+      if (!response.ok) {
+        const message = await response.text();
+        console.error("Erreur serveur:", message);
+        setError(message);
+      } else {
+        setSuccess(true);
+        setFormData({
+          Name: "",
+          Identifiant: "",
+          Email: "",
+          Password: "",
+          Classe: "",
+          Role: "student",
+          PhoneNumber: "",
+          imageFile: null,
+          imageUrl: "",
+        });
+        // ✅ Affichage d'une alerte SweetAlert2
+      Swal.fire({
+        title: "Inscription réussie !",
+        text: "Un email de vérification a été envoyé. Vous allez être redirigé vers la page de connexion.",
+        icon: "success",
+        timer: 5000,
+        showConfirmButton: false
+      });
+
+      // ✅ Redirection après un délai de 3 secondes
+      setTimeout(() => navigate(`${process.env.PUBLIC_URL}/authentication/login-simple`), 3000);
+      }
+    } catch (err) {
+      console.error("Erreur serveur:", err);
+      setError("Erreur serveur. Veuillez réessayer.");
+    }
+  };
+  
+  
 
   return (
     <div className="login-main">
-      <Form className="theme-form login-form">
+      <Form className="theme-form login-form" onSubmit={handleSubmit}>
         <div className="login-header text-center">
-          <H4>Create your account</H4>
-          <P>Enter your personal details to create account</P>
+          <H4>Créer votre compte</H4>
+          <P>Remplissez vos informations personnelles</P>
         </div>
-        <FormGroup>
-          <Label>{YourName}</Label>
-          <Row>
-            <Col sm="6">
-              <Input className="form-control" type="text" required="" placeholder="First Name" />
-            </Col>
-            <Col sm="6">
-              <Input className="form-control" type="text" required="" placeholder="Last Name" />
-            </Col>
-          </Row>
-        </FormGroup>
-        <FormGroup>
-          <Label>{EmailAddress}</Label>
-          <InputGroup>
-            <Input className="form-control" type="email" required="" placeholder="Test@gmail.com" />
-          </InputGroup>
-        </FormGroup>
-        <FormGroup className="position-relative form-group pass-hide">
-          <Label>{Password}</Label>
-          <Input className="form-control" type="password" name="login[password]" required="" placeholder="*********" />
-          <div className="show-hide">
-            <span className="show"></span>
-          </div>
-        </FormGroup>
-        <FormGroup>
-          <div className="checkbox">
-            <Input id="checkbox1" type="checkbox" />
-            <Label className="text-muted" for="checkbox1">
-              Agree with
-              <a className="ms-2" href="#javascript">{PrivacyPolicy}</a>
-            </Label>
-          </div>
-        </FormGroup>
-        <FormGroup>
-          <Btn attrBtn={{ color: "primary", className: "w-100", type: "submit" }}>{CreateAccount}</Btn>
-        </FormGroup>
         
-        {/* Bouton pour FaceID */}
+        {error && <p className="text-danger">{error}</p>}
+        {success && <p className="text-success">Inscription réussie! Redirection...</p>}
+
+
         <FormGroup>
-          <Btn attrBtn={{ color: "secondary", className: "w-100", type: "button", onClick: handleFaceIDRegistration }}>
-            Register with FaceID
-          </Btn>
+          <Label>Nom complet</Label>
+          <Input type="text" name="Name" required value={formData.Name} onChange={handleChange} placeholder="Nom complet" />
         </FormGroup>
 
-        <div className="login-social-title">
-          <H6>Or Sign in with</H6>
-        </div>
         <FormGroup>
-          <UL attrUL={{ className: "simple-list login-social flex-row" }}>
-            <LI>
-              <a href="https://in.linkedin.com/">
-                <Linkedin/>
-              </a>
-            </LI>
-            <LI>
-              <a href="https://twitter.com/i/flow/login">
-                <Twitter/>
-              </a>
-            </LI>
-            <LI>
-              <a href="https://www.instagram.com/">
-                <Instagram/>
-              </a>
-            </LI>
-            <LI>
-              <a href="https://www.facebook.com/">
-                <Facebook/>
-              </a>
-            </LI>
-          </UL>
+          <Label>Identifiant</Label>
+          <Input type="text" name="Identifiant" required value={formData.Identifiant} onChange={handleChange} placeholder="Identifiant unique" />
         </FormGroup>
-        <P attrPara={{ className: "mt-4 mb-0 text-center" }}>
-          Already have an account?
-          <a href={`${process.env.PUBLIC_URL}/login`} className="ms-2">
-            {SignIn}
-          </a>
-        </P>
+
+        <FormGroup>
+          <Label>Email</Label>
+          <Input type="email" name="Email" required value={formData.Email} onChange={handleChange} placeholder="ex: user@esprit.tn" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Mot de passe</Label>
+          <Input type="password" name="Password" required value={formData.Password} onChange={handleChange} placeholder="********" />
+        </FormGroup>
+
+     
+
+        <FormGroup>
+          <Label>Rôle</Label>
+          <Input type="select" name="Role" value={formData.Role} onChange={handleRoleChange}>
+            <option value="student">Étudiant</option>
+            <option value="teacher">Enseignant</option>
+            <option value="psychiatre">Psychiatre</option>
+          </Input>
+        </FormGroup>
+
+        {!isClasseDisabled && (
+  <FormGroup>
+    <Label>Classe</Label>
+    <Input type="text" name="Classe" value={formData.Classe} onChange={handleChange} placeholder="ex: 3A" />
+  </FormGroup>
+)}
+
+        <FormGroup>
+          <Label>Numéro de téléphone</Label>
+          <Input type="tel" name="PhoneNumber" value={formData.PhoneNumber} onChange={handleChange} placeholder="ex: +216 12 345 678" />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Image de profil</Label>
+          <Input type="file" name="imageFile" onChange={handleFileChange} accept="image/*" />
+        </FormGroup>
+
+        <FormGroup>
+          <Btn attrBtn={{ color: "primary", className: "w-100", type: "submit" }}>Créer un compte</Btn>
+        </FormGroup>
       </Form>
     </div>
   );
