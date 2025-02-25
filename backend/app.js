@@ -74,6 +74,12 @@ const upload = multer({ storage });
 app.post('/register', upload.single('imageFile'), async (req, res) => {
   const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber } = req.body;
 
+  // Vérification du rôle
+  const validRoles = ["student", "teacher", "psychiatre"];
+  if (!validRoles.includes(Role)) {
+      return res.status(400).send("Rôle invalide.");
+  }
+
   if (!validateEmail(Email)) {
     return res.status(400).send('L\'email doit être au format @esprit.tn');
   }
@@ -93,7 +99,7 @@ app.post('/register', upload.single('imageFile'), async (req, res) => {
     Identifiant,
     Email,
     Password: hashedPassword,
-    Classe,
+    Classe: Role === "student" ? Classe : "",
     Role,
     PhoneNumber,
     imageUrl,
@@ -119,7 +125,7 @@ app.post('/register', upload.single('imageFile'), async (req, res) => {
     // Envoyer l'email
     const verificationLink = `http://localhost:5000/verify-email/${verificationToken}`;
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
       to: savedUser.Email,
       subject: 'Vérification de votre compte',
       text: `Cliquez sur ce lien pour vérifier votre compte : ${verificationLink}`,

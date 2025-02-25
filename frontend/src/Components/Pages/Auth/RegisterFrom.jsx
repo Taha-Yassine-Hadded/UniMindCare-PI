@@ -31,6 +31,16 @@ const RegisterFrom = () => {
     }
   };
   
+const [isClasseDisabled, setIsClasseDisabled] = useState(false);
+
+const handleRoleChange = (e) => {
+  const selectedRole = e.target.value;
+  setFormData({ ...formData, Role: selectedRole });
+
+  // Désactiver ou masquer la classe si c'est un enseignant ou psychiatre
+  setIsClasseDisabled(selectedRole === "teacher" || selectedRole === "psychiatre");
+};
+
   
 
   const handleSubmit = async (e) => {
@@ -87,7 +97,8 @@ const RegisterFrom = () => {
       });
 
       // ✅ Redirection après un délai de 3 secondes
-      setTimeout(() => navigate("/login"), 3000);
+      setTimeout(() => navigate(`${process.env.PUBLIC_URL}/login`), 3000);
+      
       }
     } catch (err) {
       console.error("Erreur serveur:", err);
@@ -129,18 +140,23 @@ const RegisterFrom = () => {
           <Input type="password" name="Password" required value={formData.Password} onChange={handleChange} placeholder="********" />
         </FormGroup>
 
-        <FormGroup>
-          <Label>Classe</Label>
-          <Input type="text" name="Classe" value={formData.Classe} onChange={handleChange} placeholder="ex: 3ème année" />
-        </FormGroup>
+     
 
         <FormGroup>
           <Label>Rôle</Label>
-          <Input type="select" name="Role" value={formData.Role} onChange={handleChange}>
+          <Input type="select" name="Role" value={formData.Role} onChange={handleRoleChange}>
             <option value="student">Étudiant</option>
             <option value="teacher">Enseignant</option>
+            <option value="psychiatre">Psychiatre</option>
           </Input>
         </FormGroup>
+
+        {!isClasseDisabled && (
+  <FormGroup>
+    <Label>Classe</Label>
+    <Input type="text" name="Classe" value={formData.Classe} onChange={handleChange} placeholder="ex: 3A" />
+  </FormGroup>
+)}
 
         <FormGroup>
           <Label>Numéro de téléphone</Label>
