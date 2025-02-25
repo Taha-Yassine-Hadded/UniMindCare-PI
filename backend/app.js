@@ -49,6 +49,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
+ // Authentication routes
 //app.use('/users', usersRouter);
 
 
@@ -57,7 +58,6 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));
-
 
 
 
@@ -87,7 +87,8 @@ app.use('/users', usersRouter);
 
 
 
-
+// Routes
+// Authentication routes
 
 
 
@@ -225,7 +226,9 @@ app.post('/api/reset-password', async (req, res) => {
     }
 
     // Hacher le nouveau mot de passe avec SHA-256
-    const hashedPassword = crypto.createHash('sha256').update(newPassword).digest('hex');
+    //const hashedPassword = crypto.createHash('sha256').update(newPassword).digest('hex');
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
 
     // Mettre à jour le mot de passe
     user.Password = hashedPassword;

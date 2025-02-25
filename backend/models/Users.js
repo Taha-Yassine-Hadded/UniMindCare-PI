@@ -14,7 +14,15 @@ const userSchema = new mongoose.Schema({
       message: 'L\'email doit se terminer par "@esprit.tn"'
     }
   },
-  Password: { type: String, required: true },
+  //Password: { type: String, required: true },
+  Password: { 
+    type: String,
+    required: function() {
+      // Requis seulement si pas d'authentification Google
+      return !this.googleId; 
+    }
+  },
+  googleId: { type: String, unique: true, sparse: true }, // Ajouter ce champ
   Classe: { type: String },
   Role: {
     type: [String],

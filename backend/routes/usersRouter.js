@@ -32,6 +32,18 @@ router.post('/signin', async (req, res) => {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
+
+    if (user?.googleId) {
+      return res.status(400).json({ 
+        message: 'Veuillez utiliser la connexion Google' 
+      });
+    }
+
+    // Check if user is verified
+    if (!user.verified) {
+      return res.status(400).json({ message: 'Account not verified. Please verify your email.' });
+    }
+
     // Check password
     const isMatch = await bcrypt.compare(password, user.Password);
     if (!isMatch) {
@@ -40,7 +52,7 @@ router.post('/signin', async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign(
-      { userId: user._id, email: user.Email, roles: user.Role,identifiant: user.Identifiant },
+      { userId: user._id, email: user.Email, roles: user.Role, identifiant: user.Identifiant },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -56,18 +68,37 @@ router.post('/signin', async (req, res) => {
 router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 // Google login callback route
-router.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/' }),
+// routes/users.js
+router.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
   async (req, res) => {
-    // Successful authentication, generate a token and redirect home.
-    const user = req.user;
-    const token = jwt.sign(
-      { userId: user._id, email: user.Email, roles: user.Role, identifiant: user.Identifiant },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-    res.redirect(`http://localhost:3000/login?token=${token}`);
+    try {
+      const user = req.user;
+      
+      // Générer le token JWT
+      const token = jwt.sign(
+        {
+          userId: user._id,
+          email: user.Email,
+          roles: user.Role,
+          authMethod: 'google' // Ajouter une indication de la méthode d'authentification
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+
+      res.redirect(`http://localhost:3000/tivo/authentication/login-simple?token=${token}`);
+
+      // Redirection sécurisée
+    } catch (error) {
+      console.error('Google callback error:', error);
+      res.redirect('/login?error=google_auth_failed');
+    }
   }
 );
+
+
 
 // Logout route
 router.post('/logout', (req, res) => {
