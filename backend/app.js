@@ -5,6 +5,7 @@ const authRoutes = require("./routes/authRoutes"); // Authentication routes
 const twoFactorRoutes = require("./routes/twoFactorRoutes"); // 2FA routes
 const cors = require("cors");
 
+
 dotenv.config(); // Load environment variables from .env
 connectDB(); // Connect to the database
 
