@@ -91,7 +91,7 @@ exports.verify2FA = async (req, res) => {
       user.verified2FA = true;
       await user.save();
       // Générer un token JWT après vérification réussie
-      const jwtToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+      const jwtToken = jwt.sign({ userId: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
       res.json({ message: "2FA vérifié", token: jwtToken });
     } else {
       res.status(401).send("Code 2FA invalide");

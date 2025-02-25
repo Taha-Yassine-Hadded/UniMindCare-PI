@@ -40,7 +40,7 @@ const LoginForm = () => {
             } else if (data.token) {
                 setMessage("Connexion réussie !");
                 localStorage.setItem('token', data.token);
-                navigate('/dashboard/default'); // Redirige vers la page d'accueil
+                navigate('/tivo/dashboard/default'); // Redirige vers la page d'accueil
             }
         } catch (error) {
             console.error("Erreur lors de la connexion:", error);
@@ -51,7 +51,7 @@ const LoginForm = () => {
     const handleVerifyOtp = async (e) => {
         e.preventDefault();
         try {
-            const data = await verifyTwoFactor(userId, otp);
+            const data = await verifyTwoFactor(email, otp);
             console.log("Réponse de vérification 2FA:", data);
             if (data.message === "2FA vérifié") {
                 console.log("OTP vérifié, redirection...");

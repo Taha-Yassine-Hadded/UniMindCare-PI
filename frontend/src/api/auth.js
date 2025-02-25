@@ -12,10 +12,14 @@ export const loginUser = async (email, password) => {
   }
 };
 
-// Fonction pour vérifier l'OTP pour le 2FA
-export const verifyTwoFactor = async (email, otp) => {
+export const verifyTwoFactor = async (identifier, otp) => {
   try {
-    const response = await axios.post(`${API_URL}/verify-2fa`, { email, token: otp });
+    // Vous pouvez choisir d'utiliser soit `userId` soit `email` comme identifiant
+    const payload = identifier.includes('@') 
+      ? { email: identifier, token: otp } 
+      : { _id: identifier, token: otp };
+
+    const response = await axios.post(`${API_URL}/verify-2fa`, payload);
     return response.data; // Retourne la réponse du backend
   } catch (error) {
     console.error('Erreur lors de la vérification du 2FA :', error);
