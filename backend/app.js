@@ -1,7 +1,7 @@
 require('dotenv').config();
-var createError = require('http-errors');
-var path = require('path');
-var logger = require('morgan');
+const createError = require('http-errors');
+const path = require('path');
+const logger = require('morgan');
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -9,16 +9,14 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const Keycloak = require('keycloak-connect');
 const axios = require('axios');
-
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
+const passport = require('./routes/passportConfig'); // Import the configured passport instance
+const indexRouter = require('./routes/index');
+const usersRouter = require('./routes/usersRouter');
 
 // Initialize Express app
-var app = express();
+const app = express();
 
 app.use(cors());
-
-// view engine setup
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -27,9 +25,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
 
 // MongoDB connection
 mongoose
@@ -46,16 +41,18 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// Session configuration (required for Keycloak)
+// Session configuration (required for Keycloak and Passport)
 const memoryStore = new session.MemoryStore();
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'super-secret-key',
-    resave: false,
-    saveUninitialized: true,
-    store: memoryStore,
-  })
-);
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  store: memoryStore,
+}));
+
+// Initialize Passport for sessions
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Keycloak setup
 const keycloakConfig = {
@@ -67,6 +64,10 @@ const keycloakConfig = {
 };
 const keycloak = new Keycloak({ store: memoryStore }, keycloakConfig);
 app.use(keycloak.middleware());
+
+// Mount routes *AFTER* session and passport
+app.use('/', indexRouter);
+app.use('/users', usersRouter);
 
 // Route to handle Keycloak callback and exchange authorization code for tokens
 app.get('/auth/callback', async (req, res) => {
@@ -85,12 +86,10 @@ app.get('/auth/callback', async (req, res) => {
         client_id: process.env.KEYCLOAK_CLIENT_ID,
         client_secret: process.env.KEYCLOAK_CLIENT_SECRET,
         code: code,
-        redirect_uri: 'http://localhost:5000/auth/callback', // Must match the redirect URI in Keycloak
+        redirect_uri: 'http://localhost:5000/auth/callback',
       }),
       {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       }
     );
 
@@ -99,18 +98,12 @@ app.get('/auth/callback', async (req, res) => {
     // Use the access token to fetch user info
     const userInfoResponse = await axios.get(
       `${process.env.KEYCLOAK_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/userinfo`,
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${access_token}` } }
     );
-
     const userInfo = userInfoResponse.data;
 
     // Check if User Exists in MongoDB
     let existingUser = await User.findOne({ keycloakId: userInfo.sub });
-
     if (!existingUser) {
       existingUser = new User({
         keycloakId: userInfo.sub,
@@ -140,7 +133,6 @@ app.get('/protected', keycloak.protect(), async (req, res) => {
 
   // Check if User Exists in MongoDB
   let existingUser = await User.findOne({ keycloakId: user.sub });
-
   if (!existingUser) {
     existingUser = new User({
       keycloakId: user.sub,
@@ -155,18 +147,32 @@ app.get('/protected', keycloak.protect(), async (req, res) => {
   res.json({ message: 'Access Granted', user: existingUser });
 });
 
-// catch 404 and forward to error handler
+// Logout Route
+app.get('/logout', keycloak.protect(), (req, res) => {
+  const idToken = req.session.id_token; // Retrieve the ID token from the session
+
+  // Clear the session
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Failed to destroy session:', err);
+      return res.status(500).send('Logout failed.');
+    }
+
+    // Redirect to Keycloak's logout endpoint
+    const keycloakLogoutUrl = `${process.env.KEYCLOAK_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/logout?id_token_hint=${idToken}&post_logout_redirect_uri=http://localhost:5000`;
+    res.redirect(keycloakLogoutUrl);
+  });
+});
+
+// Catch 404 and forward to error handler
 app.use(function (req, res, next) {
   next(createError(404));
 });
 
-// error handler
+// Error handler
 app.use(function (err, req, res, next) {
-  // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  // render the error page
   res.status(err.status || 500);
   res.render('error');
 });
