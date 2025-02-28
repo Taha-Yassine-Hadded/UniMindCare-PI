@@ -1,22 +1,19 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const Users = require('../models/Users');
-const { v4: uuidv4 } = require('uuid'); // Import UUID library to generate unique identifiers
-const bcrypt = require('bcryptjs');
 
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: 'http://localhost:5000/users/auth/google/callback'
 },
-
 async (accessToken, refreshToken, profile, done) => {
   try {
     const email = profile.emails[0].value;
-    
+
     // Validation spécifique pour ESPRIT
     if (!email.toLowerCase().endsWith('@esprit.tn')) {
-      return done(new Error("Seuls les emails @esprit.tn sont autorisés"));
+      return done(new Error('Seuls les emails @esprit.tn sont autorisés'));
     }
 
     let user = await Users.findOne({ 
@@ -31,15 +28,10 @@ async (accessToken, refreshToken, profile, done) => {
         Name: profile.displayName,
         Email: email,
         googleId: profile.id,
-        Identifiant: uuidv4(),
-        Role: ['student'],
-        verified: true // Marquer comme vérifié automatiquement
+        imageUrl: '../public/default-profile.png', // Default profile picture
+        verified: true // Mark as verified automatically
       });
 
-      // Générer un mot de passe aléatoire pour satisfaire la validation
-      const tempPassword = uuidv4();
-      user.Password = await bcrypt.hash(tempPassword, 12);
-      
       await user.save();
     }
 

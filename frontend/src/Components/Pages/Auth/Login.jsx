@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Col, Container, Row, Form, FormGroup, Label, Input, Button } from 'reactstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import imgg from '../../../assets/images/login/login_bg.jpg';
 
 const LoginSample = () => {
     const navigate = useNavigate();
@@ -61,7 +60,7 @@ const LoginSample = () => {
         <section>
             <Container className="p-0" fluid={true}>
                 <Row className="mx-0">
-                    <Col className="px-0" xl="12" style={{ backgroundImage: `url(${imgg})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', display: 'block' }}>
+                    <Col className="px-0" xl="12" >
                         <div className="login-card">
                             <div className="logo-section text-center">
                                 <Link className="logo" to={`${process.env.PUBLIC_URL}/dashboard/default`}>

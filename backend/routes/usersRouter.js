@@ -69,28 +69,15 @@ router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 
 
 // Google login callback route
 // routes/users.js
+// Google login callback route
 router.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   async (req, res) => {
     try {
       const user = req.user;
-      
-      // Générer le token JWT
-      const token = jwt.sign(
-        {
-          userId: user._id,
-          email: user.Email,
-          roles: user.Role,
-          authMethod: 'google' // Ajouter une indication de la méthode d'authentification
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' }
-      );
 
-
-      res.redirect(`http://localhost:3000/tivo/authentication/login-simple?token=${token}`);
-
-      // Redirection sécurisée
+      // Redirect to the frontend page for additional information
+      res.redirect(`http://localhost:3000/tivo/authentication/register-bg-img?userId=${user._id}`);
     } catch (error) {
       console.error('Google callback error:', error);
       res.redirect('/login?error=google_auth_failed');
@@ -98,8 +85,38 @@ router.get('/auth/google/callback',
   }
 );
 
+// Route to handle additional user information
+router.post('/complete-registration', async (req, res) => {
+  const { userId, identifiant, classe, role, phoneNumber } = req.body;
 
+  try {
+    // Find the user by ID
+    const user = await Users.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
 
+    // Update user information
+    user.Identifiant = identifiant;
+    user.Classe = classe;
+    user.Role = role;
+    user.PhoneNumber = phoneNumber;
+
+    await user.save();
+
+    // Generate a JWT for the user
+    const token = jwt.sign(
+      { userId: user._id, email: user.Email, roles: user.Role, identifiant: user.Identifiant },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.status(200).json({ token });
+  } catch (error) {
+    console.error('Complete registration error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 // Logout route
 router.post('/logout', (req, res) => {
   const token = req.headers.authorization.split(' ')[1]; // Extract token from Authorization header
