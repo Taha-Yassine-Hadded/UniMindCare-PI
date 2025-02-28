@@ -13,7 +13,52 @@ router.get('/', function(req, res, next) {
   res.send('respond with a resource');
 });
 
+// Register route
+router.post('/register', async (req, res) => {
+  const { name, identifiant, email, password, classe, role, phoneNumber, imageUrl } = req.body;
 
+  // Validate email format
+  if (!email.endsWith('@esprit.tn')) {
+    return res.status(400).json({ message: 'Email must be from the domain @esprit.tn' });
+  }
+
+  try {
+    // Check if user already exists by email
+    const existingUserByEmail = await Users.findOne({ Email: email });
+    if (existingUserByEmail) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Check if user already exists by identifiant
+    const existingUserByIdentifiant = await Users.findOne({ Identifiant: identifiant });
+    if (existingUserByIdentifiant) {
+      return res.status(400).json({ message: 'User already exists with this identifiant' });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create a new user
+    const newUser = new Users({
+      Name: name,
+      Identifiant: identifiant,
+      Email: email,
+      Password: hashedPassword,
+      Classe: classe,
+      Role: role,
+      PhoneNumber: phoneNumber,
+      imageUrl: imageUrl
+    });
+
+    // Save the user to the database
+    await newUser.save();
+
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // Sign-in route
 router.post('/signin', async (req, res) => {
@@ -64,7 +109,7 @@ router.get('/auth/google/callback', passport.authenticate('google', { failureRed
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
-    res.redirect(`http://localhost:3000/login?token=${token}`);
+    res.redirect(`http://localhost:3000/tivo/authentication/login-simple?token=${token}`);
   }
 );
 

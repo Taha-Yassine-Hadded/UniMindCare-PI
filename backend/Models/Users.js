@@ -11,7 +11,7 @@ const usersSchema = new mongoose.Schema({
     enum: ['student', 'admin', 'psychologist', 'teacher'],
     required: true
   }, 
-  
+
   PhoneNumber: String,
   imageUrl: String
 }, { timestamps: true });
