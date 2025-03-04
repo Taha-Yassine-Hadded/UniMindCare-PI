@@ -1,38 +1,45 @@
 import React, { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { authHeader, handleResponse } from "../Services/fack.backend";
+import axios from "axios";
 
-// Dans PrivateRoute.jsx
 const PrivateRoute = () => {
-  const [authenticated, setAuthenticated] = useState(
-    JSON.parse(localStorage.getItem("login")) || false
-  );
-  const jwt_token = localStorage.getItem("token");
+  const [authenticated, setAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
 
   useEffect(() => {
-    console.log("PrivateRoute - Checking authentication:", {
-      login: JSON.parse(localStorage.getItem("login")),
-      authenticated,
-      jwt_token,
-    });
-    const requestOptions = { method: "GET", headers: authHeader() };
-    fetch("/users", requestOptions)
-      .then(handleResponse)
-      .then(() => {
-        setAuthenticated(true);
-        console.log("Authenticated set to true");
-      })
-      .catch(() => {
+    const checkAuth = async () => {
+      if (!token) {
         setAuthenticated(false);
-        console.log("Authenticated set to false");
-      });
-  }, []);
+        setLoading(false);
+        console.log("PrivateRoute - Aucun token trouvé, utilisateur non connecté");
+        return;
+      }
 
-  console.log("Rendering PrivateRoute, isAuthenticated:", authenticated || jwt_token);
-  return authenticated || jwt_token ? (
+      try {
+        const response = await axios.get("http://localhost:5000/users", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setAuthenticated(true);
+        console.log("PrivateRoute - Authentification réussie avec token:", token);
+      } catch (error) {
+        setAuthenticated(false);
+        console.error("PrivateRoute - Échec de l'authentification:", error.response?.data || error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [token]);
+
+  if (loading) return <div>Chargement...</div>;
+
+  console.log("Rendering PrivateRoute, isAuthenticated:", authenticated);
+  return authenticated ? (
     <Outlet />
   ) : (
-    <Navigate exact to={`${process.env.PUBLIC_URL}/login`} replace />
+    <Navigate to={`${process.env.PUBLIC_URL}/login`} replace />
   );
 };
 

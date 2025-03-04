@@ -23,51 +23,63 @@ const LoginSample = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [failedAttempts, setFailedAttempts] = useState(0);
-  const [loading, setLoading] = useState(false); // Ajout d'un état de chargement
+  const [loading, setLoading] = useState(false);
+  const [faceIDLoading, setFaceIDLoading] = useState(false);
 
   // Vérification du token dans les paramètres d'URL
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const token = queryParams.get('token');
-
-    // Modifiez cette partie du code
-if (token) {
-  try {
-    // Toujours utiliser localStorage au lieu d'une condition
-    localStorage.setItem('token', token);
-    localStorage.setItem('login', JSON.stringify(true)); // Synchroniser l'état login
-    
-    // Optionnel : stocker quand même la préférence utilisateur
-    localStorage.setItem('rememberMe', JSON.stringify(rememberMe));
-    
-    navigate('/tivo/dashboard/default', { replace: true });
-  } catch (err) {
-    console.error('Erreur lors de la gestion du token URL:', err);
-    setError('Erreur lors de la vérification du token.');
-  }
-}
+    const userId = queryParams.get('userId');
+  
+    const handleTokenOrUserId = async () => {
+      try {
+        if (token) {
+          const storage = rememberMe ? localStorage : sessionStorage;
+          storage.setItem('token', token);
+          storage.setItem('login', JSON.stringify(true));
+          storage.setItem('rememberMe', JSON.stringify(rememberMe));
+          navigate('/tivo/dashboard/default', { replace: true });
+        } else if (userId) {
+          const response = await axios.post('http://localhost:5000/users/complete-registration', { userId });
+          const fetchedToken = response.data.token;
+          const storage = rememberMe ? localStorage : sessionStorage;
+          storage.setItem('token', fetchedToken);
+          storage.setItem('login', JSON.stringify(true));
+          storage.setItem('rememberMe', JSON.stringify(rememberMe));
+          navigate('/tivo/dashboard/default', { replace: true });
+        }
+      } catch (err) {
+        console.error('Erreur lors de la gestion du token/userId:', err);
+        setError('Erreur lors de la vérification de la connexion.');
+      }
+    };
+  
+    if (token || userId) {
+      handleTokenOrUserId();
+    }
   }, [navigate, rememberMe]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true); // Indiquer le chargement
+    setLoading(true);
     setError('');
-
+  
     try {
       if (!email || !password) {
         throw new Error('Email and password are required.');
       }
-
+  
       const payload = { email, password };
       if (isTwoFactorRequired) {
         if (!twoFactorCode) throw new Error('Two-factor code is required.');
         payload.twoFactorCode = twoFactorCode;
       }
-
+  
       const response = await axios.post('http://localhost:5000/users/signin', payload);
-
+  
       setFailedAttempts(0);
-
+  
       if (response.data.qrCodeData && !isTwoFactorRequired) {
         const otpauthUrl = `otpauth://totp/Esprit:${email}?secret=${response.data.twoFactorSecret}&issuer=Esprit`;
         setQrCodeData(otpauthUrl);
@@ -75,19 +87,16 @@ if (token) {
         setError('Veuillez scanner le QR code et entrer le code 2FA.');
         return;
       }
-
+  
       const token = response.data.token;
       if (token) {
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('token', token);
-        storage.setItem('login', JSON.stringify(true)); // Synchroniser l'état login
-        // Attendre la mise à jour du stockage avant redirection
-        await new Promise(resolve => setTimeout(resolve, 0));
+        storage.setItem('login', JSON.stringify(true));
         navigate('/tivo/dashboard/default', { replace: true });
       }
     } catch (err) {
       setFailedAttempts(prev => prev + 1);
-
       if (err.response?.data?.message === 'Code d\'authentification à deux facteurs invalide.') {
         setError('Code 2FA invalide. Veuillez réessayer.');
       } else if (err.response?.data?.qrCodeData) {
@@ -98,13 +107,63 @@ if (token) {
       } else {
         setError(err.response?.data?.message || err.message || 'Échec de la connexion.');
       }
-
+  
       if (failedAttempts >= 2 && !isTwoFactorRequired) {
         setIsTwoFactorRequired(true);
         setError('Trop de tentatives échouées. Veuillez scanner le QR code et entrer le code 2FA.');
       }
     } finally {
-      setLoading(false); // Fin du chargement
+      setLoading(false);
+    }
+  };
+
+  // Nouvelle fonction pour la connexion par FaceID
+  const handleFaceIDLogin = async () => {
+    setFaceIDLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('http://localhost:5004/faceid_login', {
+        method: 'POST',
+        credentials: 'include', // Important pour envoyer les cookies
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({}) // Vous pouvez ajouter des données si nécessaire
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("FaceID Response:", data);
+      
+      if (data.status === 'success' && data.user) {
+        setFailedAttempts(0);
+        
+        // Stocker les informations utilisateur
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem('login', JSON.stringify(true));
+        storage.setItem('user', JSON.stringify(data.user));
+        
+        // Récupérer et stocker le token s'il est présent
+        const token = response.headers.get('Authorization') || data.token;
+        if (token) {
+          storage.setItem('token', token);
+          navigate('/tivo/dashboard/default', { replace: true });
+        } else {
+          throw new Error('Aucun token d\'authentification reçu');
+        }
+      } else {
+        throw new Error(data.message || 'Échec de la connexion par FaceID');
+      }
+    } catch (err) {
+      console.error("FaceID Login Error:", err);
+      setError(err.message || 'Échec de la connexion par FaceID');
+    } finally {
+      setFaceIDLoading(false);
     }
   };
 
@@ -143,7 +202,7 @@ if (token) {
                       onChange={handleEmailChange}
                       placeholder="Entrez votre email"
                       required
-                      disabled={loading}
+                      disabled={loading || faceIDLoading}
                     />
                   </FormGroup>
                   <FormGroup>
@@ -155,7 +214,7 @@ if (token) {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Entrez votre mot de passe"
                       required
-                      disabled={loading}
+                      disabled={loading || faceIDLoading}
                     />
                   </FormGroup>
 
@@ -169,7 +228,7 @@ if (token) {
                         onChange={(e) => setTwoFactorCode(e.target.value)}
                         placeholder="Entrez votre code 2FA"
                         required
-                        disabled={loading}
+                        disabled={loading || faceIDLoading}
                       />
                       {qrCodeData && !twoFactorCode && (
                         <div className="text-center mb-3">
@@ -187,30 +246,43 @@ if (token) {
                         id="rememberMe"
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
-                        disabled={loading}
+                        disabled={loading || faceIDLoading}
                       />
                       <Label for="rememberMe" className="ms-2 mb-0">Se souvenir de moi</Label>
                     </FormGroup>
                     <Link to={`${process.env.PUBLIC_URL}/authentication/forget-pwd`}>
-
                       Mot de passe oublié ?
                     </Link>
                   </div>
 
                   {error && <p className="text-danger">{error}</p>}
 
-                  <Button type="submit" color="primary" className="w-100 mb-2" disabled={loading}>
+                  <Button type="submit" color="primary" className="w-100 mb-2" disabled={loading || faceIDLoading}>
                     {loading ? 'Connexion en cours...' : 'Se connecter'}
                   </Button>
-                  <Button color="danger" className="w-100" onClick={handleGoogleLogin} disabled={loading}>
-                    Se connecter avec Google
-                  </Button>
+                  
+                  <div className="d-flex gap-2 mb-2">
+                    <Button color="danger" className="w-50" onClick={handleGoogleLogin} disabled={loading || faceIDLoading}>
+                      <i className="fa fa-google me-2"></i> Google
+                    </Button>
+                    <Button 
+                      color="info" 
+                      className="w-50" 
+                      onClick={handleFaceIDLogin} 
+                      disabled={loading || faceIDLoading}
+                    >
+                      {faceIDLoading ? 'Vérification...' : <><i className="fa fa-id-card me-2"></i> FaceID</>}
+                    </Button>
+                  </div>
 
                   <div className="text-center mt-3">
                     <span>Vous n'avez pas de compte ? </span>
                     <Link to={`${process.env.PUBLIC_URL}/authentication/register-simpleimg`}>
-
                       Créer un compte
+                    </Link>
+                    <span> ou </span>
+                    <Link to={`${process.env.PUBLIC_URL}/authentication/register-faceid`}>
+                      S'inscrire avec FaceID
                     </Link>
                   </div>
                 </Form>

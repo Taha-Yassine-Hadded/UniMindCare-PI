@@ -1,7 +1,31 @@
-import { CardHeader, Button } from "reactstrap";
+import { CardHeader, Button, Badge, Card } from "reactstrap";
 import { H4, P } from "../../../../AbstractElements";
 import { OurTotalEarning } from "../../../../Constant";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// Fonction pour décoder le token JWT
+const decodeJWT = (token) => {
+  try {
+    if (!token) return {};
+    
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window.atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error("Erreur de décodage du token:", error);
+    return {};
+  }
+};
+
+// Fonction pour obtenir le token depuis le stockage
+const getToken = () => {
+  return localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+};
 
 // Sauvegarde de la version originale de fetch
 const originalFetch = window.fetch;
@@ -10,10 +34,11 @@ window.fetch = async (...args) => {
     const [resource, config = {}] = args;
     
     if (!config.headers) {
-        config.headers = {}; // S'assurer que headers existe
+        config.headers = {};
     }
 
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    // Utiliser le token du localStorage
+    const token = getToken();
     if (token) {
         config.headers["Authorization"] = `Bearer ${token}`;
     }
@@ -23,15 +48,17 @@ window.fetch = async (...args) => {
 
 // Fonction pour exécuter la détection
 async function runDetection() {
-    const headers = { 'Content-Type': 'application/json' };
-    const token = localStorage.getItem('token');
-
+    const headers = { 
+        'Content-Type': 'application/json'
+    };
+    
+    const token = getToken();
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
     
     try {
-        const response = await fetch("http://192.168.1.114:5003/run-detection", {
+        const response = await fetch("http://localhost:5003/run-detection", {
             method: "POST",
             headers
         });
@@ -49,13 +76,13 @@ async function runDetection() {
     }
 }
 
-
-
 // Fonction pour arrêter la détection
 async function stopDetection() {
-  const headers = { 'Content-Type': 'application/json' };
-  const token = localStorage.getItem('token');
-
+  const headers = { 
+      'Content-Type': 'application/json'
+  };
+  
+  const token = getToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -78,12 +105,26 @@ async function stopDetection() {
   }
 }
 
-
-
-
-
 const TotalEarningCardHeader = () => {
     const [loading, setLoading] = useState(false);
+    const [userInfo, setUserInfo] = useState({ userId: "", email: "" });
+    const [tokenExists, setTokenExists] = useState(false);
+
+    // Extraire les infos du token au chargement du composant
+    useEffect(() => {
+        const token = getToken();
+        if (token) {
+            setTokenExists(true);
+            const decodedToken = decodeJWT(token);
+            setUserInfo({
+                userId: decodedToken.userId || "Non disponible",
+                email: decodedToken.email || "Non disponible"
+            });
+        } else {
+            setTokenExists(false);
+            setUserInfo({ userId: "Non connecté", email: "Non connecté" });
+        }
+    }, []);
 
     const handleRunDetection = async () => {
         setLoading(true);
@@ -92,25 +133,54 @@ const TotalEarningCardHeader = () => {
     };
 
     return (
-        <CardHeader className="pb-0">
-            <div className="d-flex justify-content-between align-items-center">
-                <div className="flex-grow-1">
-                    <P attrPara={{ className: "square-after f-w-600 header-text-primary" }} >
-                        {OurTotalEarning}
-                        <i className="fa fa-circle ms-2"></i>
-                    </P>
-                    <H4>96.564%</H4>
+        <>
+            <CardHeader className="pb-0">
+                <div className="d-flex justify-content-between align-items-center">
+                    <div className="flex-grow-1">
+                        <P attrPara={{ className: "square-after f-w-600 header-text-primary" }} >
+                            {OurTotalEarning}
+                            <i className="fa fa-circle ms-2"></i>
+                        </P>
+                        <H4>96.564%</H4>
+                    </div>
+                    <div>
+        <h1>Test de Detection Flask</h1>
+        <Button
+         color="primary"
+        className="px-4 py-2 rounded shadow-sm fw-bold"
+         onClick={runDetection}>Lancer la détection</Button>
+        <Button 
+         color="danger"
+        className="px-4 py-2 rounded shadow-sm fw-bold"
+        onClick={stopDetection}>Arrêter la détection</Button>
+      </div>
+
+
+
+
+
                 </div>
-                <Button
-                    color="primary"
-                    className="px-4 py-2 rounded shadow-sm fw-bold"
-                    onClick={handleRunDetection}
-                    disabled={loading}
-                >
-                    {loading ? "Lancement..." : "Lancer la Détection"}
-                </Button>
+            </CardHeader>
+            
+            {/* Informations utilisateur extraites du token */}
+            <div className="px-4 py-3 bg-light border-top">
+                <div className="d-flex flex-wrap align-items-center">
+                    <div className="me-4 mb-2">
+                        <Badge color="info" className="p-2 me-2">Utilisateur</Badge>
+                        <span className="fw-bold">{userInfo.userId}</span>
+                    </div>
+                    <div>
+                        <Badge color="secondary" className="p-2 me-2">Email</Badge>
+                        <span>{userInfo.email}</span>
+                    </div>
+                </div>
+                <div className="mt-2">
+                    <Badge color={tokenExists ? "success" : "danger"} pill className="p-2">
+                        {tokenExists ? "Token trouvé dans localStorage" : "Aucun token trouvé"}
+                    </Badge>
+                </div>
             </div>
-        </CardHeader>
+        </>
     );
 };
 
