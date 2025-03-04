@@ -31,7 +31,6 @@ var indexRouter = require('./routes/index');
 const passport = require('./routes/passportConfig'); // Import the configured passport instance
 const usersRouter = require('./routes/usersRouter');
 
-
 // Initialize Express app
 var app = express();
 
@@ -54,12 +53,15 @@ app.use('/', indexRouter);
 
 
 // MongoDB connection
-mongoose
+/*mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+  .catch((err) => console.error('MongoDB connection error:', err));*/
 
-
+   // Connexion à MongoDB
+   mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
+     .then(() => console.log('Connexion à MongoDB réussie'))
+     .catch(err => console.log('Erreur de connexion à MongoDB: ', err));
 
 
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -111,6 +113,15 @@ app.use('/users', usersRouter);
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
+// Partie questionnaires
+// Importer la route de questionnaires
+const questionnaireRoutes = require('./routes/Response');
+
+// Ajouter cette ligne avec vos autres routes
+app.use('/api/questionnaire', questionnaireRoutes);
+
+
+
 // Partie statistiques
 // Importer la route de statistiques
 const usersStatisticsRoutes = require('./routes/usersStatistics');
@@ -427,58 +438,70 @@ app.post('/register', upload.single('imageFile'), async (req, res) => {
     const savedUser = await newUser.save();
 
     // Générer un token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1); // Expiration dans 1 heure
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
+    // Enregistrer le code dans UserVerification
     const newVerification = new UserVerification({
       userId: savedUser._id,
-      token: verificationToken,
+      code: verificationCode,
       expiresAt
     });
 
     await newVerification.save();
 
     // Envoyer l'email
-    const verificationLink = `http://localhost:5000/verify-email/${verificationToken}`;
     const mailOptions = {
       from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
       to: savedUser.Email,
       subject: 'Vérification de votre compte',
-      text: `Cliquez sur ce lien pour vérifier votre compte : ${verificationLink}`,
-      html: `<p>Cliquez sur ce lien pour vérifier votre compte :</p><a href="${verificationLink}">Vérifier mon compte</a>`
+      text: `Votre code de vérification est : ${verificationCode}`,
+      html: `<p>Votre code de vérification est :</p><h2>${verificationCode}</h2>`
     };
 
     await transporter.sendMail(mailOptions);
 
-    res.status(201).send('Utilisateur enregistré avec succès. Vérifiez votre email.');
+
+    res.status(201).send('Utilisateur enregistré avec succès. Vérifiez votre email avec le code envoyé.');
   } catch (err) {
     console.error('Erreur lors de l\'enregistrement:', err);
     res.status(500).send('Erreur lors de l\'enregistrement');
   }
 });
 
-app.get('/verify-email/:token', async (req, res) => {
+app.post('/verify-email', async (req, res) => {
+  console.log('Requête reçue:', req.body); // Log pour voir email et code
   try {
-    const { token } = req.params;
-    const verificationRecord = await UserVerification.findOne({ token });
+    const { email, code } = req.body;
+    console.log('Email:', email, 'Code:', code); // Log détaillé
 
-    if (!verificationRecord || verificationRecord.expiresAt < new Date()) {
-      return res.status(400).send('Lien de vérification invalide ou expiré.');
+    if (!email || !code) {
+      return res.status(400).send("L'email et le code sont requis.");
     }
 
-    // Vérifier l'utilisateur
-    await User.findByIdAndUpdate(verificationRecord.userId, { verified: true });
+    // Recherche insensible à la casse
+    const user = await User.findOne({ Email: { $regex: new RegExp(`^${email}$`, 'i') } });
+    if (!user) {
+      return res.status(400).send('Utilisateur non trouvé.');
+    }
 
-    // Supprimer le token après vérification
-    await UserVerification.deleteOne({ _id: verificationRecord._id });
+    const verificationRecord = await UserVerification.findOne({ userId: user._id, code });
+    if (!verificationRecord || verificationRecord.expiresAt < new Date()) {
+      return res.status(400).send('Code invalide ou expiré.');
+    }
 
-    res.send('Votre compte a été vérifié avec succès !');
+    await User.findByIdAndUpdate(user._id, { verified: true });
+    await UserVerification.findByIdAndDelete(verificationRecord._id);
+
+    res.status(200).send('Compte vérifié avec succès.');
   } catch (err) {
-    console.error('Erreur lors de la vérification:', err);
-    res.status(500).send('Erreur serveur.');
+    console.error(err);
+    res.status(500).send('Erreur lors de la vérification.');
   }
 });
+
+
 
 
 // Endpoint pour récupérer une image

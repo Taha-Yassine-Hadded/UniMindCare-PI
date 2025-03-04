@@ -34,7 +34,9 @@ const CreatePwd = () => {
         throw new Error('Erreur lors de la réinitialisation du mot de passe');
       }
       await swal("Succès", "Mot de passe réinitialisé avec succès", "success");
-      navigate(`${process.env.PUBLIC_URL}/login`);
+    //  navigate(`${process.env.PUBLIC_URL}/login`);
+      navigate(`${process.env.PUBLIC_URL}/authentication/login-simple`);
+
     } catch (error) {
       console.error(error);
       swal("Erreur", error.message || "La réinitialisation a échoué", "error");

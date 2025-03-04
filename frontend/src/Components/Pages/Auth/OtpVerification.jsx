@@ -60,7 +60,7 @@ const OtpVerification = () => {
                     />
                   </FormGroup>
                   <FormGroup className='text-end'>
-                    <Btn attrBtn={{ color: 'primary', type: 'submit', className: 'w-100' }} >VerifyOTP</Btn>
+                    <Btn attrBtn={{ color: 'primary', type: 'submit', className: 'w-100' }} >Verify OTP</Btn>
                   </FormGroup>
                   <P attrPara={{ className: 'text-center mt-4 mb-0' }}>
                     <Link to={`${process.env.PUBLIC_URL}/authentication/forget-pwd`}>Resend OTP</Link>

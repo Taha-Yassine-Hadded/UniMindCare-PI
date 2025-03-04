@@ -33,7 +33,10 @@ const userSchema = new mongoose.Schema({
   imageUrl: { type: String },
   verified: { type: Boolean, default: false },
   otp: { type: String },
-  otpExpires: { type: Date }
+  otpExpires: { type: Date },
+  loginAttempts: { type: Number, default: 0 },
+  TwoFactorEnabled: { type: Boolean, default: false },
+  twoFactorSecret: { type: String },
 }, { 
   collection: 'users',
   timestamps: true,

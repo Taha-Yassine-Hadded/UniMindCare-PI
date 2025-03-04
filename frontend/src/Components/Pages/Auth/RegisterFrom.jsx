@@ -97,7 +97,8 @@ const handleRoleChange = (e) => {
       });
 
       // ✅ Redirection après un délai de 3 secondes
-      setTimeout(() => navigate(`${process.env.PUBLIC_URL}/authentication/login-simple`), 3000);
+      setTimeout(() => navigate(`${process.env.PUBLIC_URL}/authentication/unlock-user`, { state: { email: formData.Email } }), 3000);
+      
       }
     } catch (err) {
       console.error("Erreur serveur:", err);
@@ -129,10 +130,18 @@ const handleRoleChange = (e) => {
           <Input type="text" name="Identifiant" required value={formData.Identifiant} onChange={handleChange} placeholder="Identifiant unique" />
         </FormGroup>
 
-        <FormGroup>
-          <Label>Email</Label>
-          <Input type="email" name="Email" required value={formData.Email} onChange={handleChange} placeholder="ex: user@esprit.tn" />
-        </FormGroup>
+        <FormGroup className='form-group position-relative'>
+    <Label className="col-form-label">Email</Label>
+    <Input
+        type="email"
+        name="Email" // 🔹 Utilise "Email" pour correspondre à ton formData
+        required
+        placeholder="Email"
+        value={formData.Email} // ✅ Utilise formData.Email
+        onChange={handleChange} // ✅ Utilise la fonction existante handleChange
+    />
+</FormGroup>
+
 
         <FormGroup>
           <Label>Mot de passe</Label>
