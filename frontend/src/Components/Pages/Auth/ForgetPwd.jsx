@@ -1,91 +1,77 @@
-import { Link } from 'react-router-dom';
+//// filepath: /C:/Users/Lenovo/Desktop/Pi2025/Front-pi-main/Front-pi-main/src/Components/Pages/Auth/ForgetPwd.jsx
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Col, Container, Form, FormGroup, Input, Label, Row } from 'reactstrap';
-import { Btn, H4, H6, P, Image } from '../../../AbstractElements';
+import { Btn, H4, P, Image } from '../../../AbstractElements';
 import imgg from '../../../assets/images/login/login_bg.jpg';
-import { CreateYourPassword, Done, EnterOTP, EnterYourMobileNumber, HavePassword, Href, NewPassword, OtpMsg, RememberPassword, Resend, ResetYourPassword, RetypePassword, Send, SignIn } from '../../../Constant';
+import { Send, ResetYourPassword } from '../../../Constant';
 import { dynamicImage } from '../../../Services';
+import swal from 'sweetalert';
+
 const ForgetPwd = () => {
-    return (
-            <section>
-                <Container className='p-0' fluid={true}>
-                    <Row className="m-0">
-                        <Col className="p-0">
-                            <div className="login-card" style={{ backgroundImage: `url(${imgg})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', display: 'block' }}>
-                                <div>
-                                    <Link className="logo" to={`${process.env.PUBLIC_URL}/dashboard/default`}>
-                                        <Image attrImage={{ className: 'img-fluid', src: dynamicImage('logo/logo2.png'), alt: '' }} />
-                                    </Link>
-                                </div>
-                                <div className="login-main">
-                                    <Form className="theme-form login-form">
-                                    <H4 attrH4={{ className: 'mb-3' }}>{ResetYourPassword}</H4>
-                                        <FormGroup>
-                                            <Label>{EnterYourMobileNumber}</Label>
-                                            <Row className='gy-2'>
-                                                <Col xl="4" sm="3">
-                                                    <Input  type="text" defaultValue="+ 91" />
-                                                </Col>
-                                                <Col xl="8" sm="9">
-                                                    <Input  type="tel" defaultValue="000-000-0000" />
-                                                </Col>
-                                            </Row>
-                                        </FormGroup>
-                                        <FormGroup className='text-end'>
-                                            <Btn attrBtn={{ color: 'primary', type: 'submit' }} >{Send}</Btn>
-                                        </FormGroup>
-                                        <FormGroup>
-                                            <span className="reset-password-link">{OtpMsg}
-                                                <a className="btn-link text-danger ms-1" href={Href}>{Resend}</a>
-                                            </span>
-                                        </FormGroup>
-                                        <FormGroup>
-                                            <Label>{EnterOTP}</Label>
-                                            <Row>
-                                                <Col>
-                                                    <Input className="text-center opt-text" type="text" defaultValue="00" maxLength="2" />
-                                                </Col>
-                                                <Col>
-                                                    <Input className="text-center opt-text" type="text" defaultValue="00" maxLength="2" />
-                                                </Col>
-                                                <Col>
-                                                    <Input className="text-center opt-text" type="text" defaultValue="00" maxLength="2" />
-                                                </Col>
-                                            </Row>
-                                        </FormGroup>
-                                        <H6>{CreateYourPassword}</H6>
-                                        <FormGroup className='position-relative pass-hide'>
-                                            <Label>{NewPassword}</Label>
-                                            <Input type="password" name="login[password]" required="" placeholder="*********" />
-                                            <div className="show-hide">
-                                                <span className="show"></span>
-                                            </div>
-                                        </FormGroup>
-                                        <FormGroup>
-                                            <Label>{RetypePassword}</Label>
-                                            <Input type="password" name="login[password]" required="" placeholder="*********" />
-                                        </FormGroup>
-                                        <FormGroup>
-                                            <div className="checkbox">
-                                                <Input id="checkbox1" type="checkbox" />
-                                                <Label className="text-muted" for="checkbox1">
-                                                    {RememberPassword}</Label>
-                                            </div>
-                                        </FormGroup>
-                                        <FormGroup>
-                                            <Btn attrBtn={{ color: 'primary', className: 'w-100', type: 'submit' }} >{Done}</Btn>
-                                        </FormGroup>
-                                        <P attrPara={{ className: 'text-center mt-4 mb-0' }}>{HavePassword}
-                                            <Link className='ms-2' to={`${process.env.PUBLIC_URL}/login`}>
-                                                {SignIn}
-                                            </Link>
-                                        </P>
-                                    </Form>
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
-                </Container>
-            </section>
-    );
+  const [email, setEmail] = useState('');
+  const navigate = useNavigate();
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://localhost:5000/api/forgot-password', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'envoi de l\'OTP');
+      }
+      await swal("Succès", "OTP envoyé par email.\nValide pendant 10 minutes", "success");
+      // Redirection vers la page de vérification OTP en passant l'email
+
+      navigate(`${process.env.PUBLIC_URL}/authentication/verify-otp`, { state: { email } });
+    } catch (error) {
+      console.error(error);
+      swal("Erreur", "L'envoi de l'email a échoué", "error");
+    }
+  };
+
+  return (
+    <section>
+      <Container fluid={true} className="p-0">
+        <Row className="m-0">
+          <Col xl="12 p-0">
+            <div className="login-card" style={{ backgroundImage: `url(${imgg})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+              <div>
+                <Link className="logo" to={`${process.env.PUBLIC_URL}/dashboard/default`}>
+                  <Image attrImage={{ className: 'img-fluid', src: dynamicImage('logo/logo2.png'), alt: '' }} />
+                </Link>
+              </div>
+              <div className='login-main'>
+                <Form className="theme-form login-form" onSubmit={handleSubmit}>
+                  <H4 attrH4={{ className: 'mb-3' }}>{ResetYourPassword}</H4>
+                  <FormGroup>
+                    <Label>Email Address</Label>
+                    <Input 
+                      type="email" 
+                      required 
+                      placeholder="Enter your email" 
+                      value={email}
+                      onChange={e => setEmail(e.target.value)} 
+                    />
+                  </FormGroup>
+                  <FormGroup className='text-end'>
+                    <Btn attrBtn={{ color: 'primary', type: 'submit', className: 'w-100' }} >{Send}</Btn>
+                  </FormGroup>
+                  <P attrPara={{ className: 'text-center mt-4 mb-0' }}>
+                    Remember your password?
+                    <Link className="ps-2" to={`${process.env.PUBLIC_URL}/login`}>Sign In</Link>
+                  </P>
+                </Form>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </Container>
+    </section>
+  );
 };
+
 export default ForgetPwd;
