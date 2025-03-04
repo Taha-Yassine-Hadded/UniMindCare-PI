@@ -1,5 +1,7 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const JwtStrategy = require('passport-jwt').Strategy;
+const ExtractJwt = require('passport-jwt').ExtractJwt;
 const Users = require('../models/Users');
 
 passport.use(new GoogleStrategy({
@@ -38,6 +40,24 @@ async (accessToken, refreshToken, profile, done) => {
     done(null, user);
   } catch (error) {
     done(error, null);
+  }
+}));
+
+// Configuration de la stratégie JWT
+const opts = {};
+opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
+opts.secretOrKey = process.env.JWT_SECRET; // Assure-toi que JWT_SECRET est défini dans .env
+
+passport.use(new JwtStrategy(opts, async (jwt_payload, done) => {
+  try {
+    const user = await Users.findById(jwt_payload.userId);
+    if (user) {
+      return done(null, user);
+    } else {
+      return done(null, false);
+    }
+  } catch (error) {
+    return done(error, false);
   }
 }));
 

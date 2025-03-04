@@ -23,7 +23,7 @@ const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
 const transporter = require('./config/emailConfig');
-
+const postsRouter = require('./routes/posts');
 
 var indexRouter = require('./routes/index');
 //var usersRouter = require('./routes/users');
@@ -48,6 +48,8 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
+
+app.use('/api/posts', postsRouter);
  // Authentication routes
 //app.use('/users', usersRouter);
 

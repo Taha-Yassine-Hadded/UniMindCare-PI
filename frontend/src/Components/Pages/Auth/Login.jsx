@@ -29,45 +29,56 @@ const LoginSample = () => {
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const token = queryParams.get('token');
-
-    // Modifiez cette partie du code
-if (token) {
-  try {
-    // Toujours utiliser localStorage au lieu d'une condition
-    localStorage.setItem('token', token);
-    localStorage.setItem('login', JSON.stringify(true)); // Synchroniser l'état login
-    
-    // Optionnel : stocker quand même la préférence utilisateur
-    localStorage.setItem('rememberMe', JSON.stringify(rememberMe));
-    
-    navigate('/tivo/dashboard/default', { replace: true });
-  } catch (err) {
-    console.error('Erreur lors de la gestion du token URL:', err);
-    setError('Erreur lors de la vérification du token.');
-  }
-}
+    const userId = queryParams.get('userId');
+  
+    const handleTokenOrUserId = async () => {
+      try {
+        if (token) {
+          const storage = rememberMe ? localStorage : sessionStorage;
+          storage.setItem('token', token);
+          storage.setItem('login', JSON.stringify(true));
+          storage.setItem('rememberMe', JSON.stringify(rememberMe));
+          navigate('/tivo/dashboard/default', { replace: true });
+        } else if (userId) {
+          const response = await axios.post('http://localhost:5000/users/complete-registration', { userId });
+          const fetchedToken = response.data.token;
+          const storage = rememberMe ? localStorage : sessionStorage;
+          storage.setItem('token', fetchedToken);
+          storage.setItem('login', JSON.stringify(true));
+          storage.setItem('rememberMe', JSON.stringify(rememberMe));
+          navigate('/tivo/dashboard/default', { replace: true });
+        }
+      } catch (err) {
+        console.error('Erreur lors de la gestion du token/userId:', err);
+        setError('Erreur lors de la vérification de la connexion.');
+      }
+    };
+  
+    if (token || userId) {
+      handleTokenOrUserId();
+    }
   }, [navigate, rememberMe]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true); // Indiquer le chargement
+    setLoading(true);
     setError('');
-
+  
     try {
       if (!email || !password) {
         throw new Error('Email and password are required.');
       }
-
+  
       const payload = { email, password };
       if (isTwoFactorRequired) {
         if (!twoFactorCode) throw new Error('Two-factor code is required.');
         payload.twoFactorCode = twoFactorCode;
       }
-
+  
       const response = await axios.post('http://localhost:5000/users/signin', payload);
-
+  
       setFailedAttempts(0);
-
+  
       if (response.data.qrCodeData && !isTwoFactorRequired) {
         const otpauthUrl = `otpauth://totp/Esprit:${email}?secret=${response.data.twoFactorSecret}&issuer=Esprit`;
         setQrCodeData(otpauthUrl);
@@ -75,19 +86,16 @@ if (token) {
         setError('Veuillez scanner le QR code et entrer le code 2FA.');
         return;
       }
-
+  
       const token = response.data.token;
       if (token) {
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('token', token);
-        storage.setItem('login', JSON.stringify(true)); // Synchroniser l'état login
-        // Attendre la mise à jour du stockage avant redirection
-        await new Promise(resolve => setTimeout(resolve, 0));
-        navigate('/tivo/dashboard/default', { replace: true });
+        storage.setItem('login', JSON.stringify(true));
+        navigate('/tivo/dashboard/default', { replace: true }); // Supprime l'attente inutile
       }
     } catch (err) {
       setFailedAttempts(prev => prev + 1);
-
       if (err.response?.data?.message === 'Code d\'authentification à deux facteurs invalide.') {
         setError('Code 2FA invalide. Veuillez réessayer.');
       } else if (err.response?.data?.qrCodeData) {
@@ -98,13 +106,13 @@ if (token) {
       } else {
         setError(err.response?.data?.message || err.message || 'Échec de la connexion.');
       }
-
+  
       if (failedAttempts >= 2 && !isTwoFactorRequired) {
         setIsTwoFactorRequired(true);
         setError('Trop de tentatives échouées. Veuillez scanner le QR code et entrer le code 2FA.');
       }
     } finally {
-      setLoading(false); // Fin du chargement
+      setLoading(false);
     }
   };
 
