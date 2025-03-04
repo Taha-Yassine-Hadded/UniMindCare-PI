@@ -1,7 +1,6 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const Users = require('../Models/Users');
-const { v4: uuidv4 } = require('uuid'); // Import UUID library to generate unique identifiers
+const Users = require('../models/Users');
 
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
@@ -10,24 +9,29 @@ passport.use(new GoogleStrategy({
 },
 async (accessToken, refreshToken, profile, done) => {
   try {
-    // Check if a user with the same email already exists
-    let user = await Users.findOne({ Email: profile.emails[0].value });
+    const email = profile.emails[0].value;
 
-    if (user) {
-      // If user exists but doesn't have a googleId, update their record
-      if (!user.googleId) {
-        user.googleId = profile.id;
-        await user.save();
-      }
-    } else {
-      // If user does not exist, create a new one
+    // Validation spécifique pour ESPRIT
+    if (!email.toLowerCase().endsWith('@esprit.tn')) {
+      return done(new Error('Seuls les emails @esprit.tn sont autorisés'));
+    }
+
+    let user = await Users.findOne({ 
+      $or: [
+        { Email: email },
+        { googleId: profile.id }
+      ]
+    });
+
+    if (!user) {
       user = new Users({
         Name: profile.displayName,
-        Email: profile.emails[0].value,
+        Email: email,
         googleId: profile.id,
-        Identifiant: uuidv4(), // Generate a unique identifier
-        Role: ['student'] // Default role
+        imageUrl: '../public/default-profile.png', // Default profile picture
+        verified: true // Mark as verified automatically
       });
+
       await user.save();
     }
 

@@ -1,60 +1,35 @@
-import { Btn, H3, H4, H6, Image, P } from '../../../AbstractElements';
-import { MyProfile, Bio, Password, Website, Save, EmailAddress } from '../../../Constant';
-import user from '../../../assets/images/user/7.jpg';
-import { Card, CardBody, CardHeader, Form, FormGroup, Input, Label, Row } from 'reactstrap';
-import React, { Fragment } from 'react';
+import React from 'react';
+import { Card, CardHeader, CardBody, Form, FormGroup, Input, Label, Row } from 'reactstrap';
+import { Image, H3, P } from '../../../AbstractElements';
+import userImg from '../../../assets/images/user/7.jpg';
 
 const MyProfileEdit = () => {
+  const storedUser = JSON.parse(localStorage.getItem('user'));
+
   return (
-    <Fragment>
-      <Card>
-        <CardHeader className="pb-0">
-          <H4 attrH4={{ className: 'card-title mb-0' }}>{MyProfile}</H4>
-          <div className="card-options">
-            <a className="card-options-collapse" href="#javascript">
-              <i className="fe fe-chevron-up"></i>
-            </a>
-            <a className="card-options-remove" href="#javascript">
-              <i className="fe fe-x"></i>
-            </a>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <Form>
-            <Row className="mb-2">
-              <div className="profile-title">
-                <div className="d-lg-flex d-block align-items-center">
-                  <Image attrImage={{ className: 'img-70 rounded-circle', alt: '', src: `${user}` }} />
-                  <div className="flex-grow-1">
-                    <H3 attrH3={{ className: 'mb-1 f-20 txt-primary' }}>MARK JECNO</H3>
-                    <P attrPara={{ className: 'mb-0' }}>DESIGNER</P>
-                  </div>
-                </div>
+    <Card>
+      <CardHeader>
+        <H3 attrH3={{ className: 'card-title mb-0' }}>My Profile</H3>
+      </CardHeader>
+      <CardBody>
+        <Form>
+          <Row className="mb-2">
+            <div className="profile-title text-center">
+              <Image attrImage={{ className: 'img-70 rounded-circle', alt: '', src: storedUser && storedUser.imageUrl ? storedUser.imageUrl : userImg }} />
+              <div>
+                <H3 attrH3={{ className: 'mb-1 f-20 txt-primary' }}>{storedUser ? storedUser.Name : 'Nom'}</H3>
+                <P attrPara={{ className: 'mb-0' }}>Role: {storedUser ? storedUser.Role : 'Rôle'}</P>
               </div>
-            </Row>
-            <FormGroup className="mb-3">
-              <H6 attrH6={{ className: 'form-label' }}>{Bio}</H6>
-              <Input type="textarea" className="form-control" rows="5" defaultValue="On the other hand, we denounce with righteous indignation" />
-            </FormGroup>
-            <FormGroup className="mb-3">
-              <Label className="form-label">{EmailAddress}</Label>
-              <Input className="form-control" placeholder="your-email@domain.com" />
-            </FormGroup>
-            <FormGroup className="mb-3">
-              <Label className="form-label">{Password}</Label>
-              <Input className="form-control" type="password" defaultValue="password" />
-            </FormGroup>
-            <FormGroup className="mb-3">
-              <Label className="form-label">{Website}</Label>
-              <Input className="form-control" placeholder="http://Uplor .com" />
-            </FormGroup>
-            <div className="form-footer">
-              <Btn attrBtn={{ className: 'btn', color: 'primary', type: 'button' }}>{Save}</Btn>
             </div>
-          </Form>
-        </CardBody>
-      </Card>
-    </Fragment>
+          </Row>
+          <FormGroup className="mb-3">
+            <Label>Email Address</Label>
+            <Input type="email" defaultValue={storedUser ? storedUser.Email : ''} disabled />
+          </FormGroup>
+        </Form>
+      </CardBody>
+    </Card>
   );
 };
+
 export default MyProfileEdit;

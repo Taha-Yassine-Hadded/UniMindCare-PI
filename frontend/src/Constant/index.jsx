@@ -839,7 +839,7 @@ export const MultiImageUpload = "Multi only Image Upload";
 export const MultipleImageVideoAudioUpload = "Multiple Image Video Audio Upload";
 export const LimitationFileUpload = "Limitation File Upload";
 export const CustomFileUpload = "Custom File Upload";
-
+export const BoutonFaceId = "Create Account with Face Id";
 export const AdvancedState = "Advanced State";
 export const AlertState = "Alert State";
 

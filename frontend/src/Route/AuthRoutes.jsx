@@ -22,6 +22,8 @@ import Maintenance from '../Components/Pages/Auth/Maintenance';
 import LoginSample from '../Components/Pages/Auth/Login';
 import ErrorPage5 from '../Components/Pages/ErrorPages/error-page5';
 import ComingsoonVideo from '../Components/Pages/ComingSoon/ComingBgVideo';
+import RegisterFaceSimple from '../Components/Pages/Auth/RegisterFaceSimple';
+import OtpVerification from '../Components/Pages/Auth/OtpVerification';
 
 export const authRoutes = [
   { path: `${process.env.PUBLIC_URL}/login`, Components: <Logins /> },
@@ -37,6 +39,8 @@ export const authRoutes = [
   { path: `${process.env.PUBLIC_URL}/authentication/unlock-user`, Components: <UnlockUser /> },
   { path: `${process.env.PUBLIC_URL}/authentication/forget-pwd`, Components: <ForgetPwd /> },
   { path: `${process.env.PUBLIC_URL}/authentication/create-pwd`, Components: <CreatePwd /> },
+  {path: `${process.env.PUBLIC_URL}/authentication/register-faceid`, Components: <RegisterFaceSimple />},
+  { path: `${process.env.PUBLIC_URL}/authentication/verify-otp`, Components: <OtpVerification /> },
   { path: `${process.env.PUBLIC_URL}/authentication/maintenance`, Components: <Maintenance /> },
 
   //Coming soon

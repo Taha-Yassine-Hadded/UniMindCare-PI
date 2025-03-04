@@ -47,7 +47,7 @@ const Routers = () => {
                 <Route path={`/*`} element={<LayoutRoutes />} />
               </Route>
               <Route path={`${process.env.PUBLIC_URL}/callback`} render={() => <Callback />} />
-                <Route exact path={`${process.env.PUBLIC_URL}/login`} element={<Signin />} />
+                <Route exact path={`${process.env.PUBLIC_URL}/authentication/login-simple`} element={<Signin />} />
                 {authRoutes.map(({ path, Components }, i) => (
                   <Route path={path} element={Components} key={i} />
                 ))}

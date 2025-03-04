@@ -2,7 +2,7 @@ import React, { Fragment, useState } from 'react';
 import { Col, Container, Row, TabContent, TabPane } from 'reactstrap';
 import NavAuth from '../Auth/Nav';
 import { Link } from 'react-router-dom';
-import LoginTab from '../Auth/Tabs/LoginTab';
+import LoginTab from '../Components/Pages/Auth/Login';
 import {  Image } from '../AbstractElements';
 import imgg from '../assets/images/logo/logo2.png';
 
@@ -27,7 +27,7 @@ const LoginSample = () => {
                             <div className="login-main1 login-tab1 login-main">
                                 <NavAuth callbackNav={callbackNav} selected={selected} />
                                 <TabContent activeTab={selected} className="content-login">
-                                    <TabPane className="fade show" tabId={selected === 'simpleLogin' ? 'simpleLogin' : 'jwt'}>
+                                    <TabPane className="fade show" tabId={selected === 'simpleLogin' ? 'simpleLogin' : 'simpleLogin'}>
                                         <LoginTab selected={selected} />
                                     </TabPane>
                                 </TabContent >

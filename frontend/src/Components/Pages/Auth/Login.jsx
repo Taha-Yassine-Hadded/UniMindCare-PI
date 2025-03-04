@@ -1,133 +1,226 @@
 import { useState, useEffect } from 'react';
 import { Col, Container, Row, Form, FormGroup, Label, Input, Button } from 'reactstrap';
 import { Link, useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
-import imgg from '../../../assets/images/login/login_bg.jpg';
+
+const MyQRCode = ({ qrCodeData }) => {
+  if (!qrCodeData) return <p>Aucune donnée à encoder.</p>;
+  if (qrCodeData.length > 1000) return <p>Les données sont trop longues pour être encodées dans un QR code.</p>;
+
+  return (
+    <QRCodeSVG value={qrCodeData} size={128} level="H" version={10} />
+  );
+};
 
 const LoginSample = () => {
-    const navigate = useNavigate();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [rememberMe, setRememberMe] = useState(false);
-    const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [isTwoFactorRequired, setIsTwoFactorRequired] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState('');
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [loading, setLoading] = useState(false); // Ajout d'un état de chargement
 
-    // Check if token is passed in URL on component mount (for Google login)
-    useEffect(() => {
-        const queryParams = new URLSearchParams(window.location.search);
-        const token = queryParams.get('token');
-        
-        if (token) {
-            if (rememberMe) {
-                localStorage.setItem('token', token);  // Store token in localStorage
-            } else {
-                sessionStorage.setItem('token', token);  // Store token in sessionStorage
-            }
-            navigate('/tivo/dashboard/default');  // Redirect to the default dashboard
-        }
-    }, [navigate, rememberMe]);
+  // Vérification du token dans les paramètres d'URL
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const token = queryParams.get('token');
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        try {
-            const response = await axios.post('http://localhost:5000/users/signin', { email, password });
-            const token = response.data.token;
+    // Modifiez cette partie du code
+if (token) {
+  try {
+    // Toujours utiliser localStorage au lieu d'une condition
+    localStorage.setItem('token', token);
+    localStorage.setItem('login', JSON.stringify(true)); // Synchroniser l'état login
+    
+    // Optionnel : stocker quand même la préférence utilisateur
+    localStorage.setItem('rememberMe', JSON.stringify(rememberMe));
+    
+    navigate('/tivo/dashboard/default', { replace: true });
+  } catch (err) {
+    console.error('Erreur lors de la gestion du token URL:', err);
+    setError('Erreur lors de la vérification du token.');
+  }
+}
+  }, [navigate, rememberMe]);
 
-            if (rememberMe) {
-                localStorage.setItem('token', token);  // Store token in localStorage
-            } else {
-                sessionStorage.setItem('token', token);  // Store token in sessionStorage
-            }
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true); // Indiquer le chargement
+    setError('');
 
-            setError('');  // Clear error message on successful login
-            navigate('/tivo/dashboard/default');  // Navigate to the default dashboard page after successful login
+    try {
+      if (!email || !password) {
+        throw new Error('Email and password are required.');
+      }
 
-        } catch (err) {
-            setError(err.response?.data?.message || 'Login failed');
-        }
-    };
+      const payload = { email, password };
+      if (isTwoFactorRequired) {
+        if (!twoFactorCode) throw new Error('Two-factor code is required.');
+        payload.twoFactorCode = twoFactorCode;
+      }
 
-    const handleGoogleLogin = () => {
-        window.location.href = 'http://localhost:5000/users/auth/google';  // Redirect to Google authentication
-    };
+      const response = await axios.post('http://localhost:5000/users/signin', payload);
 
-    const handleEmailChange = (e) => {
-        setEmail(e.target.value);
-        setError('');  // Clear error message when email changes
-    };
+      setFailedAttempts(0);
 
-    return (
-        <section>
-            <Container className="p-0" fluid={true}>
-                <Row className="mx-0">
-                    <Col className="px-0" xl="12" style={{ backgroundImage: `url(${imgg})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', display: 'block' }}>
-                        <div className="login-card">
-                            <div className="logo-section text-center">
-                                <Link className="logo" to={`${process.env.PUBLIC_URL}/dashboard/default`}>
-                                    <img src={require('../../../assets/images/logo/logo2.png')} alt="Logo" className="img-fluid" />
-                                </Link>
-                            </div>
-                            <div className="login-main1 login-tab1 login-main">
-                                <Form onSubmit={handleLogin} className="theme-form">
-                                    <FormGroup>
-                                        <Label for="email">Email</Label>
-                                        <Input
-                                            type="email"
-                                            id="email"
-                                            value={email}
-                                            onChange={handleEmailChange}
-                                            placeholder="Enter your email"
-                                            required
-                                        />
-                                    </FormGroup>
-                                    <FormGroup>
-                                        <Label for="password">Password</Label>
-                                        <Input
-                                            type="password"
-                                            id="password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Enter your password"
-                                            required
-                                        />
-                                    </FormGroup>
+      if (response.data.qrCodeData && !isTwoFactorRequired) {
+        const otpauthUrl = `otpauth://totp/Esprit:${email}?secret=${response.data.twoFactorSecret}&issuer=Esprit`;
+        setQrCodeData(otpauthUrl);
+        setIsTwoFactorRequired(true);
+        setError('Veuillez scanner le QR code et entrer le code 2FA.');
+        return;
+      }
 
-                                    {/* Remember Me & Forgot Password on the Same Line */}
-                                    <div className="d-flex justify-content-between align-items-center mb-3">
-                                        <FormGroup className="mb-0 d-flex align-items-center">
-                                            <Input
-                                                type="checkbox"
-                                                id="rememberMe"
-                                                checked={rememberMe}
-                                                onChange={(e) => setRememberMe(e.target.checked)}
-                                            />
-                                            <Label for="rememberMe" className="ms-2 mb-0">Remember Me</Label>
-                                        </FormGroup>
-                                        <Link to="/forgot-password" className="text-primary">Forgot Password?</Link>
-                                    </div>
+      const token = response.data.token;
+      if (token) {
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem('token', token);
+        storage.setItem('login', JSON.stringify(true)); // Synchroniser l'état login
+        // Attendre la mise à jour du stockage avant redirection
+        await new Promise(resolve => setTimeout(resolve, 0));
+        navigate('/tivo/dashboard/default', { replace: true });
+      }
+    } catch (err) {
+      setFailedAttempts(prev => prev + 1);
 
-                                    {error && <p className="text-danger">{error}</p>}
+      if (err.response?.data?.message === 'Code d\'authentification à deux facteurs invalide.') {
+        setError('Code 2FA invalide. Veuillez réessayer.');
+      } else if (err.response?.data?.qrCodeData) {
+        const otpauthUrl = `otpauth://totp/Esprit:${email}?secret=${err.response.data.twoFactorSecret}&issuer=Esprit`;
+        setQrCodeData(otpauthUrl);
+        setIsTwoFactorRequired(true);
+        setError('Veuillez scanner le QR code et entrer le code 2FA.');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Échec de la connexion.');
+      }
 
-                                    {/* Buttons with Same Width as Input Fields */}
-                                    <Button type="submit" color="primary" className="w-100 mb-2">
-                                        Sign In
-                                    </Button>
-                                    <Button color="danger" className="w-100" onClick={handleGoogleLogin}>
-                                        Sign In with Google
-                                    </Button>
+      if (failedAttempts >= 2 && !isTwoFactorRequired) {
+        setIsTwoFactorRequired(true);
+        setError('Trop de tentatives échouées. Veuillez scanner le QR code et entrer le code 2FA.');
+      }
+    } finally {
+      setLoading(false); // Fin du chargement
+    }
+  };
 
-                                    {/* Create Account Link */}
-                                    <div className="text-center mt-3">
-                                        <span>Don't have an account? </span>
-                                        <Link to="/signup" className="text-primary">Create Account</Link>
-                                    </div>
-                                </Form>
-                            </div>
+  const handleGoogleLogin = () => {
+    window.location.href = 'http://localhost:5000/users/auth/google';
+  };
+
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+    setError('');
+  };
+
+  return (
+    <section>
+      <Container className="p-0" fluid>
+        <Row className="mx-0">
+          <Col className="px-0" xl="12">
+            <div className="login-card">
+              <div className="logo-section text-center">
+                <Link className="logo" to="/dashboard/default">
+                  <img
+                    src={require('../../../assets/images/logo/logo2.png')}
+                    alt="Logo"
+                    className="img-fluid"
+                  />
+                </Link>
+              </div>
+              <div className="login-main login-tab1">
+                <Form onSubmit={handleLogin} className="theme-form">
+                  <FormGroup>
+                    <Label for="email">Email</Label>
+                    <Input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={handleEmailChange}
+                      placeholder="Entrez votre email"
+                      required
+                      disabled={loading}
+                    />
+                  </FormGroup>
+                  <FormGroup>
+                    <Label for="password">Mot de passe</Label>
+                    <Input
+                      type="password"
+                      id="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Entrez votre mot de passe"
+                      required
+                      disabled={loading}
+                    />
+                  </FormGroup>
+
+                  {isTwoFactorRequired && (
+                    <FormGroup>
+                      <Label for="twoFactorCode">Code à deux facteurs</Label>
+                      <Input
+                        type="text"
+                        id="twoFactorCode"
+                        value={twoFactorCode}
+                        onChange={(e) => setTwoFactorCode(e.target.value)}
+                        placeholder="Entrez votre code 2FA"
+                        required
+                        disabled={loading}
+                      />
+                      {qrCodeData && !twoFactorCode && (
+                        <div className="text-center mb-3">
+                          <MyQRCode qrCodeData={qrCodeData} />
+                          <p className="mt-2">Scannez ce QR code avec votre application d'authentification</p>
                         </div>
-                    </Col>
-                </Row>
-            </Container>
-        </section>
-    );
+                      )}
+                    </FormGroup>
+                  )}
+
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <FormGroup className="mb-0 d-flex align-items-center">
+                      <Input
+                        type="checkbox"
+                        id="rememberMe"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        disabled={loading}
+                      />
+                      <Label for="rememberMe" className="ms-2 mb-0">Se souvenir de moi</Label>
+                    </FormGroup>
+                    <Link to={`${process.env.PUBLIC_URL}/authentication/forget-pwd`}>
+
+                      Mot de passe oublié ?
+                    </Link>
+                  </div>
+
+                  {error && <p className="text-danger">{error}</p>}
+
+                  <Button type="submit" color="primary" className="w-100 mb-2" disabled={loading}>
+                    {loading ? 'Connexion en cours...' : 'Se connecter'}
+                  </Button>
+                  <Button color="danger" className="w-100" onClick={handleGoogleLogin} disabled={loading}>
+                    Se connecter avec Google
+                  </Button>
+
+                  <div className="text-center mt-3">
+                    <span>Vous n'avez pas de compte ? </span>
+                    <Link to={`${process.env.PUBLIC_URL}/authentication/register-simpleimg`}>
+
+                      Créer un compte
+                    </Link>
+                  </div>
+                </Form>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </Container>
+    </section>
+  );
 };
 
 export default LoginSample;
