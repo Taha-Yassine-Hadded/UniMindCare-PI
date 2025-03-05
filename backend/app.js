@@ -1,45 +1,56 @@
 const express = require("express");
 const dotenv = require("dotenv");
-const connectDB = require("./config/db");
-const Evaluation = require("./routes/evalution");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const logger = require("morgan");
 
 dotenv.config();
-connectDB();
-
 const app = express();
-const router = express.Router();  // Définir `router`
 
-// Middleware
 app.use(express.json());
 app.use(cors());
 app.use(logger("dev"));
 
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB connecté"))
+  .catch(err => console.error("Erreur de connexion à MongoDB", err));
 
+const evaluationSchema = new mongoose.Schema({
+  nomEtudiant: { type: String, required: true },
+  classe: { type: String, required: true },
+  matiere: { type: String, required: true },
+  dateEvaluation: { type: Date, required: true },
+  engagement: { type: String, required: true },
+  concentration: { type: Number, required: true },
+  interaction: { type: String, required: true },
+  reactionCorrection: { type: String, required: true },
+  gestionStress: { type: String, required: true },
+  presence: { type: String, required: true },
+  expressionEmotionnelle: String,
+  participationOrale: String,
+  difficultes: String,
+  pointsPositifs: String,
+  axesAmelioration: String,
+  suiviRecommande: { type: Boolean, default: false },
+});
 
-// Utiliser `router` comme middleware
-app.use("/api/evaluation", router);
+const Evaluation = mongoose.model("Evaluation", evaluationSchema);
 
-// Routes importées
-app.use("/api/evaluation", Evaluation);
-
-
-// Route POST pour créer une évaluation
-router.post("/evaluation", async (req, res) => {
+app.post("/api/evaluation", async (req, res) => {
+  console.log("Requête reçue :", req.body);
   try {
-    const evaluation = new evaluation(req.body); // Crée une nouvelle instance du modèle
-    await evaluation.save(); // Sauvegarde dans la base MongoDB
+    const evaluation = new Evaluation(req.body);
+    await evaluation.save();
+    console.log("Évaluation enregistrée :", evaluation);
     res.status(201).json({ message: "Évaluation ajoutée avec succès", data: evaluation });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur lors de la création de l'évaluation" });
+    console.error("Erreur :", error);
+    res.status(500).json({ message: "Erreur lors de la création", error: error.message });
   }
 });
 
-// Gestion des erreurs serveur
 app.use((err, req, res, next) => {
-  console.error(err);
+  console.error(err.stack);
   res.status(500).json({ message: "Erreur serveur" });
 });
 
