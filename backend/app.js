@@ -48,7 +48,52 @@ app.post("/api/evaluation", async (req, res) => {
     res.status(500).json({ message: "Erreur lors de la création", error: error.message });
   }
 });
+// Nouvelle route pour les statistiques par étudiant
+app.get("/api/statistiques/:nomEtudiant", async (req, res) => {
+  try {
+    const nomEtudiant = req.params.nomEtudiant;
+    const evaluations = await Evaluation.find({ nomEtudiant });
 
+    if (!evaluations.length) {
+      return res.status(404).json({ message: "Aucune évaluation trouvée pour cet étudiant" });
+    }
+
+    // Calcul des statistiques
+    const stats = {
+      totalEvaluations: evaluations.length,
+      moyenneConcentration: evaluations.reduce((sum, eval) => sum + eval.concentration, 0) / evaluations.length,
+      engagement: {},
+      interaction: {},
+      reactionCorrection: {},
+      gestionStress: {},
+      presence: {},
+      suiviRecommande: evaluations.filter(e => e.suiviRecommande).length / evaluations.length * 100,
+    };
+
+    // Répartition des valeurs pour chaque champ catégorique
+    const countOccurrences = (field) => {
+      const counts = {};
+      evaluations.forEach(e => {
+        counts[e[field]] = (counts[e[field]] || 0) + 1;
+      });
+      for (const key in counts) {
+        counts[key] = (counts[key] / evaluations.length * 100).toFixed(2) + "%";
+      }
+      return counts;
+    };
+
+    stats.engagement = countOccurrences("engagement");
+    stats.interaction = countOccurrences("interaction");
+    stats.reactionCorrection = countOccurrences("reactionCorrection");
+    stats.gestionStress = countOccurrences("gestionStress");
+    stats.presence = countOccurrences("presence");
+
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error("Erreur lors du calcul des statistiques :", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Erreur serveur" });
