@@ -1,46 +1,77 @@
-import React, { useEffect, useState } from "react";
-import { Navigate, Outlet } from "react-router-dom";
-import axios from "axios";
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const JwtStrategy = require('passport-jwt').Strategy;
+const ExtractJwt = require('passport-jwt').ExtractJwt;
+const Users = require('../models/Users');
 
-const PrivateRoute = () => {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: 'http://localhost:5000/users/auth/google/callback'
+},
+async (accessToken, refreshToken, profile, done) => {
+  try {
+    const email = profile.emails[0].value;
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (!token) {
-        setAuthenticated(false);
-        setLoading(false);
-        console.log("PrivateRoute - Aucun token trouvé, utilisateur non connecté");
-        return;
-      }
+    // Validation spécifique pour ESPRIT
+    if (!email.toLowerCase().endsWith('@esprit.tn')) {
+      return done(new Error('Seuls les emails @esprit.tn sont autorisés'));
+    }
 
-      try {
-        const response = await axios.get("http://localhost:5000/users", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setAuthenticated(true);
-        console.log("PrivateRoute - Authentification réussie avec token:", token);
-      } catch (error) {
-        setAuthenticated(false);
-        console.error("PrivateRoute - Échec de l'authentification:", error.response?.data || error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+    let user = await Users.findOne({
+      $or: [
+        { Email: email },
+        { googleId: profile.id }
+      ]
+    });
 
-    checkAuth();
-  }, [token]);
+    if (!user) {
+      user = new Users({
+        Name: profile.displayName,
+        Email: email,
+        googleId: profile.id,
+        imageUrl: '../public/default-profile.png', // Default profile picture
+        verified: true // Mark as verified automatically
+      });
 
-  if (loading) return <div>Chargement...</div>;
+      await user.save();
+    }
 
-  console.log("Rendering PrivateRoute, isAuthenticated:", authenticated);
-  return authenticated ? (
-    <Outlet />
-  ) : (
-    <Navigate to={`${process.env.PUBLIC_URL}/login`} replace />
-  );
-};
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+}));
 
-export default PrivateRoute;
+// Configuration de la stratégie JWT
+const opts = {};
+opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
+opts.secretOrKey = process.env.JWT_SECRET; // Assure-toi que JWT_SECRET est défini dans .env
+
+passport.use(new JwtStrategy(opts, async (jwt_payload, done) => {
+  try {
+    const user = await Users.findById(jwt_payload.userId);
+    if (user) {
+      return done(null, user);
+    } else {
+      return done(null, false);
+    }
+  } catch (error) {
+    return done(error, false);
+  }
+}));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await Users.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+module.exports = passport;
