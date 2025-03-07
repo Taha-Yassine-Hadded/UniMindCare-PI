@@ -39,7 +39,7 @@ const PrivateRoute = () => {
   return authenticated ? (
     <Outlet />
   ) : (
-    <Navigate to={`${process.env.PUBLIC_URL}/login`} replace />
+    <Navigate to={`${process.env.PUBLIC_URL}/authentication/login-simple`} replace />
   );
 };
 

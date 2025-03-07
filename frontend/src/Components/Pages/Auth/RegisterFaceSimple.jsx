@@ -1,6 +1,6 @@
 import { Col, Container, Row } from 'reactstrap';
 import RegisterWithFaceID from './RegisterWithFaceID'; // Use the FaceID registration form here
-import imgg from '../../../assets/images/login/login_bg.jpg';
+import imgg from '../../../assets/images/login/login_bg.png';
 import { Image } from '../../../AbstractElements';
 import { Link } from 'react-router-dom';
 import { dynamicImage } from "../../../Services/index";

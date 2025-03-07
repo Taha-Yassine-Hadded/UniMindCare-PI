@@ -1110,7 +1110,7 @@
                           &:hover {
                             > a {
                               > span {
-                                color: $white;
+                                color: #4a6fdc;
                                 transition: all 0.3s ease;
                               }
                               &:after {
@@ -1147,7 +1147,7 @@
                               transition: all 0.3s ease;
                               svg,
                               span {
-                                color: $white;
+                                color: #4a6fdc;
                                 transition: all 0.3s ease;
                               }
                             }
@@ -1469,7 +1469,7 @@
           z-index: 9;
           // height: 100%;
           line-height: inherit;
-          background-color: $sidebar-color;
+          background-color: $white; /* Fond blanc */
           width: 280px;
           text-align: left;
           transition: all 0.3s ease-in-out;
@@ -1668,7 +1668,7 @@
                   span {
                     letter-spacing: 0.7px;
                     text-transform: capitalize;
-                    color: $white;
+                    color: #4a6fdc; /* Bleu foncé */
                   }
                   &.link-nav {
                     .according-menu {
@@ -1733,7 +1733,7 @@
                                     transition: all 0.3s ease;
                                   }
                                   span {
-                                    color: $white;
+                                    color: #4a6fdc;
                                     transition: all 0.3s ease;
                                   }
                                   .according-menu {
@@ -1756,7 +1756,7 @@
                                 vertical-align: bottom;
                                 float: none;
                                 stroke-Width: 2.3px;
-                                color: $white;
+                                color: #4a6fdc; /* Bleu foncé */
                                 transition: all 0.3s ease;
                               }
                               .sub-arrow {
@@ -1802,10 +1802,10 @@
                               li {
                                 &:hover {
                                   > a {
-                                    color: $white;
+                                    color: #4a6fdc;
                                     transition: all 0.3s ease;
                                     &:after {
-                                      border-top: 2px solid $white;
+                                      border-top: 2px solid #4a6fdc;
                                       transition: all 0.3s ease;
                                     }
                                   }
@@ -2013,7 +2013,7 @@
                                   transition: all 0.3s ease;
                                 }
                                 span {
-                                  color: $white;
+                                  color: #4a6fdc;
                                   transition: all 0.3s ease;
                                 }
                               }
@@ -2309,7 +2309,7 @@
         color: $white;
       }
       svg {
-        stroke: $white !important;
+        stroke: #4a6fdc !important;
       }
     }
   }
@@ -2457,11 +2457,11 @@
         background: $gradient-primary;
       }
       .toggle-sidebar {
-        color: rgba($white, 0.8);
+        color: rgba(#4a6fdc, 0.8);
         &:hover {
           > svg {
-            color: $white !important;
-            stroke: $white !important;
+            color: #4a6fdc !important;
+            stroke: #4a6fdc !important;
           }
         }
       }
@@ -2476,15 +2476,15 @@
           .nav-right {
             > ul {
               > li {
-                color: $white;
+                color: #4a6fdc;
                 .notification-box,
                 > a {
                   > svg {
-                    stroke: $white;
+                    stroke: #4a6fdc;
                   }
                 }
                 > svg {
-                  stroke: $white;
+                  stroke: #4a6fdc;
                 }
               }
             }
@@ -2532,20 +2532,20 @@
           }
         }
         .page-title {
-          color: $white;
+          color: #4a6fdc;
           .breadcrumb {
             .breadcrumb-item {
               a {
                 svg {
-                  color: $white;
+                  color: #4a6fdc;
                 }
               }
               &.active {
-                color: rgba($white, 0.6);
+                color: rgba(#4a6fdc, 0.6);
               }
               + .breadcrumb-item {
                 &::before {
-                  color: rgba($white, 0.8);
+                  color: rgba(#4a6fdc, 0.8);
                 }
               }
             }
@@ -2599,7 +2599,7 @@
                 font-size: 18px;
                 position: absolute;
                 top: 50%;
-                stroke: $white;
+                stroke: #4a6fdc;
               }
             }
           }

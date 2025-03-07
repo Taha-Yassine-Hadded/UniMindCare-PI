@@ -29,43 +29,40 @@ const ChatStatus = () => {
           <div className="people-list" id="people-list">
             <SearchChatList />
             {memberss && memberss.length > 0 ? (
-              <UL attrUL={{ className: 'simple-list list custom-scrollbar' }}>
-                {memberss
-                  .filter((x) => x.id !== currentUserr.id)
-                  .map((item, i) => {
-                    return (
-                      <LI attrLI={{
-                        className: `clearfix ${activeChat === item.id && 'active'}`,
-                        onClick: (e) => changeChatClick(e, item.id)
-                      }} key={i}>
-                        <Image attrImage={{
-                          src: dynamicImage(item.thumb),
-                          className: 'rounded-circle user-image',
-                          alt: ''
-                        }}
-                        />
-                        <div
-                          className={`status-circle ${item.online === true
-                            ? 'online'
-                            : 'offline'
-                            }`}
-                        ></div>
-                        <div className="about">
-                          <div className="name">{item.name}</div>
-                          <div className="status">{item.status}</div>
-                        </div>
-                      </LI>
-                    );
-                  })}
-              </UL>
-            ) : (
-              <Image attrImage={{
-                className: 'img-fluid m-auto',
-                src: dynamicImage("search-not-found.png"),
-                alt: ''
-              }} />
-              
-            )}
+  <UL attrUL={{ className: 'simple-list list custom-scrollbar' }}>
+    {memberss
+      .filter((x) => x.id !== currentUserr.id)
+      .map((item, i) => {
+        return (
+          <LI attrLI={{
+            className: `clearfix ${activeChat === item.id && 'active'}`,
+            onClick: (e) => changeChatClick(e, item.id)
+          }} key={i}>
+            <Image attrImage={{
+              src: dynamicImage(item.thumb),
+              className: 'rounded-circle user-image',
+              alt: ''
+            }} />
+            <div
+              className={`status-circle ${item.online === true ? 'online' : 'offline'}`}
+            ></div>
+            <div className="about">
+              <div className="name">{item.name}</div>
+              <div className="status">{item.status}</div>
+            </div>
+          </LI>
+        );
+      })}
+  </UL>
+) : (
+  <Image attrImage={{
+    className: 'rounded-circle user-image',
+    src: dynamicImage("search-not-found.png"),  // Utilisation de l'image par défaut ici
+    alt: ''
+  }} />
+)}
+
+
           </div>
         </div>
       </div>
