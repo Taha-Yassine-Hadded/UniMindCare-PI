@@ -4,53 +4,35 @@ import { Row, Col, Card, CardHeader, CardBody, CardFooter, Form, FormGroup, Labe
 import { storage } from '../../../firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import swal from 'sweetalert';
+import { useOutletContext } from 'react-router-dom';
 
-// Fonction pour récupérer le token
 const authHeader = () => {
   const token = localStorage.getItem("token");
   return { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
 };
 
 const EditMyProfile = () => {
+  const { userData } = useOutletContext() || {};
   const { register, handleSubmit, setValue, formState: { errors } } = useForm();
   const [profileImage, setProfileImage] = useState('/defaultProfile.png');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Récupération de l'utilisateur depuis le localStorage (en s'assurant que l'identifiant soit en minuscule)
-  const storedUser = JSON.parse(localStorage.getItem('user'));
-  const identifiant = storedUser ? storedUser.identifiant || storedUser.Identifiant : null;
+  const storedUser = JSON.parse(localStorage.getItem('user')) || userData;
+  const identifiant = storedUser?.Identifiant || storedUser?.identifiant;
 
-  // Chargement des données utilisateur
-useEffect(() => {
-  const fetchUserData = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/users/${identifiant}`, {
-        method: 'GET',
-        headers: authHeader()
-      });
-      const data = await response.json();
-
-      if (data) {
-        console.log('Données utilisateur récupérées:', data);
-        setValue('Name', data.Name);
-        setValue('Email', data.Email);
-        setValue('Classe', data.Classe);
-        setValue('Role', data.Role);
-        setValue('PhoneNumber', data.PhoneNumber);
-        setProfileImage(data.imageUrl || '/defaultProfile.png');
-      }
-    } catch (error) {
-      console.error("Erreur lors de la récupération du profil :", error);
+  useEffect(() => {
+    if (storedUser) {
+      setValue('Name', storedUser.Name || '');
+      setValue('Email', storedUser.Email || '');
+      setValue('Classe', storedUser.Classe || '');
+      setValue('Role', storedUser.Role || '');
+      setValue('PhoneNumber', storedUser.PhoneNumber || '');
+      setProfileImage(storedUser.imageUrl || '/defaultProfile.png');
+      console.log("Données chargées dans EditMyProfile:", storedUser);
     }
-  };
+  }, [storedUser, setValue]);
 
-  if (identifiant) fetchUserData();
-}, [identifiant, setValue]);
-
-  
-
-  // Upload de l'image sur Firebase Storage
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file || !identifiant) return;
@@ -62,10 +44,9 @@ useEffect(() => {
       const url = await getDownloadURL(snapshot.ref);
       setProfileImage(url);
 
-      // Mettre à jour immédiatement l'image dans le localStorage
       const updatedUser = { 
         ...storedUser, 
-        identifiant, 
+        Identifiant: identifiant, 
         imageUrl: url 
       };
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -76,10 +57,7 @@ useEffect(() => {
     setUploading(false);
   };
 
-  // Soumission du formulaire
   const onSubmit = async (data) => {
-    console.log(data);  // Affiche les données soumises dans la console pour le debug
-
     if (data.Password && data.Password !== data.ConfirmPassword) {
       swal("Erreur", "Les mots de passe ne correspondent pas !", "error");
       return;
@@ -98,7 +76,7 @@ useEffect(() => {
       const updatedUser = await response.json();
       localStorage.setItem('user', JSON.stringify({
         ...updatedUser,
-        identifiant: updatedUser.Identifiant || identifiant
+        Identifiant: updatedUser.Identifiant || identifiant
       }));
       swal("Succès", "Profil mis à jour avec succès", "success")
         .then(() => {
@@ -137,7 +115,7 @@ useEffect(() => {
             <Col md="6">
               <FormGroup>
                 <Label>Name</Label>
-                <Input type="text" {...register('Name', { required: "Le nom est requis" })} />
+                <Input type="text" {...register('Name', { required: "Le nom est requis" })} defaultValue={storedUser?.Name || ''} />
                 {errors.Name && <span style={{ color: 'red' }}>{errors.Name.message}</span>}
               </FormGroup>
             </Col>
@@ -150,7 +128,7 @@ useEffect(() => {
             <Col md="6">
               <FormGroup>
                 <Label>Email</Label>
-                <Input type="email" {...register('Email', { required: "L'email est requis" })} />
+                <Input type="email" {...register('Email', { required: "L'email est requis" })} defaultValue={storedUser?.Email || ''} />
                 {errors.Email && <span style={{ color: 'red' }}>{errors.Email.message}</span>}
               </FormGroup>
             </Col>
@@ -166,6 +144,7 @@ useEffect(() => {
                       message: "La classe doit être valide (alphanumérique)"
                     }
                   })}
+                  defaultValue={storedUser?.Classe || ''}
                 />
                 {errors.Classe && <span style={{ color: 'red' }}>{errors.Classe.message}</span>}
               </FormGroup>
@@ -173,7 +152,7 @@ useEffect(() => {
             <Col md="6">
               <FormGroup>
                 <Label>Role</Label>
-                <Input type="text" {...register('Role', { required: "Le rôle est requis" })} />
+                <Input type="text" {...register('Role', { required: "Le rôle est requis" })} defaultValue={storedUser?.Role || ''} />
                 {errors.Role && <span style={{ color: 'red' }}>{errors.Role.message}</span>}
               </FormGroup>
             </Col>
@@ -189,6 +168,7 @@ useEffect(() => {
                       message: "Le numéro de téléphone doit être valide (8 à 10 chiffres)"
                     }
                   })}
+                  defaultValue={storedUser?.PhoneNumber || ''}
                 />
                 {errors.PhoneNumber && <span style={{ color: 'red' }}>{errors.PhoneNumber.message}</span>}
               </FormGroup>
