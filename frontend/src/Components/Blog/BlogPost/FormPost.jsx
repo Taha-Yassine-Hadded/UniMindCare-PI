@@ -2,35 +2,49 @@
 import React, { useState } from 'react';
 import { Form, FormGroup, Label, Input } from 'reactstrap';
 import axios from 'axios';
+import ReactQuill from 'react-quill'; // Importer React-Quill
+import 'react-quill/dist/quill.snow.css'; // Importer les styles
 
 const FormPost = ({ onPostSuccess }) => {
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false); // État pour l'anonymat
+  const [content, setContent] = useState(''); // Contenu sous forme HTML
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('handleSubmit appelé avec :', { title, content, isAnonymous });
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
-      console.error('Aucun token trouvé, utilisateur non connecté');
       alert('Veuillez vous connecter pour publier.');
       return;
     }
     try {
-      const response = await axios.post('http://localhost:5000/api/posts', { title, content, isAnonymous }, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await axios.post(
+        'http://localhost:5000/api/posts',
+        { title, content, isAnonymous },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      });
-      console.log('Publication créée:', response.data);
+      );
       setTitle('');
       setContent('');
-      setIsAnonymous(false); // Réinitialiser l'état
+      setIsAnonymous(false);
       if (onPostSuccess) onPostSuccess();
     } catch (error) {
-      console.error('Erreur lors de la création de la publication:', error.response?.data || error.message);
+      console.error('Erreur lors de la création:', error.response?.data || error.message);
     }
+  };
+
+  // Modules pour personnaliser la barre d'outils de React-Quill
+  const modules = {
+    toolbar: [
+      [{ header: [1, 2, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link'],
+      ['clean'], // Supprime la mise en forme
+    ],
   };
 
   return (
@@ -48,13 +62,11 @@ const FormPost = ({ onPostSuccess }) => {
       </FormGroup>
       <FormGroup>
         <Label for="content">Contenu</Label>
-        <Input
-          type="textarea"
-          name="content"
-          id="content"
+        <ReactQuill
           value={content}
-          onChange={(e) => setContent(e.target.value)}
-          required
+          onChange={setContent}
+          modules={modules}
+          theme="snow"
         />
       </FormGroup>
       <FormGroup check>
@@ -67,6 +79,7 @@ const FormPost = ({ onPostSuccess }) => {
           Publier anonymement
         </Label>
       </FormGroup>
+    
     </Form>
   );
 };

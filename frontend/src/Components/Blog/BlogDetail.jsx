@@ -1,7 +1,7 @@
 // BlogDetailContain.js
 import React, { Fragment, useState, useEffect } from 'react';
 import { Container, Row, Col, Card } from 'reactstrap';
-import { H6, Image, LI, P, UL } from '../../AbstractElements';
+import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
 
 const BlogDetailContain = () => {
@@ -11,10 +11,9 @@ const BlogDetailContain = () => {
     const fetchPosts = async () => {
       try {
         const response = await axios.get('http://localhost:5000/api/posts');
-        console.log('Publications récupérées:', response.data);
         setPosts(response.data);
       } catch (error) {
-        console.error('Erreur lors de la récupération des publications:', error.response?.data || error.message);
+        console.error('Erreur lors de la récupération:', error.response?.data || error.message);
       }
     };
     fetchPosts();
@@ -58,7 +57,9 @@ const BlogDetailContain = () => {
                       <H6 attrH6={{ className: 'blog-bottom-details' }}>
                         {post.title || 'Titre non disponible'}
                       </H6>
-                      <P>{post.content || 'Contenu non disponible'}</P>
+                      <div
+                        dangerouslySetInnerHTML={{ __html: post.content || 'Contenu non disponible' }}
+                      />
                       <div className="detail-footer">
                         <UL attrUL={{ className: 'social-list simple-list flex-row' }}>
                           <LI>
