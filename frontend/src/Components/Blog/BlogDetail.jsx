@@ -3,6 +3,8 @@ import React, { Fragment, useState, useEffect } from 'react';
 import { Container, Row, Col, Card } from 'reactstrap';
 import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
+import { Link } from 'react-router-dom'; // Ajoutez cette importation
+
 
 const BlogDetailContain = () => {
   const [posts, setPosts] = useState([]);
@@ -33,6 +35,8 @@ const BlogDetailContain = () => {
           {posts.length > 0 ? (
             posts.map((post) => (
               <Col sm="6" xl="3" className="box-col-6 des-xl-50" key={post._id}>
+                 {/* Encapsuler la Card dans un Link pour la redirection */}
+                 <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <Card>
                   <div className="blog-box blog-grid">
                     <div className="blog-wrraper">
@@ -77,6 +81,7 @@ const BlogDetailContain = () => {
                     </div>
                   </div>
                 </Card>
+                </Link>
               </Col>
             ))
           ) : (

@@ -202,7 +202,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/learning/learning-list`, Component: <LearningList /> },
   { path: `${process.env.PUBLIC_URL}/faq`, Component: <FAQContent /> },
   { path: `${process.env.PUBLIC_URL}/blog/blogDetail`, Component: <BlogDetail /> },
-  { path: `${process.env.PUBLIC_URL}/blog/blogSingle`, Component: <BlogSingle /> },
+  { path: `${process.env.PUBLIC_URL}/blog/:id`, Component: <BlogSingle /> },
   { path: `${process.env.PUBLIC_URL}/blog/blogPost`, Component: <BlogPost /> },
   { path: `${process.env.PUBLIC_URL}/jobSearch/job-apply`, Component: <ApplyContain /> },
   { path: `${process.env.PUBLIC_URL}/jobSearch/job-detail`, Component: <JobDetails /> },

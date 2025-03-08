@@ -1,19 +1,82 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import blogSingle from '../../assets/images/blog/blog-single.jpg';
 import { Breadcrumbs, H4, LI, P, UL } from '../../AbstractElements';
 import { Container, Row, Col, Card, CardBody } from 'reactstrap';
 import BlogComments from './BlogComments';
+import axios from 'axios';
 
 const BlogSingleContain = () => {
+  const { id } = useParams(); // Récupérer l'ID du post depuis l'URL
+  const [post, setPost] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Charger les données du post au chargement de la page
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/api/posts/${id}`);
+        setPost(response.data);
+      } catch (error) {
+        console.error('Erreur lors de la récupération du post:', error.response?.data || error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchPost();
+  }, [id]);
+
+  // Formater la date pour l'affichage
+  const formatDate = (dateString) => {
+    if (!dateString) return ''; 
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+  
+  // Style pour l'image de couverture
   const styless = {
-    backgroundImage: `url(${blogSingle})`,
+    backgroundImage: `url(${post?.imageUrl || blogSingle})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     display: 'block',
   };
+
+  if (loading) {
+    return (
+      <Fragment>
+        <Container>
+          <Row>
+            <Col>
+              <div className="text-center mt-5">
+                <h3>Chargement de l'article...</h3>
+              </div>
+            </Col>
+          </Row>
+        </Container>
+      </Fragment>
+    );
+  }
+
+  if (!post) {
+    return (
+      <Fragment>
+        <Container>
+          <Row>
+            <Col>
+              <div className="text-center mt-5">
+                <h3>Article non trouvé</h3>
+              </div>
+            </Col>
+          </Row>
+        </Container>
+      </Fragment>
+    );
+  }
+
   return (
     <Fragment>
-      <Breadcrumbs mainTitle="Blog Single" parent="Blog" title="Blog Single" />
+      <Breadcrumbs mainTitle={post.title} parent="Blog" title="Blog Single" />
       <Container fluid={true}>
         <Row>
           <Col sm="12">
@@ -31,43 +94,30 @@ const BlogSingleContain = () => {
                           className: 'blog-social flex-row simple-list',
                         }}
                       >
-                        <LI>{'25 July 2023'}</LI>
+                        <LI>{formatDate(post.createdAt)}</LI>
                         <LI>
                           <i className="icofont icofont-user"></i>
-                          {'Mark'} <span>{'Jecno'} </span>
+                          {post.isAnonymous ? post.anonymousPseudo : (post.author?.Name || 'Inconnu')}
                         </LI>
                         <LI>
                           <i className="icofont icofont-thumbs-up"></i>
-                          {'02'}
-                          <span>{'Hits'}</span>
+                          {post.likes || 0}
+                          <span> Hits</span>
                         </LI>
                         <LI>
                           <i className="icofont icofont-ui-chat"></i>
-                          {'598 Comments'}
+                          {post.comments?.length || 0} Comments
                         </LI>
                       </UL>
-                      <H4>
-                        {
-                          'The Harpeth rises in the westernmost part of Rutherford County, just to the east of the community of College Grove in eastern Williamson County.'
-                        }
-                      </H4>
+                      <H4>{post.title}</H4>
                       <div className="single-blog-content-top">
-                        <P>
-                          {
-                            'From the east coast to the west, each river has its own beauty and character. Each river has its own story. Take a look at some America’s best rivers and some of the rivers we’re working to protect. And learn some facts about your favorite rivers. The Harpeth River and its tributaries are home to rich freshwater biodiversity, including more than 50 species of fish and 30 species of mussels'
-                          }
-                        </P>
-                        <P>
-                          {
-                            'The Harpeth River flows through the heart of downtown Franklin, the 14th fastest growing city in the United States, and traverses Williamson County, one of the fastest growing counties in Tennessee. This rapid development has already caused harm to the river from adding treated sewage, increasing stormwater runoff, and withdrawing water.The river’s impairment is caused by dangerously low levels of dissolved oxygen driven by high concentrations of nutrients – particularly phosphorus – that fuel oxygen-hungry algal blooms that can lead to toxic conditions.'
-                          }
-                        </P>
+                        <div dangerouslySetInnerHTML={{ __html: post.content }} />
                       </div>
                     </div>
                   </CardBody>
                 </Card>
               </div>
-              <BlogComments />
+              <BlogComments postId={id} />
             </div>
           </Col>
         </Row>
@@ -75,4 +125,5 @@ const BlogSingleContain = () => {
     </Fragment>
   );
 };
+
 export default BlogSingleContain;
