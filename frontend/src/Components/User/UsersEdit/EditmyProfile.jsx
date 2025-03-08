@@ -4,80 +4,35 @@ import { Row, Col, Card, CardHeader, CardBody, CardFooter, Form, FormGroup, Labe
 import { storage } from '../../../firebase';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import swal from 'sweetalert';
-import { jwtDecode } from 'jwt-decode'; // Nouvelle façon d'importer
+import { useOutletContext } from 'react-router-dom';
 
-// Fonction pour récupérer et décoder le token
-const getAuthData = () => {
+const authHeader = () => {
   const token = localStorage.getItem("token");
-  if (!token) return { headers: null, userData: null };
-  
-  try {
-    // Décodage du token pour récupérer les données utilisateur
-    const userData = jwtDecode(token); // ← Changez ici aussi
-    return {
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-      userData
-    };
-  } catch (error) {
-    console.error("Erreur de décodage du token:", error);
-    return { headers: null, userData: null };
-  }
+  return { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
 };
 
 const EditMyProfile = () => {
+  const { userData } = useOutletContext() || {};
   const { register, handleSubmit, setValue, formState: { errors } } = useForm();
   const [profileImage, setProfileImage] = useState('/defaultProfile.png');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
-  const [userInfo, setUserInfo] = useState(null);
 
-  // Récupération des données du token
-  const { headers, userData } = getAuthData();
-  const identifiant = userData ? (userData.identifiant || userData.Identifiant) : null;
+  const storedUser = JSON.parse(localStorage.getItem('user')) || userData;
+  const identifiant = storedUser?.Identifiant || storedUser?.identifiant;
 
-  // Chargement des données utilisateur depuis le token et l'API
   useEffect(() => {
-     // Ajoutez ces logs pour déboguer
-  console.log("Token décodé:", userData);
-  console.log("Identifiant extrait:", identifiant);
-    const fetchUserData = async () => {
-      if (!headers || !identifiant) {
-        console.error("Token invalide ou identifiant manquant");
-        return;
-      }
+    if (storedUser) {
+      setValue('Name', storedUser.Name || '');
+      setValue('Email', storedUser.Email || '');
+      setValue('Classe', storedUser.Classe || '');
+      setValue('Role', storedUser.Role || '');
+      setValue('PhoneNumber', storedUser.PhoneNumber || '');
+      setProfileImage(storedUser.imageUrl || '/defaultProfile.png');
+      console.log("Données chargées dans EditMyProfile:", storedUser);
+    }
+  }, [storedUser, setValue]);
 
-      try {
-        const response = await fetch(`http://localhost:5000/api/users/${identifiant}`, {
-          method: 'GET',
-          headers: headers
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP: ${response.status}`);
-        }
-        
-        const data = await response.json();
-
-        if (data) {
-          console.log('Données utilisateur récupérées:', data);
-          setUserInfo(data);
-          setValue('Name', data.Name);
-          setValue('Email', data.Email);
-          setValue('Classe', data.Classe);
-          setValue('Role', data.Role);
-          setValue('PhoneNumber', data.PhoneNumber);
-          setProfileImage(data.imageUrl || '/defaultProfile.png');
-        }
-      } catch (error) {
-        console.error("Erreur lors de la récupération du profil :", error);
-        swal("Erreur", "Impossible de récupérer vos informations de profil", "error");
-      }
-    };
-
-    fetchUserData();
-  }, [identifiant, setValue, headers]);
-
-  // Upload de l'image sur Firebase Storage
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file || !identifiant) return;
@@ -88,6 +43,13 @@ const EditMyProfile = () => {
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
       setProfileImage(url);
+
+      const updatedUser = { 
+        ...storedUser, 
+        Identifiant: identifiant, 
+        imageUrl: url 
+      };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
     } catch (err) {
       console.error("Erreur d'upload :", err);
       swal("Erreur", "Échec de l'upload de l'image", "error");
@@ -95,13 +57,7 @@ const EditMyProfile = () => {
     setUploading(false);
   };
 
-  // Soumission du formulaire
   const onSubmit = async (data) => {
-    if (!headers || !identifiant) {
-      swal("Erreur", "Session expirée. Veuillez vous reconnecter.", "error");
-      return;
-    }
-
     if (data.Password && data.Password !== data.ConfirmPassword) {
       swal("Erreur", "Les mots de passe ne correspondent pas !", "error");
       return;
@@ -110,19 +66,18 @@ const EditMyProfile = () => {
     try {
       const response = await fetch(`http://localhost:5000/api/users/${identifiant}`, {
         method: 'PUT',
-        headers: headers,
+        headers: authHeader(),
         body: JSON.stringify({
           ...data,
           imageUrl: profileImage
         })
       });
       
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
-      }
-      
       const updatedUser = await response.json();
-      
+      localStorage.setItem('user', JSON.stringify({
+        ...updatedUser,
+        Identifiant: updatedUser.Identifiant || identifiant
+      }));
       swal("Succès", "Profil mis à jour avec succès", "success")
         .then(() => {
           window.location.reload();
@@ -133,25 +88,11 @@ const EditMyProfile = () => {
     }
   };
 
-  // Si le token n'est pas valide ou si on n'a pas d'identifiant, afficher un message d'erreur
-  if (!headers || !identifiant) {
-    return (
-      <Card>
-        <CardBody className="text-center">
-          <h4>Session expirée ou invalide</h4>
-          <p>Veuillez vous reconnecter pour accéder à votre profil.</p>
-          <Button color="primary" onClick={() => window.location.href = '/login'}>Se connecter</Button>
-        </CardBody>
-      </Card>
-    );
-  }
-
   return (
     <Form onSubmit={handleSubmit(onSubmit)}>
       <Card>
         <CardHeader>
           <h4>Edit Profile</h4>
-          <p>Identifiant: {identifiant}</p>
         </CardHeader>
         <CardBody>
           <Row>
@@ -174,7 +115,7 @@ const EditMyProfile = () => {
             <Col md="6">
               <FormGroup>
                 <Label>Name</Label>
-                <Input type="text" {...register('Name', { required: "Le nom est requis" })} />
+                <Input type="text" {...register('Name', { required: "Le nom est requis" })} defaultValue={storedUser?.Name || ''} />
                 {errors.Name && <span style={{ color: 'red' }}>{errors.Name.message}</span>}
               </FormGroup>
             </Col>
@@ -187,7 +128,7 @@ const EditMyProfile = () => {
             <Col md="6">
               <FormGroup>
                 <Label>Email</Label>
-                <Input type="email" {...register('Email', { required: "L'email est requis" })} />
+                <Input type="email" {...register('Email', { required: "L'email est requis" })} defaultValue={storedUser?.Email || ''} />
                 {errors.Email && <span style={{ color: 'red' }}>{errors.Email.message}</span>}
               </FormGroup>
             </Col>
@@ -203,6 +144,7 @@ const EditMyProfile = () => {
                       message: "La classe doit être valide (alphanumérique)"
                     }
                   })}
+                  defaultValue={storedUser?.Classe || ''}
                 />
                 {errors.Classe && <span style={{ color: 'red' }}>{errors.Classe.message}</span>}
               </FormGroup>
@@ -210,7 +152,8 @@ const EditMyProfile = () => {
             <Col md="6">
               <FormGroup>
                 <Label>Role</Label>
-                <Input type="text" value={userData ? userData.roles.join(', ') : ''} disabled />
+                <Input type="text" {...register('Role', { required: "Le rôle est requis" })} defaultValue={storedUser?.Role || ''} />
+                {errors.Role && <span style={{ color: 'red' }}>{errors.Role.message}</span>}
               </FormGroup>
             </Col>
             <Col md="6">
@@ -225,6 +168,7 @@ const EditMyProfile = () => {
                       message: "Le numéro de téléphone doit être valide (8 à 10 chiffres)"
                     }
                   })}
+                  defaultValue={storedUser?.PhoneNumber || ''}
                 />
                 {errors.PhoneNumber && <span style={{ color: 'red' }}>{errors.PhoneNumber.message}</span>}
               </FormGroup>
