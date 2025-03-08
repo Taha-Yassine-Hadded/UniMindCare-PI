@@ -1,6 +1,7 @@
+// BlogDetailContain.js
 import React, { Fragment, useState, useEffect } from 'react';
 import { Container, Row, Col, Card } from 'reactstrap';
-import { H6, Image, LI, P, UL } from '../../AbstractElements'; // Chemin corrigé
+import { H6, Image, LI, P, UL } from '../../AbstractElements';
 import axios from 'axios';
 
 const BlogDetailContain = () => {
@@ -19,11 +20,10 @@ const BlogDetailContain = () => {
     fetchPosts();
   }, []);
 
-  // Fonction pour formater la date comme dans l’image (jour et mois)
   const formatDate = (date) => {
     const d = new Date(date);
-    const day = d.getDate().toString().padStart(2, '0'); // Jour sur 2 chiffres
-    const month = d.toLocaleString('fr-FR', { month: 'long' }); // Mois complet en français
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = d.toLocaleString('fr-FR', { month: 'long' });
     return { day, month };
   };
 
@@ -40,7 +40,7 @@ const BlogDetailContain = () => {
                       <Image
                         attrImage={{
                           className: 'img-fluid top-radius-blog',
-                          src: post.imageUrl || 'https://via.placeholder.com/300x200', // Image par défaut si aucune image
+                          src: post.imageUrl || 'https://via.placeholder.com/300x200',
                           alt: post.title || 'Publication',
                         }}
                       />
@@ -62,7 +62,8 @@ const BlogDetailContain = () => {
                       <div className="detail-footer">
                         <UL attrUL={{ className: 'social-list simple-list flex-row' }}>
                           <LI>
-                            <i className="fa fa-user-o"></i>{post.isAnonymous ? 'Anonyme' : post.author?.Name || 'Inconnu'}
+                            <i className="fa fa-user-o"></i>
+                            {post.isAnonymous ? post.anonymousPseudo : post.author?.Name || 'Inconnu'}
                           </LI>
                           <LI>
                             <i className="fa fa-comments-o"></i>{post.comments?.length || 5} Hits
