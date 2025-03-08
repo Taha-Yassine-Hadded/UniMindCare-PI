@@ -23,7 +23,9 @@ const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
 const transporter = require('./config/emailConfig');
+const { initScheduler } = require('./utils/scheduler');
 
+// Servir les fichiers statiques depuis le dossier images
 
 var indexRouter = require('./routes/index');
 //var usersRouter = require('./routes/users');
@@ -33,6 +35,8 @@ const usersRouter = require('./routes/usersRouter');
 
 // Initialize Express app
 var app = express();
+
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -121,6 +125,8 @@ const questionnaireRoutes = require('./routes/Response');
 // Ajouter cette ligne avec vos autres routes
 app.use('/api/questionnaire', questionnaireRoutes);
 
+// Initialiser le planificateur
+initScheduler();
 
 
 // Partie statistiques
@@ -154,7 +160,7 @@ app.post('/api/forgot-password', async (req, res) => {
     const { email } = req.body;
     console.log('Searching for email:', email);
 
-    // Recherche dans la collection en utilisant le champ "Email"
+    // Recherche dans la collection
     const directResult = await mongoose.connection.db.collection('users').findOne({
       Email: new RegExp(`^${email}$`, 'i')
     });
@@ -176,12 +182,101 @@ app.post('/api/forgot-password', async (req, res) => {
     user.otpExpires = otpExpires;
     await user.save();
 
-    // Envoyer l'email avec l'OTP
+    // Template HTML pour l'email OTP avec le même design
+    const mailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+        }
+        .header {
+          background-color: #4a6fdc;
+          color: white;
+          padding: 20px;
+          text-align: center;
+          border-radius: 5px 5px 0 0;
+        }
+        .logo {
+          max-width: 150px;
+          margin-bottom: 10px;
+        }
+        .content {
+          padding: 20px;
+          border: 1px solid #ddd;
+          border-top: none;
+          border-radius: 0 0 5px 5px;
+        }
+        .footer {
+          text-align: center;
+          margin-top: 20px;
+          font-size: 12px;
+          color: #666;
+        }
+        .otp-code {
+          font-size: 32px;
+          font-weight: bold;
+          color: #4a6fdc;
+          text-align: center;
+          padding: 15px;
+          background-color: #f9f9f9;
+          border-radius: 5px;
+          margin: 20px 0;
+          letter-spacing: 5px;
+        }
+        .info-box {
+          background-color: #f9f9f9;
+          padding: 15px;
+          border-radius: 5px;
+          margin: 20px 0;
+          border-left: 3px solid #4a6fdc;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <img src="http://localhost:5000/images/logo2.png" alt="UniMindCare Logo" class="logo">
+        <h1>UniMindCare</h1>
+        <p>Réinitialisation de mot de passe</p>
+      </div>
+      
+      <div class="content">
+        <p>Bonjour${directResult.Name ? ' ' + directResult.Name : ''},</p>
+        
+        <p>Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte UniMindCare.</p>
+        
+        <p>Voici votre code de vérification :</p>
+        
+        <div class="otp-code">${otp}</div>
+        
+        <div class="info-box">
+          <p><strong>Important :</strong> Ce code est valable pendant 10 minutes. Si vous n'avez pas demandé de réinitialisation de mot de passe, veuillez ignorer cet email.</p>
+        </div>
+        
+        <p>Si vous avez des difficultés à vous connecter, n'hésitez pas à contacter notre équipe de support.</p>
+        
+        <p>Cordialement,<br>L'équipe UniMindCare</p>
+      </div>
+      
+      <div class="footer">
+        <p>Ce message a été généré automatiquement. Merci de ne pas y répondre.</p>
+        <p>UniMindCare © 2025 - Tous droits réservés</p>
+      </div>
+    </body>
+    </html>
+    `;
+
+    // Options de l'email avec HTML au lieu de texte
     const mailOptions = {
       from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Réinitialisation de mot de passe',
-      text: `Votre code OTP est : ${otp}. Il expirera dans 10 minutes.`
+      html: mailHtml
     };
 
     transporterHoussine.sendMail(mailOptions, (error) => {

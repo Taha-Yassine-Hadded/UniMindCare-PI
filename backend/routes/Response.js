@@ -7,6 +7,7 @@ const User = require('../models/Users');
 const Points = require('../models/Points');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const { sendRemindersToAllUsers } = require('../services/reminderService');
 
 console.log("JWT_SECRET disponible:", !!process.env.JWT_SECRET);
 console.log("EMAIL_USER:", process.env.EMAIL_USER);
@@ -93,25 +94,64 @@ const questions = [
 
 // Récupérer les questions
 router.get('/questions', (req, res) => {
-  res.json(questions);
+  // Vérifier si aujourd'hui est un samedi (jour 6 de la semaine en JavaScript)
+  const today = new Date();
+  if (today.getDay() !== 6) {
+    return res.status(403).json({ 
+      message: "Le questionnaire est uniquement disponible le samedi",
+      isAvailable: false,
+      nextAvailableDate: getNextSaturday()
+    });
+  }
+  
+  res.json({ 
+    questions,
+    isAvailable: true
+  });
 });
 
-// Middleware d'authentification
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+// Fonction pour obtenir la date du prochain samedi
+function getNextSaturday() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 (dimanche) à 6 (samedi)
+  const daysUntilSaturday = dayOfWeek === 6 ? 7 : 6 - dayOfWeek; // Si on est déjà samedi, on prend le samedi suivant
   
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Token non fourni' });
-  }
+  const nextSaturday = new Date(today);
+  nextSaturday.setDate(today.getDate() + daysUntilSaturday);
+  
+  return nextSaturday.toISOString().split('T')[0]; // Format YYYY-MM-DD
+}
 
-  const token = authHeader.split(' ')[1];
+
+// Récupérer les questions (modifier cette route existante)
+/*router.get('/questions', (req, res) => {
+  // Vérifier si aujourd'hui est un dimanche (jour 0 de la semaine en JavaScript) au lieu de samedi
+  const today = new Date();
+  if (today.getDay() !== 0) { // 0 pour dimanche au lieu de 6 pour samedi
+    return res.status(403).json({ 
+      message: "Le questionnaire est uniquement disponible le dimanche",
+      isAvailable: false,
+      nextAvailableDate: getNextSunday()
+    });
+  }
   
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ message: 'Token invalide' });
-    req.user = decoded;
-    next();
+  res.json({ 
+    questions,
+    isAvailable: true
   });
-};
+});
+
+// Fonction pour obtenir la date du prochain dimanche
+function getNextSunday() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 (dimanche) à 6 (samedi)
+  const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+  
+  const nextSunday = new Date(today);
+  nextSunday.setDate(today.getDate() + daysUntilSunday);
+  
+  return nextSunday.toISOString().split('T')[0]; // Format YYYY-MM-DD
+}*/
 
 // Soumettre les réponses et analyser l'état mental
 router.post('/submit', async (req, res) => {
@@ -236,102 +276,108 @@ router.post('/submit', async (req, res) => {
     });
     
     // Construire l'email HTML
-    const mailHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-        .header {
-          background-color: #4a6fdc;
-          color: white;
-          padding: 20px;
-          text-align: center;
-          border-radius: 5px 5px 0 0;
-        }
-        .content {
-          padding: 20px;
-          border: 1px solid #ddd;
-          border-top: none;
-          border-radius: 0 0 5px 5px;
-        }
-        .footer {
-          text-align: center;
-          margin-top: 20px;
-          font-size: 12px;
-          color: #666;
-        }
-        .result {
-          margin: 20px 0;
-          padding: 15px;
-          background-color: #f9f9f9;
-          border-radius: 5px;
-        }
-        .score {
-          font-size: 24px;
-          font-weight: bold;
-          color: ${
-            score <= 15 ? '#28a745' : 
-            score <= 25 ? '#17a2b8' : 
-            score <= 35 ? '#ffc107' : 
-            '#dc3545'
-          };
-        }
-        ul {
-          padding-left: 20px;
-        }
-        .badge {
-          display: inline-block;
-          background-color: #ffd700;
-          color: #333;
-          padding: 5px 10px;
-          border-radius: 20px;
-          font-weight: bold;
-          margin-top: 15px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>UniMindCare</h1>
-        <p>Résultats de votre questionnaire de bien-être</p>
-      </div>
+   // Dans la partie où vous construisez l'email HTML (ligne ~290)
+const mailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .header {
+      background-color: #4a6fdc;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 5px 5px 0 0;
+    }
+    .logo {
+      max-width: 150px;
+      margin-bottom: 10px;
+    }
+    .content {
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-top: none;
+      border-radius: 0 0 5px 5px;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: #666;
+    }
+    .result {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+    }
+    .score {
+      font-size: 24px;
+      font-weight: bold;
+      color: ${
+        score <= 15 ? '#28a745' : 
+        score <= 25 ? '#17a2b8' : 
+        score <= 35 ? '#ffc107' : 
+        '#dc3545'
+      };
+    }
+    ul {
+      padding-left: 20px;
+    }
+    .badge {
+      display: inline-block;
+      background-color: #ffd700;
+      color: #333;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-weight: bold;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="http://localhost:5000/images/logo2.png" alt="UniMindCare Logo" class="logo">
+    <h1>UniMindCare</h1>
+    <p>Résultats de votre questionnaire de bien-être</p>
+  </div>
+  
+  <div class="content">
+    <p>Bonjour ${user.Name || 'Étudiant'},</p>
+    
+    <p>Merci d'avoir complété le questionnaire de bien-être le ${currentDate}.</p>
+    
+    <div class="result">
+      <h2>Votre état émotionnel : <span class="score">${emotionalState}</span></h2>
+      <p>Votre score : ${score}/50</p>
       
-      <div class="content">
-        <p>Bonjour ${user.Name || 'Étudiant'},</p>
-        
-        <p>Merci d'avoir complété le questionnaire de bien-être le ${currentDate}.</p>
-        
-        <div class="result">
-          <h2>Votre état émotionnel : <span class="score">${emotionalState}</span></h2>
-          <p>Votre score : ${score}/50</p>
-          
-          <h3>Nos recommandations :</h3>
-          <ul>
-            ${recommendations.map(rec => `<li>${rec}</li>`).join('')}
-          </ul>
-        </div>
-        
-        <p><span class="badge">+20 points</span> Félicitations ! Vous avez gagné 20 points pour avoir complété ce questionnaire.</p>
-        
-        <p>N'hésitez pas à consulter nos ressources supplémentaires sur votre tableau de bord pour améliorer votre bien-être.</p>
-        
-        <p>Cordialement,<br>L'équipe UniMindCare</p>
-      </div>
-      
-      <div class="footer">
-        <p>Ce message a été généré automatiquement. Merci de ne pas y répondre.</p>
-        <p>UniMindCare © 2025 - Tous droits réservés</p>
-      </div>
-    </body>
-    </html>
-    `;
+      <h3>Nos recommandations :</h3>
+      <ul>
+        ${recommendations.map(rec => `<li>${rec}</li>`).join('')}
+      </ul>
+    </div>
+    
+    <p><span class="badge">+20 points</span> Félicitations ! Vous avez gagné 20 points pour avoir complété ce questionnaire.</p>
+    
+    <p>N'hésitez pas à consulter nos ressources supplémentaires sur votre tableau de bord pour améliorer votre bien-être.</p>
+    
+    <p>Cordialement,<br>L'équipe UniMindCare</p>
+  </div>
+  
+  <div class="footer">
+    <p>Ce message a été généré automatiquement. Merci de ne pas y répondre.</p>
+    <p>UniMindCare © 2025 - Tous droits réservés</p>
+  </div>
+</body>
+</html>
+`;
     
     // Options de l'email
     const mailOptions = {
@@ -412,4 +458,121 @@ router.get('/points/:userId', async (req, res) => {
   }
 });
 
+
+router.post('/send-reminders', async (req, res) => {
+  try {
+    // Vérifier si c'est samedi (jour 6 de la semaine en JavaScript)
+    const today = new Date();
+    if (today.getDay() !== 6) {
+      return res.status(400).json({ 
+        message: "Les rappels ne peuvent être envoyés que le samedi" 
+      });
+    }
+    
+    const result = await sendRemindersToAllUsers();
+    res.status(200).json({ 
+      message: "Rappels envoyés avec succès", 
+      stats: result 
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'envoi des rappels:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+
+/*
+
+router.post('/send-reminders', async (req, res) => {
+  try {
+    // Vérifier si c'est dimanche (jour 0 de la semaine en JavaScript)
+    const today = new Date();
+    if (today.getDay() !== 0) {
+      return res.status(400).json({ 
+        message: "Les rappels ne peuvent être envoyés que le dimanche" 
+      });
+    }
+    
+    const result = await sendRemindersToAllUsers();
+    res.status(200).json({ 
+      message: "Rappels envoyés avec succès", 
+      stats: result 
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'envoi des rappels:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+
+*/
+
+
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+// Récupérer les questions
+router.get('/questions', (req, res) => {
+  // Vérifier si aujourd'hui est un mercredi (jour 3 de la semaine en JavaScript)
+  const today = new Date();
+  if (today.getDay() !== 3) {
+    return res.status(403).json({ 
+      message: "Le questionnaire est uniquement disponible le mercredi",
+      isAvailable: false,
+      nextAvailableDate: getNextWednesday()
+    });
+  }
+  
+  res.json({ 
+    questions,
+    isAvailable: true
+  });
+});
+
+// Fonction pour obtenir la date du prochain mercredi
+function getNextWednesday() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 (dimanche) à 6 (samedi)
+  const daysUntilWednesday = dayOfWeek === 3 ? 7 : (3 + 7 - dayOfWeek) % 7; // Si on est déjà mercredi, on prend le mercredi suivant
+  
+  const nextWednesday = new Date(today);
+  nextWednesday.setDate(today.getDate() + daysUntilWednesday);
+  
+  return nextWednesday.toISOString().split('T')[0]; // Format YYYY-MM-DD
+}
+
+// Modifier également la vérification pour l'envoi des rappels
+router.post('/send-reminders', async (req, res) => {
+  try {
+    // Vérifier si c'est mercredi (jour 3 de la semaine en JavaScript)
+    const today = new Date();
+    if (today.getDay() !== 3) {
+      return res.status(400).json({ 
+        message: "Les rappels ne peuvent être envoyés que le mercredi" 
+      });
+    }
+    
+    const result = await sendRemindersToAllUsers();
+    res.status(200).json({ 
+      message: "Rappels envoyés avec succès", 
+      stats: result 
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'envoi des rappels:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+*/

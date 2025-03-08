@@ -118,54 +118,57 @@ const LoginSample = () => {
   };
 
   // Nouvelle fonction pour la connexion par FaceID
-  const handleFaceIDLogin = async () => {
-    setFaceIDLoading(true);
-    setError('');
+ // Remplacez cette partie dans handleFaceIDLogin
+const handleFaceIDLogin = async () => {
+  setFaceIDLoading(true);
+  setError('');
+  
+  try {
+    const response = await fetch('http://localhost:5004/faceid_login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
     
-    try {
-      const response = await fetch('http://localhost:5004/faceid_login', {
-        method: 'POST',
-        credentials: 'include', // Important pour envoyer les cookies
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({}) // Vous pouvez ajouter des données si nécessaire
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log("FaceID Response:", data);
-      
-      if (data.status === 'success' && data.user) {
-        setFailedAttempts(0);
-        
-        // Stocker les informations utilisateur
-        const storage = rememberMe ? localStorage : sessionStorage;
-        storage.setItem('login', JSON.stringify(true));
-        storage.setItem('user', JSON.stringify(data.user));
-        
-        // Récupérer et stocker le token s'il est présent
-        const token = response.headers.get('Authorization') || data.token;
-        if (token) {
-          storage.setItem('token', token);
-          navigate('/tivo/dashboard/default', { replace: true });
-        } else {
-          throw new Error('Aucun token d\'authentification reçu');
-        }
-      } else {
-        throw new Error(data.message || 'Échec de la connexion par FaceID');
-      }
-    } catch (err) {
-      console.error("FaceID Login Error:", err);
-      setError(err.message || 'Échec de la connexion par FaceID');
-    } finally {
-      setFaceIDLoading(false);
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
     }
-  };
+    
+    const data = await response.json();
+    console.log("FaceID Response:", data);
+    
+    if (data.status === 'success' && data.user) {
+      setFailedAttempts(0);
+      
+      // Stocker les informations utilisateur
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem('login', JSON.stringify(true));
+      storage.setItem('user', JSON.stringify(data.user));
+      
+      // Récupérer le token et supprimer le préfixe "Bearer " s'il existe
+      let token = response.headers.get('Authorization') || data.token;
+      if (token) {
+        // Supprimer le préfixe "Bearer " si présent
+        token = token.replace('Bearer ', '');
+        storage.setItem('token', token);
+        navigate('/tivo/dashboard/default', { replace: true });
+      } else {
+        throw new Error('Aucun token d\'authentification reçu');
+      }
+    } else {
+      throw new Error(data.message || 'Échec de la connexion par FaceID');
+    }
+  } catch (err) {
+    console.error("FaceID Login Error:", err);
+    setError(err.message || 'Échec de la connexion par FaceID');
+  } finally {
+    setFaceIDLoading(false);
+  }
+};
 
   const handleGoogleLogin = () => {
     window.location.href = 'http://localhost:5000/users/auth/google';

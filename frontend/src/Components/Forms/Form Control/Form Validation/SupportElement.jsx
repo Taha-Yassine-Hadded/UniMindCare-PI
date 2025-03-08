@@ -29,6 +29,8 @@ const getToken = () => {
 
 const SupportElement = () => {
   // États
+  const [isQuestionnaireAvailable, setIsQuestionnaireAvailable] = useState(true);
+  const [nextAvailableDate, setNextAvailableDate] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [step, setStep] = useState(1);
@@ -81,12 +83,30 @@ const SupportElement = () => {
         });
         
         if (!response.ok) {
-          throw new Error(`Erreur HTTP ${response.status}`);
+          const errorData = await response.json();
+          if (response.status === 403) {
+            setIsQuestionnaireAvailable(false);
+            setNextAvailableDate(errorData.nextAvailableDate);
+            throw new Error(errorData.message);
+          } else {
+            throw new Error(`Erreur HTTP ${response.status}`);
+          }
         }
         
         const data = await response.json();
-        console.log("Questions récupérées:", data.length);
-        setQuestions(data);
+        console.log("Questions récupérées:", data);
+        
+        // S'assurer que nous extrayons correctement le tableau de questions
+        if (data.questions && Array.isArray(data.questions)) {
+          setQuestions(data.questions);
+        } else if (Array.isArray(data)) {
+          setQuestions(data);
+        } else {
+          console.error("Format de données inattendu:", data);
+          setQuestions([]);
+        }
+        
+        setIsQuestionnaireAvailable(data.isAvailable !== undefined ? data.isAvailable : true);
         setLoading(false);
       } catch (err) {
         console.error("Erreur:", err);
@@ -184,6 +204,27 @@ const SupportElement = () => {
     );
   }
 
+  if (!isQuestionnaireAvailable) {
+    return (
+      <Container className="mt-5">
+        <Alert color="info" className="text-center">
+          <H4>Questionnaire non disponible</H4>
+          <p>Le questionnaire de bien-être est uniquement disponible le samedi.</p>
+          {nextAvailableDate && (
+            <p>Prochain questionnaire disponible le: <strong>{new Date(nextAvailableDate).toLocaleDateString()}</strong></p>
+          )}
+          <Button 
+            color="primary" 
+            className="mt-3"
+            onClick={() => navigate('/tivo/dashboard/default')}
+          >
+            Retour au tableau de bord
+          </Button>
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Fragment>
       <Container fluid>
@@ -207,34 +248,46 @@ const SupportElement = () => {
                 
                 {step === 1 ? (
                   <Form onSubmit={handleSubmit}>
-                    {questions.map((question) => (
-                      <FormGroup key={question.id} className="mb-4 p-3 border rounded">
-                        <H5>{question.text}</H5>
-                        <div className="d-flex flex-wrap mt-3">
-                          {question.options.map((option, index) => (
-                            <div key={index} className="form-check m-2">
-                              <Input
-                                type="radio"
-                                name={`question-${question.id}`}
-                                id={`q${question.id}-opt${index}`}
-                                value={index + 1}
-                                onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                                required
-                              />
-                              <Label for={`q${question.id}-opt${index}`}>
-                                {option}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </FormGroup>
-                    ))}
+                    {Array.isArray(questions) && questions.length > 0 ? (
+                      questions.map((question) => (
+                        <FormGroup key={question.id} className="mb-4 p-3 border rounded">
+                          <H5>{question.text}</H5>
+                          <div className="d-flex flex-wrap mt-3">
+                            {question.options && Array.isArray(question.options) ? (
+                              question.options.map((option, index) => (
+                                <div key={index} className="form-check m-2">
+                                  <Input
+                                    type="radio"
+                                    name={`question-${question.id}`}
+                                    id={`q${question.id}-opt${index}`}
+                                    value={index + 1}
+                                    onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                                    required
+                                  />
+                                  <Label for={`q${question.id}-opt${index}`}>
+                                    {option}
+                                  </Label>
+                                </div>
+                              ))
+                            ) : (
+                              <p>Options non disponibles pour cette question</p>
+                            )}
+                          </div>
+                        </FormGroup>
+                      ))
+                    ) : (
+                      <div className="text-center py-4">
+                        <p>Aucune question disponible pour le moment.</p>
+                      </div>
+                    )}
 
-                    <div className="text-center mt-4">
-                      <Button color="primary" size="lg" type="submit" disabled={loading}>
-                        {loading ? "Traitement en cours..." : "Valider le questionnaire"}
-                      </Button>
-                    </div>
+                    {Array.isArray(questions) && questions.length > 0 && (
+                      <div className="text-center mt-4">
+                        <Button color="primary" size="lg" type="submit" disabled={loading}>
+                          {loading ? "Traitement en cours..." : "Valider le questionnaire"}
+                        </Button>
+                      </div>
+                    )}
                   </Form>
                 ) : (
                   <div className="result-section">
@@ -260,9 +313,13 @@ const SupportElement = () => {
                       <CardHeader>Recommandations</CardHeader>
                       <CardBody>
                         <ul className="list-unstyled">
-                          {result.recommendations.map((rec, index) => (
-                            <li key={index} className="mb-2">✔️ {rec}</li>
-                          ))}
+                          {result.recommendations && Array.isArray(result.recommendations) ? (
+                            result.recommendations.map((rec, index) => (
+                              <li key={index} className="mb-2">✔️ {rec}</li>
+                            ))
+                          ) : (
+                            <li>Aucune recommandation disponible</li>
+                          )}
                         </ul>
                       </CardBody>
                     </Card>
