@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/Users');
+const User = require('../Models/Users');
 
 // Route GET pour récupérer les statistiques sur les utilisateurs
 router.get('/statistics', async (req, res) => {
