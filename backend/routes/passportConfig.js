@@ -18,7 +18,7 @@ async (accessToken, refreshToken, profile, done) => {
       return done(new Error('Seuls les emails @esprit.tn sont autorisés'));
     }
 
-    let user = await Users.findOne({ 
+    let user = await Users.findOne({
       $or: [
         { Email: email },
         { googleId: profile.id }

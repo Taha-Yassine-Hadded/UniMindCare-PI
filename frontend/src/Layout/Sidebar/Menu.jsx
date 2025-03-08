@@ -874,43 +874,17 @@ export const MENU = [
           },
         ],
       },
-      {
-        title: "Maps",
-        icon: <Map />,
-        type: "sub",
-        menu: [
-          {
-            url: `${process.env.PUBLIC_URL}/map/googleMap`,
-            type: "link",
-            title: "Google Maps",
-          },
-          {
-            url: `${process.env.PUBLIC_URL}/map/pigeonMap`,
-            type: "link",
-            title: "Pigeon Maps",
-          },
-        ],
-      },
+     
       {
         title: "Editor",
         icon: <Edit />,
         type: "sub",
         menu: [
           {
-            url: `${process.env.PUBLIC_URL}/editor/ckEditor`,
-            type: "link",
-            title: "CK  Editor",
-          },
-          {
             url: `${process.env.PUBLIC_URL}/editor/mdeEditor`,
             type: "link",
             title: "MDE Editor",
-          },
-          {
-            url: `${process.env.PUBLIC_URL}/editor/acecodeeditor`,
-            type: "link",
-            title: "ACE code editor",
-          },
+          }
         ],
       },
       {
@@ -928,17 +902,8 @@ export const MENU = [
             url: `${process.env.PUBLIC_URL}/knowledgebase/knowledgebase`,
             type: "link",
             title: "knowledgebase",
-          },
-          {
-            url: `${process.env.PUBLIC_URL}/knowledgebase/KnowledgeCategory`,
-            type: "link",
-            title: "KnowledgeCategory",
-          },
-          {
-            url: `${process.env.PUBLIC_URL}/knowledgebase/KnowledgeDetailContain`,
-            type: "link",
-            title: "KnowledgeDetail",
-          },
+          }
+        
         ],
       },
       {

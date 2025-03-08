@@ -23,7 +23,8 @@ const LoginSample = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [failedAttempts, setFailedAttempts] = useState(0);
-  const [loading, setLoading] = useState(false); // Ajout d'un état de chargement
+  const [loading, setLoading] = useState(false);
+  const [faceIDLoading, setFaceIDLoading] = useState(false);
 
   // Vérification du token dans les paramètres d'URL
   useEffect(() => {
@@ -92,7 +93,7 @@ const LoginSample = () => {
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('token', token);
         storage.setItem('login', JSON.stringify(true));
-        navigate('/tivo/dashboard/default', { replace: true }); // Supprime l'attente inutile
+        navigate('/tivo/dashboard/default', { replace: true });
       }
     } catch (err) {
       setFailedAttempts(prev => prev + 1);
@@ -113,6 +114,56 @@ const LoginSample = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Nouvelle fonction pour la connexion par FaceID
+  const handleFaceIDLogin = async () => {
+    setFaceIDLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('http://localhost:5004/faceid_login', {
+        method: 'POST',
+        credentials: 'include', // Important pour envoyer les cookies
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({}) // Vous pouvez ajouter des données si nécessaire
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("FaceID Response:", data);
+      
+      if (data.status === 'success' && data.user) {
+        setFailedAttempts(0);
+        
+        // Stocker les informations utilisateur
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem('login', JSON.stringify(true));
+        storage.setItem('user', JSON.stringify(data.user));
+        
+        // Récupérer et stocker le token s'il est présent
+        const token = response.headers.get('Authorization') || data.token;
+        if (token) {
+          storage.setItem('token', token);
+          navigate('/tivo/dashboard/default', { replace: true });
+        } else {
+          throw new Error('Aucun token d\'authentification reçu');
+        }
+      } else {
+        throw new Error(data.message || 'Échec de la connexion par FaceID');
+      }
+    } catch (err) {
+      console.error("FaceID Login Error:", err);
+      setError(err.message || 'Échec de la connexion par FaceID');
+    } finally {
+      setFaceIDLoading(false);
     }
   };
 
@@ -151,7 +202,7 @@ const LoginSample = () => {
                       onChange={handleEmailChange}
                       placeholder="Entrez votre email"
                       required
-                      disabled={loading}
+                      disabled={loading || faceIDLoading}
                     />
                   </FormGroup>
                   <FormGroup>
@@ -163,7 +214,7 @@ const LoginSample = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Entrez votre mot de passe"
                       required
-                      disabled={loading}
+                      disabled={loading || faceIDLoading}
                     />
                   </FormGroup>
 
@@ -177,7 +228,7 @@ const LoginSample = () => {
                         onChange={(e) => setTwoFactorCode(e.target.value)}
                         placeholder="Entrez votre code 2FA"
                         required
-                        disabled={loading}
+                        disabled={loading || faceIDLoading}
                       />
                       {qrCodeData && !twoFactorCode && (
                         <div className="text-center mb-3">
@@ -195,30 +246,43 @@ const LoginSample = () => {
                         id="rememberMe"
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
-                        disabled={loading}
+                        disabled={loading || faceIDLoading}
                       />
                       <Label for="rememberMe" className="ms-2 mb-0">Se souvenir de moi</Label>
                     </FormGroup>
                     <Link to={`${process.env.PUBLIC_URL}/authentication/forget-pwd`}>
-
                       Mot de passe oublié ?
                     </Link>
                   </div>
 
                   {error && <p className="text-danger">{error}</p>}
 
-                  <Button type="submit" color="primary" className="w-100 mb-2" disabled={loading}>
+                  <Button type="submit" color="primary" className="w-100 mb-2" disabled={loading || faceIDLoading}>
                     {loading ? 'Connexion en cours...' : 'Se connecter'}
                   </Button>
-                  <Button color="danger" className="w-100" onClick={handleGoogleLogin} disabled={loading}>
-                    Se connecter avec Google
-                  </Button>
+                  
+                  <div className="d-flex gap-2 mb-2">
+                    <Button color="danger" className="w-50" onClick={handleGoogleLogin} disabled={loading || faceIDLoading}>
+                      <i className="fa fa-google me-2"></i> Google
+                    </Button>
+                    <Button 
+                      color="info" 
+                      className="w-50" 
+                      onClick={handleFaceIDLogin} 
+                      disabled={loading || faceIDLoading}
+                    >
+                      {faceIDLoading ? 'Vérification...' : <><i className="fa fa-id-card me-2"></i> FaceID</>}
+                    </Button>
+                  </div>
 
                   <div className="text-center mt-3">
                     <span>Vous n'avez pas de compte ? </span>
                     <Link to={`${process.env.PUBLIC_URL}/authentication/register-simpleimg`}>
-
                       Créer un compte
+                    </Link>
+                    <span> ou </span>
+                    <Link to={`${process.env.PUBLIC_URL}/authentication/register-faceid`}>
+                      S'inscrire avec FaceID
                     </Link>
                   </div>
                 </Form>

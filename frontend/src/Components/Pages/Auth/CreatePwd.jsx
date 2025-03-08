@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Col, Container, Form, FormGroup, Input, Label, Row } from 'reactstrap';
 import { Btn, H4, P, Image } from '../../../AbstractElements';
-import imgg from '../../../assets/images/login/login_bg.jpg';
+import imgg from '../../../assets/images/login/login_bg.png';
 import { dynamicImage } from '../../../Services';
 import swal from 'sweetalert';
 

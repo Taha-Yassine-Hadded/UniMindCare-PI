@@ -70,10 +70,6 @@ import JobDetails from "../Components/JobSearch/JobDetail";
 import ListView from "../Components/JobSearch/ListView";
 import JobCardsContain from "../Components/JobSearch/JobCardView";
 import KnowledgeCategoryContain from "../Components/Knowledgebase/Knowledge Category";
-import KnowledgeBaseContain from "../Components/Knowledgebase/Knowledgebase";
-import KnowledgeDetailContain from "../Components/Knowledgebase/Knowledge Details";
-import CkEditorContain from "../Components/Editor/CkEditor";
-import ACEEditorContain from "../Components/Editor/Ace code editor/ACECodeEditor";
 import MdeEDitorContain from "../Components/Editor/MDE Editor/MDEEditor";
 import MesonryGalleryContain from "../Components/Gallery/MesonryGallery";
 import MesonryDescContain from "../Components/Gallery/MesonryDesc";
@@ -120,7 +116,6 @@ import CheckOutContain from "../Components/Eccommerce/CheckOut/index";
 import AddProductName from "../Components/Eccommerce/AddProduct";
 import FileManagerContain from "../Components/FileManager/index"
 import MapJsContain from "../Components/Maps/pigeon-maps";
-import GoolgeMapsContain from "../Components/Maps/GoogleMaps";
 
 export const routes = [
   //dashboard
@@ -214,10 +209,6 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/jobSearch/job-list`, Component: <ListView /> },
   { path: `${process.env.PUBLIC_URL}/jobSearch/cardView`, Component: <JobCardsContain /> },
   { path: `${process.env.PUBLIC_URL}/knowledgebase/knowledgecategory`, Component: <KnowledgeCategoryContain /> },
-  { path: `${process.env.PUBLIC_URL}/knowledgebase/knowledgebase`, Component: <KnowledgeBaseContain /> },
-  { path: `${process.env.PUBLIC_URL}/knowledgebase/KnowledgeDetailContain`, Component: <KnowledgeDetailContain /> },
-  { path: `${process.env.PUBLIC_URL}/editor/ckEditor`, Component: <CkEditorContain /> },
-  { path: `${process.env.PUBLIC_URL}/editor/acecodeeditor`, Component: <ACEEditorContain /> },
   { path: `${process.env.PUBLIC_URL}/editor/mdeEditor`, Component: <MdeEDitorContain /> },
   { path: `${process.env.PUBLIC_URL}/gallery/mesonryGallery`, Component: <MesonryGalleryContain /> },
   { path: `${process.env.PUBLIC_URL}/gallery/mesonryDesc`, Component: <MesonryDescContain /> },
@@ -226,7 +217,6 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/gallery/imageGallery`, Component: <ImageGalleryContain /> },
   { path: `${process.env.PUBLIC_URL}/samplepage`, Component: <SampleCard /> },
   { path: `${process.env.PUBLIC_URL}/map/pigeonMap`, Component: <MapJsContain /> },
-  { path: `${process.env.PUBLIC_URL}/map/googleMap`, Component: <GoolgeMapsContain /> },
   { path: `${process.env.PUBLIC_URL}/learning/learning-detail`, Component: <DetailCourseContain /> },
   { path: `${process.env.PUBLIC_URL}/charts/apexCharts`, Component: <ApexchartsContain /> },
   { path: `${process.env.PUBLIC_URL}/charts/googleChart`, Component: <GoogleChartsContain /> },
