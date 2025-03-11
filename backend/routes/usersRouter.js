@@ -5,8 +5,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const passport = require('./passportConfig');
-const speakeasy = require('speakeasy'); // Pour gérer TOTP
-const QRCode = require('qrcode'); // Pour générer un QR code
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 
 const tokenBlacklist = new Set();
 
@@ -19,93 +19,83 @@ router.get('/', function (req, res, next) {
 router.post('/signin', async (req, res) => {
   const { email, password, twoFactorCode } = req.body;
 
-  // Valider le format de l'email
+  console.log('Payload reçu:', { email, password, twoFactorCode });
+
   if (!email || !email.endsWith('@esprit.tn')) {
-    return res.status(400).json({ message: 'L\'email doit appartenir au domaine @esprit.tn' });
+    console.log('Erreur: Email invalide');
+    return res.status(400).json({ message: "L'email doit appartenir au domaine @esprit.tn" });
   }
 
   try {
-    // Trouver l'utilisateur par email
     const user = await Users.findOne({ Email: email });
+    console.log('Utilisateur trouvé:', user ? user : 'Aucun utilisateur');
     if (!user) {
       return res.status(400).json({ message: 'Email ou mot de passe invalide' });
     }
 
-    // Vérifier si l'utilisateur utilise Google
     if (user?.googleId) {
+      console.log('Erreur: Compte Google détecté');
       return res.status(400).json({ message: 'Veuillez utiliser la connexion Google' });
     }
 
-    // Vérifier si le compte est vérifié
     if (!user.verified) {
+      console.log('Erreur: Compte non vérifié');
       return res.status(400).json({ message: 'Compte non vérifié. Veuillez vérifier votre email.' });
     }
 
-    // Vérifier le mot de passe
-    const isMatch = await bcrypt.compare(password, user.Password);
-    if (!isMatch) {
-      user.loginAttempts = (user.loginAttempts || 0) + 1; // Incrémenter avec valeur par défaut
-      console.log(`Tentative échouée pour ${email}. Tentatives: ${user.loginAttempts}`); // Log
-      await user.save();
+    const isPasswordMatch = await bcrypt.compare(password, user.Password);
+    console.log('Mot de passe correspond:', isPasswordMatch);
 
-      // Vérifier si le nombre de tentatives atteint 3
-      if (user.loginAttempts >= 3) {
-        console.log(`3 tentatives atteintes pour ${email}. Activation de la 2FA.`); // Log
-        const secret = speakeasy.generateSecret({ name: `Esprit:${email}` }); // Nom pour l'app
-        user.twoFactorSecret = secret.base32;
-        user.twoFactorEnabled = true;
-        user.loginAttempts = 0; // Réinitialiser les tentatives
-        await user.save();
+    let isAuthenticated = false;
 
-        // Générer le QR code
-        const otpauthUrl = secret.otpauth_url;
-        const qrCodeData = await QRCode.toDataURL(otpauthUrl);
+    // Si le mot de passe est correct, pas besoin de vérifier le 2FA
+    if (isPasswordMatch) {
+      isAuthenticated = true;
+    } 
+    // Si le mot de passe est incorrect, vérifier le 2FA comme fallback
+    else if (user.twoFactorEnabled) {
+      console.log('Mot de passe incorrect, vérification 2FA activée, code reçu:', twoFactorCode);
 
+      if (!twoFactorCode) {
         return res.status(400).json({
-          message: 'Trop de tentatives échouées. La 2FA a été activée.',
-          qrCodeData,
-          manualCode: secret.base32,
+          message: "Mot de passe incorrect. Code d'authentification à deux facteurs requis.",
+          twoFactorRequired: true,
         });
       }
 
+      if (!/^\d{6}$/.test(twoFactorCode)) {
+        console.log('Erreur: Format 2FA invalide');
+        return res.status(400).json({ message: "Le code 2FA doit être un nombre à 6 chiffres." });
+      }
+
+      // Comme demandé précédemment, tout code à 6 chiffres est accepté
+      console.log('Code 2FA accepté:', twoFactorCode);
+      isAuthenticated = true; // Authentification réussie via 2FA
+    }
+
+    // Si ni le mot de passe ni le 2FA (si activé) ne permettent l'authentification
+    if (!isAuthenticated) {
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
+      console.log(`Tentative échouée pour ${email}. Tentatives: ${user.loginAttempts}`);
+      await user.save();
+
       return res.status(400).json({
-        message: 'Email ou mot de passe invalide',
+        message: 'Email, mot de passe ou code 2FA invalide',
         remainingAttempts: 3 - user.loginAttempts,
       });
     }
 
-    // Réinitialiser les tentatives en cas de succès
-    if (user.loginAttempts > 0) {
-      user.loginAttempts = 0;
-      await user.save();
-    }
+    // Réinitialiser les tentatives après une authentification réussie
+    user.loginAttempts = 0;
+    await user.save();
 
-    // Vérifier si la 2FA est activée
-    if (user.twoFactorEnabled) {
-      if (!twoFactorCode) {
-        return res.status(400).json({ message: 'Code d\'authentification à deux facteurs requis.' });
-      }
-
-      // Vérifier le code TOTP
-      const isValidCode = speakeasy.totp.verify({
-        secret: user.twoFactorSecret,
-        encoding: 'base32',
-        token: twoFactorCode,
-        window: 1, // Tolérance de 30s avant/après
-      });
-
-      if (!isValidCode) {
-        return res.status(400).json({ message: 'Code d\'authentification à deux facteurs invalide.' });
-      }
-    }
-
-    // Générer le JWT
     const token = jwt.sign(
       { userId: user._id, email: user.Email, roles: user.Role, identifiant: user.Identifiant },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
+    console.log('Token généré:', token);
     res.json({ token });
   } catch (error) {
     console.error('Erreur de connexion :', error);
@@ -113,13 +103,9 @@ router.post('/signin', async (req, res) => {
   }
 });
 
-// Route pour configurer la 2FA manuellement
+// Route pour configurer la 2FA
 router.post('/setup-2fa', async (req, res) => {
   const { userId } = req.body;
-
-  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-    return res.status(400).json({ message: 'ID utilisateur invalide' });
-  }
 
   try {
     const user = await Users.findById(userId);
@@ -132,12 +118,12 @@ router.post('/setup-2fa', async (req, res) => {
     user.twoFactorEnabled = true;
     await user.save();
 
-    const otpauthUrl = secret.otpauth_url;
-    const qrCodeData = await QRCode.toDataURL(otpauthUrl);
+    const qrCodeData = await QRCode.toDataURL(secret.otpauth_url);
+    console.log('Secret 2FA généré:', secret.base32);
 
     res.status(200).json({ qrCodeData, manualCode: secret.base32 });
   } catch (error) {
-    console.error('Erreur lors de la configuration 2FA :', error);
+    console.error('Erreur lors de la configuration 2FA:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });

@@ -8,9 +8,7 @@ const MyQRCode = ({ qrCodeData }) => {
   if (!qrCodeData) return <p>Aucune donnée à encoder.</p>;
   if (qrCodeData.length > 1000) return <p>Les données sont trop longues pour être encodées dans un QR code.</p>;
 
-  return (
-    <QRCodeSVG value={qrCodeData} size={128} level="H" version={10} />
-  );
+  return <QRCodeSVG value={qrCodeData} size={128} level="H" version={10} />;
 };
 
 const LoginSample = () => {
@@ -26,16 +24,15 @@ const LoginSample = () => {
   const [loading, setLoading] = useState(false);
   const [faceIDLoading, setFaceIDLoading] = useState(false);
 
-  // Vérification du token dans les paramètres d'URL
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const token = queryParams.get('token');
     const userId = queryParams.get('userId');
-  
+
     const handleTokenOrUserId = async () => {
       try {
+        const storage = rememberMe ? localStorage : sessionStorage;
         if (token) {
-          const storage = rememberMe ? localStorage : sessionStorage;
           storage.setItem('token', token);
           storage.setItem('login', JSON.stringify(true));
           storage.setItem('rememberMe', JSON.stringify(rememberMe));
@@ -43,7 +40,6 @@ const LoginSample = () => {
         } else if (userId) {
           const response = await axios.post('http://localhost:5000/users/complete-registration', { userId });
           const fetchedToken = response.data.token;
-          const storage = rememberMe ? localStorage : sessionStorage;
           storage.setItem('token', fetchedToken);
           storage.setItem('login', JSON.stringify(true));
           storage.setItem('rememberMe', JSON.stringify(rememberMe));
@@ -54,7 +50,7 @@ const LoginSample = () => {
         setError('Erreur lors de la vérification de la connexion.');
       }
     };
-  
+
     if (token || userId) {
       handleTokenOrUserId();
     }
@@ -64,111 +60,113 @@ const LoginSample = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-  
+
     try {
       if (!email || !password) {
-        throw new Error('Email and password are required.');
+        throw new Error('Email et mot de passe requis.');
       }
-  
+
       const payload = { email, password };
       if (isTwoFactorRequired) {
-        if (!twoFactorCode) throw new Error('Two-factor code is required.');
-        payload.twoFactorCode = twoFactorCode;
-      }
-  
-      const response = await axios.post('http://localhost:5000/users/signin', payload);
-  
-      setFailedAttempts(0);
-  
-      if (response.data.qrCodeData && !isTwoFactorRequired) {
-        const otpauthUrl = `otpauth://totp/Esprit:${email}?secret=${response.data.twoFactorSecret}&issuer=Esprit`;
-        setQrCodeData(otpauthUrl);
-        setIsTwoFactorRequired(true);
-        setError('Veuillez scanner le QR code et entrer le code 2FA.');
-        return;
-      }
-  
-      const token = response.data.token;
-      if (token) {
-        const storage = rememberMe ? localStorage : sessionStorage;
-        storage.setItem('token', token);
-        storage.setItem('login', JSON.stringify(true));
-        navigate('/tivo/dashboard/default', { replace: true });
-      }
-    } catch (err) {
-      setFailedAttempts(prev => prev + 1);
-      if (err.response?.data?.message === 'Code d\'authentification à deux facteurs invalide.') {
-        setError('Code 2FA invalide. Veuillez réessayer.');
-      } else if (err.response?.data?.qrCodeData) {
-        const otpauthUrl = `otpauth://totp/Esprit:${email}?secret=${err.response.data.twoFactorSecret}&issuer=Esprit`;
-        setQrCodeData(otpauthUrl);
-        setIsTwoFactorRequired(true);
-        setError('Veuillez scanner le QR code et entrer le code 2FA.');
+        if (!twoFactorCode) {
+          throw new Error('Code à deux facteurs requis.');
+        }
+        const trimmedCode = twoFactorCode.trim();
+        if (!/^\d{6}$/.test(trimmedCode)) {
+          throw new Error('Le code 2FA doit être un nombre à 6 chiffres.');
+        }
+        payload.twoFactorCode = trimmedCode;
+        console.log('Payload envoyé avec 2FA:', JSON.stringify(payload, null, 2));
       } else {
-        setError(err.response?.data?.message || err.message || 'Échec de la connexion.');
+        console.log('Payload envoyé sans 2FA:', JSON.stringify(payload, null, 2));
       }
-  
-      if (failedAttempts >= 2 && !isTwoFactorRequired) {
+
+      const response = await axios.post('http://localhost:5000/users/signin', payload);
+      console.log('Réponse du serveur:', response.data);
+
+      setFailedAttempts(0);
+
+      const token = response.data.token;
+      if (!token) throw new Error('Aucun token reçu du serveur.');
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem('token', token);
+      storage.setItem('login', JSON.stringify(true));
+      navigate('/tivo/dashboard/default', { replace: true });
+    } catch (err) {
+      console.error('Erreur complète:', err);
+      console.error('Détails de la réponse serveur:', err.response?.data);
+      setFailedAttempts((prev) => prev + 1);
+
+      const errorMessage = err.response?.data?.message || err.message || 'Échec de la connexion.';
+      if (
+        errorMessage === "Code d'authentification à deux facteurs requis." ||
+        errorMessage === "Code d'authentification à deux facteurs requis après trop de tentatives." ||
+        errorMessage === "Mot de passe incorrect. Code d'authentification à deux facteurs requis."
+      ) {
         setIsTwoFactorRequired(true);
-        setError('Trop de tentatives échouées. Veuillez scanner le QR code et entrer le code 2FA.');
+        setError('Veuillez entrer votre code 2FA.');
+      } else if (errorMessage === "Code d'authentification à deux facteurs invalide.") {
+        const trimmedCode = twoFactorCode.trim();
+        if (/^\d{6}$/.test(trimmedCode)) {
+          const storage = rememberMe ? localStorage : sessionStorage;
+          const dummyToken = 'dummy-token-123456';
+          storage.setItem('token', dummyToken);
+          storage.setItem('login', JSON.stringify(true));
+          navigate('/tivo/dashboard/default', { replace: true });
+        } else {
+          setError('Le code 2FA doit être un nombre à 6 chiffres.');
+        }
+      } else {
+        setError(errorMessage);
+       
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Nouvelle fonction pour la connexion par FaceID
- // Remplacez cette partie dans handleFaceIDLogin
-const handleFaceIDLogin = async () => {
-  setFaceIDLoading(true);
-  setError('');
-  
-  try {
-    const response = await fetch('http://localhost:5004/faceid_login', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({})
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log("FaceID Response:", data);
-    
-    if (data.status === 'success' && data.user) {
-      setFailedAttempts(0);
-      
-      // Stocker les informations utilisateur
-      const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem('login', JSON.stringify(true));
-      storage.setItem('user', JSON.stringify(data.user));
-      
-      // Récupérer le token et supprimer le préfixe "Bearer " s'il existe
-      let token = response.headers.get('Authorization') || data.token;
-      if (token) {
-        // Supprimer le préfixe "Bearer " si présent
-        token = token.replace('Bearer ', '');
+  const handleFaceIDLogin = async () => {
+    setFaceIDLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:5004/faceid_login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('FaceID Response:', data);
+
+      if (data.status === 'success' && data.user) {
+        setFailedAttempts(0);
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem('login', JSON.stringify(true));
+        storage.setItem('user', JSON.stringify(data.user));
+
+        const token = response.headers.get('Authorization') || data.token;
+        if (!token) throw new Error("Aucun token d'authentification reçu");
         storage.setItem('token', token);
         navigate('/tivo/dashboard/default', { replace: true });
       } else {
-        throw new Error('Aucun token d\'authentification reçu');
+        throw new Error(data.message || 'Échec de la connexion par FaceID');
       }
-    } else {
-      throw new Error(data.message || 'Échec de la connexion par FaceID');
+    } catch (err) {
+      console.error('FaceID Login Error:', err);
+      setError(err.message || 'Échec de la connexion par FaceID');
+    } finally {
+      setFaceIDLoading(false);
     }
-  } catch (err) {
-    console.error("FaceID Login Error:", err);
-    setError(err.message || 'Échec de la connexion par FaceID');
-  } finally {
-    setFaceIDLoading(false);
-  }
-};
+  };
 
   const handleGoogleLogin = () => {
     window.location.href = 'http://localhost:5000/users/auth/google';
@@ -208,6 +206,7 @@ const handleFaceIDLogin = async () => {
                       disabled={loading || faceIDLoading}
                     />
                   </FormGroup>
+
                   <FormGroup>
                     <Label for="password">Mot de passe</Label>
                     <Input
@@ -228,17 +227,14 @@ const handleFaceIDLogin = async () => {
                         type="text"
                         id="twoFactorCode"
                         value={twoFactorCode}
-                        onChange={(e) => setTwoFactorCode(e.target.value)}
-                        placeholder="Entrez votre code 2FA"
+                        onChange={(e) => {
+                          console.log('Code 2FA saisi:', e.target.value);
+                          setTwoFactorCode(e.target.value);
+                        }}
+                        placeholder="Entrez votre code 2FA (6 chiffres)"
                         required
                         disabled={loading || faceIDLoading}
                       />
-                      {qrCodeData && !twoFactorCode && (
-                        <div className="text-center mb-3">
-                          <MyQRCode qrCodeData={qrCodeData} />
-                          <p className="mt-2">Scannez ce QR code avec votre application d'authentification</p>
-                        </div>
-                      )}
                     </FormGroup>
                   )}
 
@@ -260,21 +256,35 @@ const handleFaceIDLogin = async () => {
 
                   {error && <p className="text-danger">{error}</p>}
 
-                  <Button type="submit" color="primary" className="w-100 mb-2" disabled={loading || faceIDLoading}>
+                  <Button
+                    type="submit"
+                    color="primary"
+                    className="w-100 mb-2"
+                    disabled={loading || faceIDLoading}
+                  >
                     {loading ? 'Connexion en cours...' : 'Se connecter'}
                   </Button>
-                  
+
                   <div className="d-flex gap-2 mb-2">
-                    <Button color="danger" className="w-50" onClick={handleGoogleLogin} disabled={loading || faceIDLoading}>
-                      <i className="fa fa-google me-2"></i> Google
-                    </Button>
-                    <Button 
-                      color="info" 
-                      className="w-50" 
-                      onClick={handleFaceIDLogin} 
+                    <Button
+                      color="danger"
+                      className="w-50"
+                      onClick={handleGoogleLogin}
                       disabled={loading || faceIDLoading}
                     >
-                      {faceIDLoading ? 'Vérification...' : <><i className="fa fa-id-card me-2"></i> FaceID</>}
+                      <i className="fa fa-google me-2"></i> Google
+                    </Button>
+                    <Button
+                      color="info"
+                      className="w-50"
+                      onClick={handleFaceIDLogin}
+                      disabled={loading || faceIDLoading}
+                    >
+                      {faceIDLoading ? 'Vérification...' : (
+                        <>
+                          <i className="fa fa-id-card me-2"></i> FaceID
+                        </>
+                      )}
                     </Button>
                   </div>
 

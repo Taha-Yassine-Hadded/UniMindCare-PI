@@ -35,8 +35,9 @@ const userSchema = new mongoose.Schema({
   otp: { type: String },
   otpExpires: { type: Date },
   loginAttempts: { type: Number, default: 0 },
-  TwoFactorEnabled: { type: Boolean, default: false },
-  twoFactorSecret: { type: String },
+  twoFactorSecret: String,        // Secret 2FA permanent
+    twoFactorSecretTemp: String,    // Secret temporaire avant activation
+    twoFactorEnabled: { type: Boolean, default: false } // Statut 2FA
 }, { 
   collection: 'users',
   timestamps: true,
