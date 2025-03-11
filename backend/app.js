@@ -14,7 +14,7 @@ const Keycloak = require('keycloak-connect');
 const axios = require('axios');
 const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
-const UserVerification = require('./models/UserVerification'); 
+const UserVerification = require('./Models/UserVerification'); 
 const User = require('./models/Users');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
@@ -23,6 +23,7 @@ const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
 const transporter = require('./config/emailConfig');
+const postsRouter = require('./routes/posts');
 const { initScheduler } = require('./utils/scheduler');
 
 // Servir les fichiers statiques depuis le dossier images
@@ -52,6 +53,8 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
+
+app.use('/api/posts', postsRouter);
  // Authentication routes
 //app.use('/users', usersRouter);
 
