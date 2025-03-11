@@ -4,6 +4,7 @@ import { Form, FormGroup, Label, Input } from 'reactstrap';
 import axios from 'axios';
 import ReactQuill from 'react-quill'; // Importer React-Quill
 import 'react-quill/dist/quill.snow.css'; // Importer les styles
+import Swal from 'sweetalert2'; 
 
 const FormPost = ({ onPostSuccess }) => {
   const [title, setTitle] = useState('');
@@ -12,9 +13,33 @@ const FormPost = ({ onPostSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+     // Vérification des champs obligatoires
+     if (!title.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Champ requis',
+        text: 'Le titre est obligatoire.',
+      });
+      return;
+    }
+
+    if (!content.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Champ requis',
+        text: 'Le contenu est obligatoire.',
+      });
+      return;
+    }
+
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
-      alert('Veuillez vous connecter pour publier.');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Non connecté',
+        text: 'Veuillez vous connecter pour publier.',
+      });
       return;
     }
     try {
@@ -30,9 +55,22 @@ const FormPost = ({ onPostSuccess }) => {
       setTitle('');
       setContent('');
       setIsAnonymous(false);
+
+       // 🛑 Désactiver l'alerte par défaut du navigateur
+    window.alert = function () {}; // Désactiver tout alert() natif du navigateur
+    
+      Swal.fire({
+        icon: 'success',
+        title: 'Publication réussie !',
+        text: 'Votre post a été publié avec succès.',
+      });
       if (onPostSuccess) onPostSuccess();
     } catch (error) {
-      console.error('Erreur lors de la création:', error.response?.data || error.message);
+      Swal.fire({
+        icon: 'error',
+        title: 'Erreur lors de la publication',
+        text: error.response?.data?.message || 'Une erreur est survenue, veuillez réessayer.',
+      });
     }
   };
 
@@ -57,7 +95,7 @@ const FormPost = ({ onPostSuccess }) => {
           id="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          required
+          
         />
       </FormGroup>
       <FormGroup>
