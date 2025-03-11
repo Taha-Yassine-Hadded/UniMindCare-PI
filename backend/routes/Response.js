@@ -123,15 +123,17 @@ function getNextSaturday() {
 }
 
 
-// Récupérer les questions (modifier cette route existante)
-/*router.get('/questions', (req, res) => {
-  // Vérifier si aujourd'hui est un dimanche (jour 0 de la semaine en JavaScript) au lieu de samedi
+/*
+
+
+router.get('/questions', (req, res) => {
+  // Vérifier si aujourd'hui est un mercredi (jour 3 de la semaine en JavaScript)
   const today = new Date();
-  if (today.getDay() !== 0) { // 0 pour dimanche au lieu de 6 pour samedi
+  if (today.getDay() !== 3) {
     return res.status(403).json({ 
-      message: "Le questionnaire est uniquement disponible le dimanche",
+      message: "Le questionnaire est uniquement disponible le mercredi",
       isAvailable: false,
-      nextAvailableDate: getNextSunday()
+      nextAvailableDate: getNextWednesday()
     });
   }
   
@@ -141,17 +143,18 @@ function getNextSaturday() {
   });
 });
 
-// Fonction pour obtenir la date du prochain dimanche
-function getNextSunday() {
+// Fonction pour obtenir la date du prochain mercredi
+function getNextWednesday() {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 (dimanche) à 6 (samedi)
-  const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+  const daysUntilWednesday = dayOfWeek === 3 ? 7 : (3 + 7 - dayOfWeek) % 7; // Si on est déjà mercredi, on prend le mercredi suivant
   
-  const nextSunday = new Date(today);
-  nextSunday.setDate(today.getDate() + daysUntilSunday);
+  const nextWednesday = new Date(today);
+  nextWednesday.setDate(today.getDate() + daysUntilWednesday);
   
-  return nextSunday.toISOString().split('T')[0]; // Format YYYY-MM-DD
-}*/
+  return nextWednesday.toISOString().split('T')[0]; // Format YYYY-MM-DD
+}
+*/
 
 // Soumettre les réponses et analyser l'état mental
 router.post('/submit', async (req, res) => {
@@ -485,11 +488,11 @@ router.post('/send-reminders', async (req, res) => {
 
 router.post('/send-reminders', async (req, res) => {
   try {
-    // Vérifier si c'est dimanche (jour 0 de la semaine en JavaScript)
+    // Vérifier si c'est mercredi (jour 3 de la semaine en JavaScript)
     const today = new Date();
-    if (today.getDay() !== 0) {
+    if (today.getDay() !== 3) {
       return res.status(400).json({ 
-        message: "Les rappels ne peuvent être envoyés que le dimanche" 
+        message: "Les rappels ne peuvent être envoyés que le mercredi" 
       });
     }
     
@@ -503,7 +506,6 @@ router.post('/send-reminders', async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 });
-
 
 */
 
