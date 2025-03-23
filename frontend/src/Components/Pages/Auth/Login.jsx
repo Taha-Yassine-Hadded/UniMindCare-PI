@@ -128,7 +128,7 @@ const LoginSample = () => {
   const handleFaceIDLogin = async () => {
     setFaceIDLoading(true);
     setError('');
-
+  
     try {
       const response = await fetch('http://localhost:5004/faceid_login', {
         method: 'POST',
@@ -139,23 +139,40 @@ const LoginSample = () => {
         },
         body: JSON.stringify({}),
       });
-
+  
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
-
+  
       const data = await response.json();
       console.log('FaceID Response:', data);
-
+  
       if (data.status === 'success' && data.user) {
         setFailedAttempts(0);
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('login', JSON.stringify(true));
         storage.setItem('user', JSON.stringify(data.user));
-
-        const token = response.headers.get('Authorization') || data.token;
+  
+        // Extraire le token de l'en-tête Authorization ou du corps de la réponse
+        let token = data.token;
+        const authHeader = response.headers.get('Authorization');
+        
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          // Enlever le préfixe 'Bearer ' de l'en-tête Authorization
+          token = authHeader.substring(7);
+          console.log('Token extrait de l\'en-tête Authorization:', token);
+        } else if (authHeader) {
+          token = authHeader;
+          console.log('Token brut de l\'en-tête Authorization:', token);
+        } else if (token) {
+          console.log('Token extrait du corps de la réponse:', token);
+        }
+  
         if (!token) throw new Error("Aucun token d'authentification reçu");
+        
         storage.setItem('token', token);
+        console.log('Token stocké dans', rememberMe ? 'localStorage' : 'sessionStorage');
+        
         navigate('/tivo/dashboard/default', { replace: true });
       } else {
         throw new Error(data.message || 'Échec de la connexion par FaceID');

@@ -22,6 +22,8 @@
     "axios": "^0.27.2",
     "body-scroll-lock": "^4.0.0-beta.0",
     "bootstrap": "^5.2.2",
+    "chart.js": "^3.9.1",
+    "chartjs-plugin-zoom": "^2.2.0",
     "core-js": "^3.40.0",
     "deni-react-treeview": "^1.1.11",
     "emoji-picker-react": "^3.5.1",

@@ -179,14 +179,8 @@ const SupportElement = () => {
       <Container className="mt-5">
         <Alert color="warning" className="text-center">
           <H4>{error}</H4>
-          <p>Vous devez être connecté pour accéder au questionnaire</p>
-          <Button 
-            color="primary" 
-            className="mt-3"
-            onClick={handleLoginRedirect}
-          >
-            Se connecter
-          </Button>
+          <p></p>
+       
         </Alert>
       </Container>
     );

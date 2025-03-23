@@ -121,6 +121,12 @@ app.use('/users', usersRouter);
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 
+// Partie meteo
+// Importer la route de météo
+const weatherRoutes = require('./routes/Weather');
+app.use('/api/weather', weatherRoutes);
+
+
 // Partie questionnaires
 // Importer la route de questionnaires
 const questionnaireRoutes = require('./routes/Response');

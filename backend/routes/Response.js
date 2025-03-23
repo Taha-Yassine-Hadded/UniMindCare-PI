@@ -93,6 +93,7 @@ const questions = [
 ];
 
 // Récupérer les questions
+
 router.get('/questions', (req, res) => {
   // Vérifier si aujourd'hui est un samedi (jour 6 de la semaine en JavaScript)
   const today = new Date();
@@ -100,7 +101,8 @@ router.get('/questions', (req, res) => {
     return res.status(403).json({ 
       message: "Le questionnaire est uniquement disponible le samedi",
       isAvailable: false,
-      nextAvailableDate: getNextSaturday()
+      nextAvailableDate: getNextSaturday(),
+      reminderMessage: "N'oubliez pas de revenir samedi prochain pour compléter le questionnaire et gagner des points!",
     });
   }
   
@@ -123,9 +125,9 @@ function getNextSaturday() {
 }
 
 
+
+
 /*
-
-
 router.get('/questions', (req, res) => {
   // Vérifier si aujourd'hui est un mercredi (jour 3 de la semaine en JavaScript)
   const today = new Date();
@@ -133,7 +135,9 @@ router.get('/questions', (req, res) => {
     return res.status(403).json({ 
       message: "Le questionnaire est uniquement disponible le mercredi",
       isAvailable: false,
-      nextAvailableDate: getNextWednesday()
+      nextAvailableDate: getNextWednesday(),
+      reminderMessage: "N'oubliez pas de revenir mercredi prochain pour compléter le questionnaire et gagner des points!",
+
     });
   }
   
@@ -154,7 +158,25 @@ function getNextWednesday() {
   
   return nextWednesday.toISOString().split('T')[0]; // Format YYYY-MM-DD
 }
+
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Soumettre les réponses et analyser l'état mental
 router.post('/submit', async (req, res) => {
@@ -484,8 +506,8 @@ router.post('/send-reminders', async (req, res) => {
 });
 
 
-/*
 
+/*
 router.post('/send-reminders', async (req, res) => {
   try {
     // Vérifier si c'est mercredi (jour 3 de la semaine en JavaScript)
