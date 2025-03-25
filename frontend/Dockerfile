@@ -1,4 +1,4 @@
-  FROM node:18
+FROM node:18
 
 # Set the working directory
 WORKDIR /src
@@ -17,4 +17,3 @@ EXPOSE 3000
 
 # Start the development server
 CMD ["npm", "start"]
-

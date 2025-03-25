@@ -1,45 +1,302 @@
-import React, { Fragment } from 'react';
-import { Form, FormGroup, Input, Label } from 'reactstrap';
+import React, { useState, useEffect, Fragment } from 'react';
+import { Container, Row, Col, Card, CardHeader, CardBody, Form, FormGroup, Label, Input, Button, Alert, Progress, Badge } from 'reactstrap';
+import { H4, H5, P } from '../../../../AbstractElements';
+import { useNavigate } from 'react-router-dom';
+
+// Fonction pour décoder le token JWT
+const decodeJWT = (token) => {
+  try {
+    if (!token) return {};
+    
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window.atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error("Erreur de décodage du token:", error);
+    return {};
+  }
+};
+
+// Fonction pour obtenir le token depuis le stockage
+const getToken = () => {
+  return localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+};
 
 const SupportElement = () => {
+  // États
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [userEmail, setUserEmail] = useState(null);
+  const [tokenExists, setTokenExists] = useState(false);
+  const navigate = useNavigate();
+
+  // Fonction pour gérer les réponses
+  const handleAnswerChange = (questionId, value) => {
+    console.log("Question répondue:", questionId, value);
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: parseInt(value, 10)
+    }));
+  };
+
+  // Fetch questions au chargement du composant
+  useEffect(() => {
+    async function initializeData() {
+      try {
+        // Récupérer le token du localStorage
+        const token = getToken();
+        if (!token) {
+          throw new Error("Aucun token d'authentification trouvé. Veuillez vous connecter.");
+        }
+        
+        setTokenExists(true);
+        console.log("Initialisation du test avec token du localStorage");
+        
+        // Décoder le token pour obtenir le userId et email
+        const decodedToken = decodeJWT(token);
+        if (!decodedToken.userId) {
+          throw new Error("Token invalide ou expiré");
+        }
+        
+        setUserId(decodedToken.userId);
+        setUserEmail(decodedToken.email || "Email non disponible");
+        console.log("UserID extrait du token:", decodedToken.userId);
+        
+        // Récupérer les questions
+        const response = await fetch('http://localhost:5000/api/questionnaire/questions', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log("Questions récupérées:", data.length);
+        setQuestions(data);
+        setLoading(false);
+      } catch (err) {
+        console.error("Erreur:", err);
+        setError(`${err.message}`);
+        setLoading(false);
+        setTokenExists(false);
+      }
+    }
+    
+    initializeData();
+  }, []);
+
+  // Soumission du formulaire
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (Object.keys(answers).length !== questions.length) {
+      setError("Veuillez répondre à toutes les questions.");
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      // Récupérer le token du localStorage
+      const token = getToken();
+      if (!token) {
+        throw new Error("Session expirée. Veuillez vous reconnecter.");
+      }
+      
+      const formattedAnswers = Object.entries(answers).map(([id, value]) => ({
+        questionId: parseInt(id, 10),
+        answer: value
+      }));
+
+      const response = await fetch('http://localhost:5000/api/questionnaire/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId,
+          answers: formattedAnswers
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}`);
+      }
+
+      const resultData = await response.json();
+      setResult(resultData);
+      setStep(2);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Redirection vers la page de connexion
+  const handleLoginRedirect = () => {
+    navigate('/tivo/authentication/login-simple');
+  };
+
+  // Affichage pour l'erreur d'authentification
+  if (!tokenExists && error) {
     return (
-      <Fragment>
-        <Form className="was-validated">
-          <div className="mb-3">
-            <Label className="form-label" for="validationTextarea">Textarea</Label>
-            <textarea className="form-control" id="validationTextarea" placeholder="Required example textarea" required></textarea>
-            <div className="invalid-feedback">Please enter a message in the textarea.</div>
-          </div>
-          <div className="custom-control custom-checkbox mb-3">
-            <Input className="custom-control-input me-2" id="customControlValidation1" type="checkbox" required />
-            <Label className="custom-control-label" htmlFor="customControlValidation1">{'Check this custom checkbox'}</Label>
-            <div className="invalid-feedback">{'Example invalid feedback text'}</div>
-          </div>
-          <div className="custom-control custom-radio">
-            <Input className="custom-control-input me-2" id="customControlValidation2" type="radio" name="radio-stacked" required />
-            <Label className="custom-control-label" htmlFor="customControlValidation2">{'Toggle this custom radio'}</Label>
-          </div>
-          <div className="custom-control custom-radio mb-3">
-            <Input className="custom-control-input me-2" id="customControlValidation3" type="radio" name="radio-stacked" required />
-            <Label className="custom-control-label" htmlFor="customControlValidation3">{'Or toggle this custom radio'}</Label>
-            <div className="invalid-feedback">{'More example invalid feedback text'}</div>
-          </div>
-          <FormGroup>
-            <Input type="select" className=" form-select" required>
-              <option value="">{'Open this select menu'}</option>
-              <option value="1">{'One'}</option>
-              <option value="2">{'Two'}</option>
-              <option value="3">{'Three'}</option>
-            </Input>
-            <div className="invalid-feedback">{'Example invalid custom select feedback'}</div>
-          </FormGroup>
-          <div className="custom-file">
-            <Input className="custom-file-input" id="validatedCustomFile" type="file" required />
-            <Label className="form-label" htmlFor="validatedCustomFile">{'Choose file...'}</Label>
-            <div className="invalid-feedback">{'Example invalid custom file feedback'}</div>
-          </div>
-        </Form>
-      </Fragment>
+      <Container className="mt-5">
+        <Alert color="warning" className="text-center">
+          <H4>{error}</H4>
+          <p>Vous devez être connecté pour accéder au questionnaire</p>
+          <Button 
+            color="primary" 
+            className="mt-3"
+            onClick={handleLoginRedirect}
+          >
+            Se connecter
+          </Button>
+        </Alert>
+      </Container>
     );
+  }
+
+  // Affichage du chargement
+  if (loading && !questions.length) {
+    return (
+      <Container className="text-center p-5">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Chargement...</span>
+        </div>
+        <p className="mt-3">Chargement du questionnaire...</p>
+      </Container>
+    );
+  }
+
+  return (
+    <Fragment>
+      <Container fluid>
+        <Row className="justify-content-center">
+          <Col xl="8">
+            <Card>
+              <CardHeader className="pb-0">
+                <H4>Questionnaire sur le bien-être étudiant</H4>
+                <P>Évaluez votre état psychologique et votre expérience scolaire</P>
+                {userEmail && (
+                  <div className="mt-2">
+                    <Badge color="info" pill className="p-2">
+                      <i className="fa fa-user me-1"></i> {userEmail}
+                    </Badge>
+                  </div>
+                )}
+              </CardHeader>
+              
+              <CardBody>
+                {error && <Alert color="danger" timeout={500}>{error}</Alert>}
+                
+                {step === 1 ? (
+                  <Form onSubmit={handleSubmit}>
+                    {questions.map((question) => (
+                      <FormGroup key={question.id} className="mb-4 p-3 border rounded">
+                        <H5>{question.text}</H5>
+                        <div className="d-flex flex-wrap mt-3">
+                          {question.options.map((option, index) => (
+                            <div key={index} className="form-check m-2">
+                              <Input
+                                type="radio"
+                                name={`question-${question.id}`}
+                                id={`q${question.id}-opt${index}`}
+                                value={index + 1}
+                                onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                                required
+                              />
+                              <Label for={`q${question.id}-opt${index}`}>
+                                {option}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </FormGroup>
+                    ))}
+
+                    <div className="text-center mt-4">
+                      <Button color="primary" size="lg" type="submit" disabled={loading}>
+                        {loading ? "Traitement en cours..." : "Valider le questionnaire"}
+                      </Button>
+                    </div>
+                  </Form>
+                ) : (
+                  <div className="result-section">
+                    <H4 className="text-center mb-4">Résultats de l'analyse</H4>
+                    
+                    <div className="score-section mb-4">
+                        <Progress
+                          value={result.score}
+                          max={50}
+                          color={
+                            result.score <= 15 ? 'success' :
+                            result.score <= 25 ? 'info' :
+                            result.score <= 35 ? 'warning' : 'danger'
+                          }
+                          className="mb-3"
+                        >
+                          Score: {result.score}/50
+                        </Progress>
+                        <H5>État émotionnel : {result.emotionalState}</H5>
+                    </div>
+
+                    <Card className="recommendation-card">
+                      <CardHeader>Recommandations</CardHeader>
+                      <CardBody>
+                        <ul className="list-unstyled">
+                          {result.recommendations.map((rec, index) => (
+                            <li key={index} className="mb-2">✔️ {rec}</li>
+                          ))}
+                        </ul>
+                      </CardBody>
+                    </Card>
+
+                    {/* Carte pour les points avec couleur bleue */}
+                    <Card className="points-card mb-4" color="primary">
+                      <CardBody className="text-center text-white">
+                        <div className="mb-2">
+                          <span className="badge bg-warning text-dark p-2">
+                            <i className="fa fa-star me-1"></i> +{result.pointsEarned || 20} points
+                          </span>
+                        </div>
+                        <p className="mb-0">Félicitations ! Vous avez gagné des points pour avoir complété ce questionnaire.</p>
+                        <p className="text-white-50 small">Un email récapitulatif a été envoyé à votre adresse.</p>
+                      </CardBody>
+                    </Card>
+
+                    <div className="text-center mt-4">
+                      <Button color="secondary" className="me-2" onClick={() => setStep(1)}>
+                        Refaire le test
+                      </Button>
+                      <Button color="primary" href="/tivo/dashboard/default">
+                        Retour au tableau de bord
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    </Fragment>
+  );
 };
+
 export default SupportElement;

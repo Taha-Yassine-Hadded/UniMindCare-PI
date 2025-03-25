@@ -1,24 +1,59 @@
 import React, { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { authHeader, handleResponse } from "../Services/fack.backend";
+import axios from "axios";
 
 const PrivateRoute = () => {
-  const login = JSON.parse(localStorage.getItem("login"))
   const [authenticated, setAuthenticated] = useState(false);
-  const jwt_token = localStorage.getItem("token");
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState(null);
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
 
   useEffect(() => {
-    const requestOptions = { method: "GET", headers: authHeader() };
-    fetch("/users", requestOptions).then(handleResponse);
-    setAuthenticated(JSON.parse(localStorage.getItem("authenticated")));
+    const checkAuth = async () => {
+      if (!token) {
+        setAuthenticated(false);
+        setLoading(false);
+        console.log("PrivateRoute - Aucun token trouvé, utilisateur non connecté");
+        return;
+      }
 
-    localStorage.setItem("authenticated", authenticated);
-    localStorage.setItem("login", login);
-  }, []);
-  return login || authenticated || jwt_token ? (
-    <Outlet />
+      try {
+        console.log("PrivateRoute - Token utilisé:", token); // Ajout ici
+        const response = await axios.get("http://localhost:5000/api/users/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = response.data;
+        // Assurez-vous que les champs sont uniformes
+        const normalizedData = {
+          Name: data.Name || "",
+          Identifiant: data.Identifiant || data.identifiant || "",
+          Email: data.Email || "",
+          Classe: data.Classe || "",
+          Role: data.Role || "",
+          PhoneNumber: data.PhoneNumber || "",
+          imageUrl: data.imageUrl || "/defaultProfile.png",
+        };
+        setAuthenticated(true);
+        setUserData(normalizedData);
+        localStorage.setItem('user', JSON.stringify(normalizedData));
+        console.log("PrivateRoute - Données utilisateur:", normalizedData);
+      } catch (error) {
+        setAuthenticated(false);
+        console.error("PrivateRoute - Échec de l'authentification:", error.response?.data || error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [token]);
+
+  if (loading) return <div>Chargement...</div>;
+
+  return authenticated ? (
+    <Outlet context={{ userData }} />
   ) : (
-    <Navigate exact to={`${process.env.PUBLIC_URL}/login`} />
+    <Navigate to={`${process.env.PUBLIC_URL}/login`} replace />
   );
 };
 

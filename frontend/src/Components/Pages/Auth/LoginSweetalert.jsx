@@ -7,7 +7,21 @@ const LoginSweetalert = () => {
             <section>
                 <Container className="p-0" fluid={true}>
                     <Row className="mx-0">
-                        <Col className="px-0" xl="12" style={{ backgroundImage: `url(${imgg})`, backgroundRepeat: 'no-repeat', backgroundSize: 'cover', backgroundPosition: 'center', display: 'block' }}>
+                    <Col xl="7" style={{ 
+    backgroundImage: `url(${imgg})`, 
+    backgroundRepeat: 'no-repeat', 
+    backgroundSize: 'cover', 
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+    margin: '0 auto',
+    boxShadow: 'inset 0 0 100px rgba(0, 0, 0, 0.5)',
+    padding: '30px 12px'
+}} >
                             <div className="login-card">
                                 <LoginForm />
                             </div>
