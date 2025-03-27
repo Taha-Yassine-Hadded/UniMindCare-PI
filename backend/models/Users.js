@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema({
   PhoneNumber: { type: String },
   imageUrl: { type: String },
   verified: { type: Boolean, default: false },
+  enabled: { type: Boolean, default: false },
   otp: { type: String },
   otpExpires: { type: Date },
   loginAttempts: { type: Number, default: 0 },

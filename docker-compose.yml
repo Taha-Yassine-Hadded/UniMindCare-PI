@@ -1,39 +1,4 @@
-#version: '3.8'
-
 services:
-  postgres:
-    image: postgres:15
-    container_name: postgres
-    environment:
-      - POSTGRES_DB=keycloak
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - unimindcare_network
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:21.1.1
-    container_name: keycloak
-    environment:
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
-      - KC_DB_USERNAME=admin
-      - KC_DB_PASSWORD=admin
-      - KC_HOSTNAME=localhost
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=admin
-    ports:
-      - "8080:8080"
-    command:
-      - start-dev
-    depends_on:
-      - postgres
-    networks:
-      - unimindcare_network
 
   mongo:
     image: mongo:6.0
@@ -42,8 +7,6 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
-    networks:
-      - unimindcare_network
 
   backend:
     container_name: backend
@@ -54,16 +17,9 @@ services:
       - "5000:5000"
     environment:
       MONGO_URI: mongodb://mongo:27017/Pi-2025
-      KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_REALM: unimindcare
-      KEYCLOAK_CLIENT_ID: unimindcare-client
-      KEYCLOAK_CLIENT_SECRET: SJjHnmJMsmm2LyjMY3gNqEytsE25mDZE
       FRONTEND_URI: http://frontend:3000
     depends_on:
       - mongo
-      - keycloak
-    networks:
-      - unimindcare_network
   
   frontend:
     container_name: frontend
@@ -76,15 +32,6 @@ services:
       BACKEND_URI: http://backend:5000
     depends_on:
       - backend
-    networks:
-      - unimindcare_network
-
-
 
 volumes:
   mongo-data:
-  postgres_data:
-
-networks:
-  unimindcare_network:
-    driver: bridge

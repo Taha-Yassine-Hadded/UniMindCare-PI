@@ -10,12 +10,10 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
-const Keycloak = require('keycloak-connect');
-const axios = require('axios');
 const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
 const UserVerification = require('./Models/UserVerification'); 
-const User = require('./models/Users');
+const User = require('./Models/Users');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
 const crypto = require('crypto');
@@ -25,11 +23,13 @@ const { GridFsStorage } = require('multer-gridfs-storage');
 const transporter = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
 const { initScheduler } = require('./utils/scheduler');
+const { spawn } = require("child_process");
+
 
 // Servir les fichiers statiques depuis le dossier images
 
 var indexRouter = require('./routes/index');
-//var usersRouter = require('./routes/users');
+var usersRoutes = require('./routes/users');
 
 const passport = require('./routes/passportConfig'); // Import the configured passport instance
 const usersRouter = require('./routes/usersRouter');
@@ -53,22 +53,16 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
+app.use("/api/users", usersRoutes);
 
 app.use('/api/posts', postsRouter);
- // Authentication routes
-//app.use('/users', usersRouter);
 
 
 // MongoDB connection
-/*mongoose
+mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));*/
-
-   // Connexion à MongoDB
-   mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
-     .then(() => console.log('Connexion à MongoDB réussie'))
-     .catch(err => console.log('Erreur de connexion à MongoDB: ', err));
+  .catch((err) => console.error('MongoDB connection error:', err));
 
 
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -636,12 +630,97 @@ app.get('/image/:filename', async (req, res) => {
     res.status(500).send('Erreur lors du chargement de l\'image');
   }
 });
+
+
+// Partie Taha
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
-/* ////////////////////////////////////////////////////////////////////////////////////////////*/
-/* ////////////////////////////////////////////////////////////////////////////////////////////*/
+
+
+const fetchUsers = async () => {
+  try {
+    const users = await User.find().lean();
+    return users.map((user) => ({
+      ...user,
+      createdAt: user.createdAt.toISOString(),
+    }));
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    throw error;
+  }
+};
+
+app.get("/predictions", async (req, res) => {
+  try {
+    const users = await fetchUsers();
+    if (!users || users.length === 0) {
+      return res.status(404).json({ error: "No user data found" });
+    }
+
+    const pythonProcess = spawn("python", [path.join(__dirname, "predict.py")]);
+    let output = "";
+    let errorOutput = "";
+
+    pythonProcess.stdin.write(JSON.stringify(users));
+    pythonProcess.stdin.end();
+
+    pythonProcess.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+
+    pythonProcess.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+    });
+
+    pythonProcess.on("close", (code) => {
+      console.log("Python Exit Code:", code);
+      console.log("Python Output:", output);
+      console.log("Python Error Output:", errorOutput);
+      if (code === 0) {
+        try {
+          const predictions = JSON.parse(output);
+          res.json(predictions);
+        } catch (parseError) {
+          console.error("Parse error:", parseError);
+          res.status(500).json({ error: "Failed to parse prediction output" });
+        }
+      } else {
+        console.error("Python script error:", errorOutput);
+        res.status(500).json({ error: "Prediction script failed", details: errorOutput });
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ error: "Failed to fetch user data" });
+  }
+});
+
+// Cleanup function
+app.closeAll = async () => {
+  try {
+    await mongoose.connection.close();
+    console.log("Mongoose connection closed");
+
+    if (storage.client) {
+      await storage.client.close();
+      console.log("GridFsStorage client closed");
+    } else if (storage.db) {
+      await storage.db.close();
+      console.log("GridFsStorage db closed");
+    }
+
+    // Remove these lines since transporter doesn't need to be closed
+    // transporter.close();
+    // console.log("Transporter from emailConfig closed");
+    // transporterHoussine.close();
+    // console.log("TransporterHoussine closed");
+  } catch (err) {
+    console.error("Error during cleanup:", err);
+  }
+};
+
 
 
 

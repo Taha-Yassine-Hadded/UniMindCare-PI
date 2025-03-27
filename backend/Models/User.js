@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   Role: String,
   PhoneNumber: String,  // éviter les espaces dans le nom de champ
   imageUrl: String,
+  enabled: { type: Boolean, default: false },
   verified: { type: Boolean, default: false }  // champ ajouté pour la vérification de l'email
 }, { timestamps: true });
 
