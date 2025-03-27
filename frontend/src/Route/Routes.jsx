@@ -115,8 +115,15 @@ import CheckOutContain from "../Components/Eccommerce/CheckOut/index";
 import AddProductName from "../Components/Eccommerce/AddProduct";
 import FileManagerContain from "../Components/FileManager/index";
 import MapJsContain from "../Components/Maps/pigeon-maps";
+import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
+
+
+
 
 export const routes = [
+    //Weather
+    { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
+    
   // dashboard
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/default`, Component: <Default /> },

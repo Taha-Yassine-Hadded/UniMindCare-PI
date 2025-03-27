@@ -59,10 +59,15 @@ app.use('/api/posts', postsRouter);
 
 
 // MongoDB connection
-mongoose
+/*mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+  .catch((err) => console.error('MongoDB connection error:', err));*/
+
+   // Connexion à MongoDB
+   mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
+     .then(() => console.log('Connexion à MongoDB réussie'))
+     .catch(err => console.log('Erreur de connexion à MongoDB: ', err));
 
 
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
