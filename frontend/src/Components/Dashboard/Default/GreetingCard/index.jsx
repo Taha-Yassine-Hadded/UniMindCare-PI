@@ -297,7 +297,9 @@ const Greetingcard = () => {
     style={{
       borderRadius: '8px',
       padding: '0.375rem 0.75rem',
-      transition: 'all 0.2s ease'
+      transition: 'all 0.2s ease' ,
+      color: '#000000', 
+      fontWeight: 500   
     }}
   >
     Voir prévisions complètes

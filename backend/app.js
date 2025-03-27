@@ -121,6 +121,19 @@ app.use('/users', usersRouter);
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 
+
+// Partie Crise
+const crisisDataRoutes = require('./routes/crisisData');
+
+
+// Ajouter la route des données de crise
+app.use('/api/crisis', crisisDataRoutes);
+
+
+
+
+
+
 // Partie meteo
 // Importer la route de météo
 const weatherRoutes = require('./routes/Weather');
