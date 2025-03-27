@@ -44,9 +44,7 @@ const Users = () => {
     <LI attrLI={{ className: `profile-nav onhover-dropdown` }}>
       <div className="account-user"><User onClick={Active} /></div>
       <UL attrUL={{ className: "profile-dropdown onhover-show-div" }}>
-        <LI><Link to={"/users/userProfile"}><User /><span>{Account}</span></Link></LI>
-        <LI><Link to={"/email-app"}><Inbox /><span>Inbox</span></Link></LI>
-        <LI><Link to={`${process.env.PUBLIC_URL}/users/useredit`}><i><Settings /></i><span>Settings</span></Link></LI>
+        <LI><Link to={`${process.env.PUBLIC_URL}/users/useredit`}><i><Settings /></i><span>Account</span></Link></LI>
         <LI attrLI={{ onClick: Logout }}><LogIn /><span>{LogOut}</span></LI>
       </UL>
     </LI>

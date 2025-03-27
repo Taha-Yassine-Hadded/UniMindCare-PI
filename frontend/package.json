@@ -25,6 +25,7 @@
     "feather-icons": "^4.29.0",
     "firebase": "^11.3.1",
     "i18next-browser-languagedetector": "^6.1.5",
+    "jwt-decode": "^4.0.0",
     "latest-version": "^7.0.0",
     "pigeon-maps": "^0.21.0",
     "qrcode.react": "^4.2.0",

@@ -1,4 +1,5 @@
 
+
 require('dotenv').config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -15,6 +16,9 @@ const axios = require('axios');
 const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
 const UserVerification = require('./models/UserVerification'); 
+const appointementRoutes = require('./routes/appointmentRoutes');
+const caseRoutes = require('./routes/caseRoutes');
+const availabilityRoutes = require('./routes/availabilityRoutes');
 const User = require('./models/Users');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
@@ -32,7 +36,7 @@ const passport = require('./routes/passportConfig'); // Import the configured pa
 const usersRouter = require('./routes/usersRouter');
 
 // Initialize Express app
-const app = express();
+var app = express();
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -113,6 +117,7 @@ app.use('/users', usersRouter);
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
+
 // Partie questionnaires
 // Importer la route de questionnaires
 const questionnaireRoutes = require('./routes/Response');
@@ -528,32 +533,29 @@ app.get('/image/:filename', async (req, res) => {
 
 
 
-// Logout Route
-app.get('/logout', keycloak.protect(), (req, res) => {
-  const idToken = req.session.id_token; // Retrieve the ID token from the session
 
-  // Clear the session
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Failed to destroy session:', err);
-      return res.status(500).send('Logout failed.');
-    }
+/*Partie salma gestion appointements */
 
-    // Redirect to Keycloak's logout endpoint
-    const keycloakLogoutUrl = `${process.env.KEYCLOAK_URL}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/logout?id_token_hint=${idToken}&post_logout_redirect_uri=http://localhost:5000`;
-    res.redirect(keycloakLogoutUrl);
-  });
-});
 
-// Catch 404 and forward to error handler
+app.use('/api/appointments', appointementRoutes);
+app.use('/api/cases', caseRoutes);
+app.use('/api/availability', availabilityRoutes);
+
+
+
+
+// catch 404 and forward to error handler
 app.use(function (req, res, next) {
   next(createError(404));
 });
 
-// Error handler
+// error handler
 app.use(function (err, req, res, next) {
+  // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+  // render the error page
   res.status(err.status || 500);
   res.render('error');
 });
