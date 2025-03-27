@@ -140,7 +140,7 @@ router.get('/available', async (req, res) => {
 
 // Book an appointment
 router.post('/book', async (req, res) => {
-    const { studentId, psychologistId, date } = req.body;
+    const { studentId, psychologistId, date, priority } = req.body;
 
     try {
         if (!mongoose.Types.ObjectId.isValid(studentId) || !mongoose.Types.ObjectId.isValid(psychologistId)) {
@@ -148,7 +148,13 @@ router.post('/book', async (req, res) => {
         }
 
         const appointmentDate = new Date(date);
-        console.log('Booking date:', appointmentDate); // Debug log
+        console.log('Booking date:', appointmentDate);
+
+        // Validate priority if provided
+        const validPriorities = ['emergency', 'regular'];
+        if (priority && !validPriorities.includes(priority)) {
+            return res.status(400).json({ message: 'Invalid priority value. Must be "emergency" or "regular"' });
+        }
 
         // Check for any availability slot (available or blocked)
         const slot = await Availability.findOne({
@@ -156,7 +162,7 @@ router.post('/book', async (req, res) => {
             startTime: { $lte: appointmentDate },
             endTime: { $gt: appointmentDate }
         });
-        console.log('Found slot:', slot); // Debug log
+        console.log('Found slot:', slot);
 
         // Only reject if slot exists and is blocked
         if (slot && slot.status === 'blocked') {
@@ -170,7 +176,7 @@ router.post('/book', async (req, res) => {
             date: appointmentDate,
             status: { $ne: 'cancelled' }
         });
-        console.log('Existing appointment:', existingAppointment); // Debug log
+        console.log('Existing appointment:', existingAppointment);
 
         if (existingAppointment) {
             return res.status(400).json({ message: 'Time slot is already booked' });
@@ -180,11 +186,12 @@ router.post('/book', async (req, res) => {
             studentId,
             psychologistId,
             date: appointmentDate,
-            status: 'pending'
+            status: 'pending',
+            priority: priority || 'regular' // Use provided priority or default to 'regular'
         });
 
         await appointment.save();
-        console.log('Appointment booked:', appointment); // Debug log
+        console.log('Appointment booked:', appointment);
         res.status(201).json(appointment);
     } catch (error) {
         console.error('Error booking appointment:', error.stack);
