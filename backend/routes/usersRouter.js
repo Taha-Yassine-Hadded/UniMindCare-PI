@@ -1,6 +1,6 @@
 var express = require('express');
 var router = express.Router();
-const Users = require('../models/Users');
+const Users = require('../Models/Users');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -41,6 +41,11 @@ router.post('/signin', async (req, res) => {
     if (!user.verified) {
       console.log('Erreur: Compte non vérifié');
       return res.status(400).json({ message: 'Compte non vérifié. Veuillez vérifier votre email.' });
+    }
+
+    // Check if user is verified
+    if (!user.enabled) {
+      return res.status(400).json({ message: "Account disabled for the moment ! Please wait until the admin confirms your informations." });
     }
 
     const isPasswordMatch = await bcrypt.compare(password, user.Password);
