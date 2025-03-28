@@ -5,12 +5,14 @@ import axios from "axios";
 import RevenueChartCardBody from "./RevenueChartCardBody";
 import CardInvest from "../CardInvest/CardInvest";
 import { AlertTriangle, Check, Activity, Heart } from "react-feather";
+import EmergencyClaimButton from "../../../EmergencyClaim/EmergencyClaimButton"; // Importation du nouveau composant
 
 const Ravanuechart = () => {
   const [healthData, setHealthData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [animate, setAnimate] = useState(false);
+  const [userIdentifiant, setUserIdentifiant] = useState(""); // Pour stocker l'identifiant de l'utilisateur
   
   // Animation d'entrée
   useEffect(() => {
@@ -27,7 +29,12 @@ const Ravanuechart = () => {
         
         // Récupérer l'identifiant du localStorage ou du state global si disponible
         const user = JSON.parse(localStorage.getItem("user")) || {};
-        const identifiant = user.identifiant;
+        
+        // Correction ici: utiliser Identifiant avec majuscule comme dans PrivateRoute.jsx
+        const identifiant = user.Identifiant || user.identifiant;
+        setUserIdentifiant(identifiant); // Stocker l'identifiant pour le passer au composant EmergencyClaimButton
+        
+        console.log("Identifiant récupéré du localStorage:", identifiant);
         
         // Si aucun identifiant n'est trouvé, utilisez un identifiant de test
         if (!identifiant) {
@@ -44,10 +51,21 @@ const Ravanuechart = () => {
         
         if (response.data) {
           setHealthData(response.data);
+          console.log("Données de santé récupérées pour l'utilisateur:", identifiant);
         }
       } catch (err) {
         console.error("Erreur lors de la récupération des données de santé:", err);
         setError("Impossible de charger vos données de santé");
+        
+        // En cas d'erreur, afficher quand même quelque chose d'utile
+        try {
+          // Fallback sur les données test
+          console.log("Tentative de récupération des données de test après erreur");
+          const testResponse = await axios.get("http://localhost:5000/api/crisis/student/233alt014");
+          setHealthData(testResponse.data);
+        } catch (fallbackError) {
+          console.error("Erreur également avec les données de test:", fallbackError);
+        }
       } finally {
         setLoading(false);
       }
@@ -199,6 +217,11 @@ const Ravanuechart = () => {
           </div>
         </CardHeader>
         <RevenueChartCardBody healthData={healthData} loading={loading} error={error} animate={animate} />
+        
+        {/* Bouton de réclamation d'urgence ajouté ici */}
+        <div className="px-3 pb-3">
+          <EmergencyClaimButton userIdentifiant={userIdentifiant} />
+        </div>
       </Card>
       <style jsx="true">{`
         @keyframes pulse {

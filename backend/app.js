@@ -20,7 +20,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
-const { transporter } = require('./config/emailConfig');
+const transporter = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
 const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
@@ -119,6 +119,14 @@ app.use('/users', usersRouter);
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
+
+
+// Partie emergency
+const emergencyClaimsRouter = require('./routes/emergencyClaims');
+app.use('/api/emergency', emergencyClaimsRouter);
+
+// Servir le dossier uploads pour les images d'urgence
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // Partie Crise
