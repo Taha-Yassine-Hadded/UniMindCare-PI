@@ -56,7 +56,7 @@ router.post("/add", async function (req, res, next) {
 
     // Save the user to the database
     const savedUser = await newUser.save();
-
+    
     // Send email notification
     const mailOptions = {
       from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
