@@ -6,11 +6,10 @@ import TotalEarningCardFooter from "./TotalEarningCardFooter";
 
 const TotalEarning = () => {
   return (
-    <Col xl="4" lg="6" className="box-col-30 xl-30">
+    <Col xl="16" lg="16" className="box-col-90 xl-160">
       <Card className="our-earning">
         <TotalEarningCardHeader />
         <CardBody className="p-0">
-          <Chart options={apexMixedCharts.options} series={apexMixedCharts.series} type="bar" height={270}/>
         </CardBody>
         <TotalEarningCardFooter />
       </Card>

@@ -1,4 +1,3 @@
-// dashbaord
 import Default from "../Components/Dashboard/Default/Default";
 import Ecommerce from "../Components/Dashboard/Ecommerce/Ecommerce";
 import General from "../Components/Widgeta/General";
@@ -114,21 +113,27 @@ import DatePicker from "../Components/Forms/Form Widgets/Form DataPicker";
 import RangePicker from "../Components/Forms/Form Widgets/Form Date Rangepicker";
 import CheckOutContain from "../Components/Eccommerce/CheckOut/index";
 import AddProductName from "../Components/Eccommerce/AddProduct";
-import FileManagerContain from "../Components/FileManager/index"
+import FileManagerContain from "../Components/FileManager/index";
 import MapJsContain from "../Components/Maps/pigeon-maps";
+import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
+
+
+
 
 export const routes = [
-  //dashboard
-
+    //Weather
+    { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
+    
+  // dashboard
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/default`, Component: <Default /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/ecommerce`, Component: <Ecommerce /> },
 
-  //widgets
+  // widgets
   { path: `${process.env.PUBLIC_URL}/widgets/general`, Component: <General /> },
   { path: `${process.env.PUBLIC_URL}/widgets/chart`, Component: <Chart /> },
 
-  //Project
+  // Project
   { path: `${process.env.PUBLIC_URL}/project/project-list`, Component: <Project /> },
   { path: `${process.env.PUBLIC_URL}/project/new-project`, Component: <CreateListContain /> },
   { path: `${process.env.PUBLIC_URL}/kanban-board`, Component: <KanbanBoard /> },
@@ -147,7 +152,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/video-chat-app`, Component: <VideoApp /> },
 
   { path: `${process.env.PUBLIC_URL}/users/userProfile`, Component: <UsersProfileContain /> },
-  { path: `${process.env.PUBLIC_URL}/users/userEdit`, Component: <UsersEditContain /> },
+  { path: `${process.env.PUBLIC_URL}/users/useredit/*`, Component: <UsersEditContain /> }, // Updated to include /*
   { path: `${process.env.PUBLIC_URL}/users/userCards`, Component: <UsersCardssContain /> },
 
   { path: `${process.env.PUBLIC_URL}/bookmark`, Component: <BookmarksContain /> },
@@ -202,7 +207,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/learning/learning-list`, Component: <LearningList /> },
   { path: `${process.env.PUBLIC_URL}/faq`, Component: <FAQContent /> },
   { path: `${process.env.PUBLIC_URL}/blog/blogDetail`, Component: <BlogDetail /> },
-  { path: `${process.env.PUBLIC_URL}/blog/blogSingle`, Component: <BlogSingle /> },
+  { path: `${process.env.PUBLIC_URL}/blog/:id`, Component: <BlogSingle /> },
   { path: `${process.env.PUBLIC_URL}/blog/blogPost`, Component: <BlogPost /> },
   { path: `${process.env.PUBLIC_URL}/jobSearch/job-apply`, Component: <ApplyContain /> },
   { path: `${process.env.PUBLIC_URL}/jobSearch/job-detail`, Component: <JobDetails /> },
@@ -257,5 +262,4 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/form-widget/rangepicker`, Component: <RangePicker /> },
   { path: `${process.env.PUBLIC_URL}/ecommerce/checkout`, Component: <CheckOutContain /> },
   { path: `${process.env.PUBLIC_URL}/ecommerce/Add-product`, Component: <AddProductName /> },
-
 ];

@@ -1038,7 +1038,9 @@ export const Left = "Left";
 export const Middle = "Middle";
 export const Right = "Right";
 
-export const BasicAreaChart = "Basic Area Chart";
+export const UserRegistrationTrends = "User Registration Trends";
+export const UserPredictions = "User Registration Predictions";
+
 export const AreaSpalineChart = "Area Spaline Chart";
 export const BarChart = "Bar chart";
 export const ColumnChart = "Column Chart";

@@ -1,7 +1,5 @@
 import React from 'react';
-import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
-import { Btn } from '../../../../AbstractElements';
-import { Close, SaveChanges } from '../../../../Constant';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 const CommonModal = (props) => {
   return (
@@ -12,10 +10,6 @@ const CommonModal = (props) => {
       <ModalBody className={props.bodyClass}>
         {props.children}
       </ModalBody>
-      <ModalFooter>
-        <Btn attrBtn={{ color: 'secondary', onClick: props.toggler }} >{Close}</Btn>
-        <Btn attrBtn={{ color: 'primary', onClick: props.toggler }}>{SaveChanges}</Btn>
-      </ModalFooter>
     </Modal>
   );
 };

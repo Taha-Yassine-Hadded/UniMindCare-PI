@@ -6,11 +6,8 @@ WORKDIR /app
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Supprimer les anciens modules locaux
-RUN rm -rf node_modules
-
 # Install dependencies
-RUN npm install --build-from-source
+RUN npm install
 
 # Copy the application code
 COPY . .

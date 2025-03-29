@@ -21,8 +21,6 @@ const Default = () => {
           <Ravanuechart />
           <TotalUserCard />
           <TotalEarning />
-          <AppoimentCard />
-          <CountryCard />
           <TotalGrowthCard />
           <RecentActivity />
           <ChatCard />

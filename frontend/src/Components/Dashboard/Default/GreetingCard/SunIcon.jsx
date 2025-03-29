@@ -7,7 +7,7 @@ const SunIcon = () => {
       <div className="weather d-flex">
         <H2 attrH2={{ className: "f-w-400" }}>
           <span>
-            28
+            30
             <sup>
               <i className="fa fa-circle-o f-10"></i>
             </sup>

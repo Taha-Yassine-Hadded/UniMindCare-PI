@@ -20,7 +20,10 @@ const PrivateRoute = () => {
       try {
         console.log("PrivateRoute - Token utilisé:", token); // Ajout ici
         const response = await axios.get("http://localhost:5000/api/users/me", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Auth-FaceID': 'true' // Nouvel header
+            },
         });
         const data = response.data;
         // Assurez-vous que les champs sont uniformes
