@@ -25,6 +25,7 @@
     "chart.js": "^3.9.1",
     "chartjs-plugin-zoom": "^2.2.0",
     "core-js": "^3.40.0",
+    "cors": "^2.8.5",
     "deni-react-treeview": "^1.1.11",
     "emoji-picker-react": "^3.5.1",
     "feather-icons": "^4.29.0",
@@ -119,6 +120,7 @@
     "babel-eslint": "^10.1.0",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "react-app-rewired": "^2.2.1",
     "source-map-loader": "^3.0.0"
   },
   "resolutions": {

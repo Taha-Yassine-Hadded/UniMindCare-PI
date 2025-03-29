@@ -24,7 +24,9 @@ const { transporter } = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
 const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
-
+const evaluationRoutes = require("./routes/evalution");
+const crisisRoutes = require("./routes/crisisData"); // Nouvelle route
+const weatherRoutes = require("./routes/weather");
 
 // Servir les fichiers statiques depuis le dossier images
 
@@ -51,12 +53,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-
-app.use('/', indexRouter);
+app.use("/api", (req, res, next) => {
+  console.log("Requête reçue sur /api :", req.method, req.url);
+  next();
+}, evaluationRoutes);app.use('/', indexRouter);
 app.use("/api/users", usersRoutes);
 
 app.use('/api/posts', postsRouter);
 
+app.use('/api/crisis', crisisRoutes); // Nouvelle route pour la crise
 
 // MongoDB connection
 /*mongoose
@@ -135,7 +140,6 @@ app.use('/api/crisis', crisisDataRoutes);
 
 // Partie meteo
 // Importer la route de météo
-const weatherRoutes = require('./routes/Weather');
 app.use('/api/weather', weatherRoutes);
 
 
