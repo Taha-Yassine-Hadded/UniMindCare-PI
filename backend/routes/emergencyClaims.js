@@ -96,6 +96,10 @@ const EmergencyClaim = mongoose.model('EmergencyClaim', new mongoose.Schema({
     required: true 
   },
   location: String,
+  coordinates: {
+    lat: Number,
+    lng: Number
+  },
   symptoms: [{
     id: Number,
     name: String,
@@ -169,18 +173,22 @@ transporter.verify(function(error, success) {
 // Route pour soumettre une réclamation d'urgence
 router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
   try {
-    const { description, location, symptoms, identifiant } = req.body;
+    const { description, location, symptoms, identifiant, latitude, longitude } = req.body;
     
     // Vérifier que les champs requis sont présents
     if (!description || !identifiant) {
       return res.status(400).json({ message: "La description et l'identifiant sont obligatoires" });
     }
     
-    // Créer une nouvelle réclamation
+    // Créer une nouvelle réclamation avec coordonnées GPS
     const emergencyClaim = new EmergencyClaim({
       identifiant,
       description,
       location,
+      coordinates: {
+        lat: latitude ? parseFloat(latitude) : null,
+        lng: longitude ? parseFloat(longitude) : null
+      },
       symptoms: symptoms ? JSON.parse(symptoms) : [],
       imageUrl: req.file ? `/uploads/emergency/${req.file.filename}` : null,
       createdAt: new Date()
@@ -217,6 +225,36 @@ router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
             symptomsForEmail = '<em>Aucun symptôme spécifié</em>';
           }
         }
+
+        // Section carte Google Maps
+        let googleMapsSection = '';
+        if (emergencyClaim.coordinates && emergencyClaim.coordinates.lat && emergencyClaim.coordinates.lng) {
+          // Icône personnalisée pour Google Maps représentant une personne malade
+          const personIcon = 'https://i.imgur.com/qgtR0v3.png'; // URL d'une icône de personne malade
+          
+          // Générer l'image statique de la carte
+          const mapImageUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${emergencyClaim.coordinates.lat},${emergencyClaim.coordinates.lng}&zoom=15&size=600x300&maptype=roadmap&markers=icon:${personIcon}|${emergencyClaim.coordinates.lat},${emergencyClaim.coordinates.lng}&key=AIzaSyDxNmY6XebyJbi8eb0LkQhOCCTPh4x71D8`;
+          
+          // URL pour ouvrir Google Maps directement
+          const googleMapsUrl = `https://www.google.com/maps?q=${emergencyClaim.coordinates.lat},${emergencyClaim.coordinates.lng}`;
+          
+          googleMapsSection = `
+            <div style="margin: 15px 0;">
+              <h4 style="color: #333;"></h4>
+              <div style="text-align: center;">
+                
+                <div style="margin-top: 10px;">
+                  <a href="${googleMapsUrl}" 
+                     target="_blank" 
+                     style="background-color: #4285F4; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">
+                    <img src="https://i.imgur.com/q6jYcD5.png" alt="Maps" style="height: 18px; vertical-align: middle; margin-right: 8px;"/>
+                    Voir sur Google Maps-
+                  </a>
+                </div>
+              </div>
+            </div>
+          `;
+        }
         
         // Configuration de l'email
         const mailOptions = {
@@ -233,6 +271,8 @@ router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
                 <p><strong>Localisation:</strong> ${location || 'Non spécifiée'}</p>
               </div>
               
+              ${googleMapsSection}
+              
               <div style="margin: 15px 0;">
                 <h4 style="color: #333;">Symptômes signalés:</h4>
                 <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
@@ -245,16 +285,7 @@ router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
                 <p style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; color: #333;">${description}</p>
               </div>
               
-              ${req.file ? `
-              <div style="margin: 15px 0;">
-                <h4 style="color: #333;">Image jointe:</h4>
-                <div style="text-align: center;">
-                  <img src="${process.env.BACKEND_URL || 'http://localhost:5000'}/uploads/emergency/${req.file.filename}" 
-                       alt="Image jointe à la réclamation" 
-                       style="max-width: 100%; max-height: 300px; border-radius: 5px; border: 1px solid #ddd;" />
-                </div>
-              </div>
-              ` : ''}
+             
               
               <div style="text-align: center; margin-top: 20px;">
                 <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/emergency-claims/${emergencyClaim._id}" 
@@ -413,6 +444,25 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
       );
       
       if (student && student.Email) {
+        // Section Google Maps pour l'email de mise à jour
+        let googleMapsSection = '';
+        if (updatedClaim.coordinates && updatedClaim.coordinates.lat && updatedClaim.coordinates.lng) {
+          const personIcon = 'https://i.imgur.com/qgtR0v3.png'; // URL de l'icône de personne malade
+          const mapImageUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${updatedClaim.coordinates.lat},${updatedClaim.coordinates.lng}&zoom=15&size=600x300&maptype=roadmap&markers=icon:${personIcon}|${updatedClaim.coordinates.lat},${updatedClaim.coordinates.lng}&key=AIzaSyDxNmY6XebyJbi8eb0LkQhOCCTPh4x71D8`;
+          const googleMapsUrl = `https://www.google.com/maps?q=${updatedClaim.coordinates.lat},${updatedClaim.coordinates.lng}`;
+          
+          googleMapsSection = `
+            <div style="margin: 15px 0;">
+              <h4 style="color: #333;">Votre localisation:</h4>
+              <div style="text-align: center;">
+                <img src="${mapImageUrl}" 
+                     alt="Localisation de l'urgence" 
+                     style="max-width: 100%; height: auto; border-radius: 5px; border: 1px solid #ddd;" />
+              </div>
+            </div>
+          `;
+        }
+
         // Configuration de l'email
         const mailOptions = {
           from: process.env.EMAIL_USER || 'notifications@unimindcare.com',
@@ -428,6 +478,8 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
               
               <p>Bonjour ${student.Name || 'cher(e) étudiant(e)'},</p>
               <p>Votre réclamation d'urgence soumise le ${new Date(updatedClaim.createdAt).toLocaleString()} a été mise à jour.</p>
+              
+              ${googleMapsSection}
               
               ${notes ? `
               <div style="margin: 15px 0;">
@@ -503,10 +555,13 @@ function getStatusLabel(status) {
 // Fonction pour obtenir une couleur selon la gravité des symptômes
 function getSeverityColor(severity) {
   switch (severity?.toLowerCase()) {
+    case 'high':
     case 'grave':
       return '#ffcccc'; // light red
+    case 'medium':
     case 'modéré':
       return '#fff2cc'; // light yellow
+    case 'low':
     case 'léger':
       return '#ccffcc'; // light green
     default:

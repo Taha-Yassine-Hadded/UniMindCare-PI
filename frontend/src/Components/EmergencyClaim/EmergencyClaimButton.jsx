@@ -14,6 +14,8 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
   const [step, setStep] = useState(1);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
   const [symptomsList, setSymptomsList] = useState([]);
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [uploadedImage, setUploadedImage] = useState(null);
@@ -21,18 +23,35 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [showMap, setShowMap] = useState(false);
   const fileInputRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+
+  // Réinitialiser la carte Google Maps lors du changement d'étape
+  useEffect(() => {
+    // Si on est à l'étape 2 et qu'on a des coordonnées, on réinitialise la carte
+    if (step === 2 && showMap && latitude && longitude) {
+      // Petit délai pour laisser le DOM se mettre à jour
+      setTimeout(() => {
+        initMap(latitude, longitude);
+      }, 300);
+    }
+  }, [step]);
 
   // Fonction pour réinitialiser le formulaire
   const resetForm = () => {
     setDescription('');
     setLocation('');
+    setLatitude(null);
+    setLongitude(null);
     setSelectedSymptoms([]);
     setUploadedImage(null);
     setImagePreview(null);
     setStep(1);
     setError(null);
     setSubmissionSuccess(false);
+    setShowMap(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -102,6 +121,99 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
     }
   };
 
+  // Initialiser la carte Google Maps
+  const initMap = (lat, lng) => {
+    if (!window.google || !window.google.maps) {
+      // Script pour Google Maps n'est pas chargé
+      loadGoogleMapsScript(() => initMap(lat, lng));
+      return;
+    }
+
+    if (!mapRef.current) return;
+
+    const mapOptions = {
+      center: { lat, lng },
+      zoom: 15,
+      mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false
+    };
+    
+    const map = new window.google.maps.Map(mapRef.current, mapOptions);
+    
+    // Utiliser un SVG intégré pour l'icône du marqueur (personne malade)
+    const svgMarker = {
+      path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+      fillColor: "#dc3545", // Rouge pour urgence
+      fillOpacity: 1,
+      strokeWeight: 2,
+      strokeColor: "#FFFFFF",
+      rotation: 0,
+      scale: 2,
+      anchor: new window.google.maps.Point(12, 24),
+    };
+    
+    // Ajouter un marqueur à la position
+    const marker = new window.google.maps.Marker({
+      position: { lat, lng },
+      map: map,
+      icon: svgMarker,
+      animation: window.google.maps.Animation.DROP,
+      title: 'Votre position d\'urgence'
+    });
+    
+    markerRef.current = marker;
+  };
+
+  // Charger le script Google Maps de façon asynchrone
+  const loadGoogleMapsScript = (callback) => {
+    if (window.google && window.google.maps) {
+      callback();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDxNmY6XebyJbi8eb0LkQhOCCTPh4x71D8&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    
+    script.onload = () => {
+      callback();
+    };
+    
+    document.head.appendChild(script);
+  };
+
+  // Activer géolocalisation
+  const activateGeolocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setLatitude(latitude);
+          setLongitude(longitude);
+          setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          setShowMap(true);
+          
+          // Initialiser la carte avec un délai pour laisser le DOM se mettre à jour
+          setTimeout(() => {
+            initMap(latitude, longitude);
+          }, 300);
+          
+          toast.info("Emplacement récupéré avec succès");
+        },
+        (error) => {
+          console.error("Erreur de géolocalisation:", error);
+          toast.warning("Impossible d'obtenir votre emplacement actuel");
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      toast.warning("La géolocalisation n'est pas prise en charge par votre navigateur");
+    }
+  };
+
   // Gérer la soumission du formulaire
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -113,6 +225,12 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
       formData.append('location', location);
       formData.append('symptoms', JSON.stringify(selectedSymptoms));
       formData.append('identifiant', userIdentifiant);
+      
+      // Ajouter les coordonnées GPS si disponibles
+      if (latitude && longitude) {
+        formData.append('latitude', latitude);
+        formData.append('longitude', longitude);
+      }
       
       if (uploadedImage) {
         formData.append('emergencyImage', uploadedImage);
@@ -158,25 +276,6 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
     }
   };
 
-  // Activer géolocalisation
-  const activateGeolocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setLocation(`${latitude}, ${longitude}`);
-          toast.info("Emplacement récupéré avec succès");
-        },
-        (error) => {
-          console.error("Erreur de géolocalisation:", error);
-          toast.warning("Impossible d'obtenir votre emplacement actuel");
-        }
-      );
-    } else {
-      toast.warning("La géolocalisation n'est pas prise en charge par votre navigateur");
-    }
-  };
-
   // Rendu des différentes étapes du formulaire
   const renderStepContent = () => {
     switch (step) {
@@ -208,7 +307,6 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
                       cursor: 'pointer', 
                       borderRadius: '30px', 
                       fontSize: '0.85rem',
-                      // Modification: le texte sera noir pour les symptômes non sélectionnés
                       color: selectedSymptoms.some(s => s.id === symptom.id) ? 'white' : '#212529'
                     }}
                     onClick={() => toggleSymptomSelection(symptom)}
@@ -245,6 +343,28 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
                 Cliquez sur l'icône pour utiliser votre position actuelle
               </small>
             </FormGroup>
+            
+            {/* Affichage de la carte Google Maps si les coordonnées sont disponibles */}
+            {showMap && latitude && longitude && (
+              <div className="google-maps-container mt-3 mb-4">
+                <div 
+                  ref={mapRef} 
+                  className="google-map" 
+                  style={{ height: '250px', borderRadius: '8px', border: '1px solid #ddd' }}
+                ></div>
+                <div className="d-flex justify-content-center mt-2">
+                  <a 
+                    href={`https://www.google.com/maps?q=${latitude},${longitude}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="btn btn-sm btn-outline-primary"
+                  >
+                    <img src="https://i.imgur.com/q6jYcD5.png" alt="Maps" style={{ height: '16px', marginRight: '6px' }} />
+                    Ouvrir dans Google Maps
+                  </a>
+                </div>
+              </div>
+            )}
             
             <div className="d-flex justify-content-between mt-4">
               <Button 
@@ -291,6 +411,35 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
                 ))}
               </div>
             </div>
+            
+            {/* Afficher la localisation et la carte si disponible */}
+            {latitude && longitude && (
+              <div className="location-confirmation mb-4">
+                <Label className="form-label fw-bold">Votre localisation:</Label>
+                <div className="location-details d-flex align-items-center mb-2">
+                  <MapPin size={16} className="me-2 text-primary" />
+                  <span>{location}</span>
+                </div>
+                
+                <div 
+                  className="google-map mb-2" 
+                  style={{ height: '200px', borderRadius: '8px', border: '1px solid #ddd' }}
+                  ref={el => { mapRef.current = el; }}
+                ></div>
+                
+                <div className="d-flex justify-content-center">
+                  <a 
+                    href={`https://www.google.com/maps?q=${latitude},${longitude}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="btn btn-sm btn-outline-primary"
+                  >
+                    <img src="https://i.imgur.com/q6jYcD5.png" alt="Maps" style={{ height: '16px', marginRight: '6px' }} />
+                    Vérifier sur Google Maps
+                  </a>
+                </div>
+              </div>
+            )}
             
             <FormGroup className="mb-4">
               <Label className="form-label fw-bold">Description détaillée</Label>
@@ -411,7 +560,6 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
                       </div>
                       <div>
                         <div className="fw-bold">SAMU</div>
-                        {/* Modification: Numéro d'urgence en noir */}
                         <div className="emergency-number text-dark">190</div>
                       </div>
                     </div>
@@ -424,7 +572,6 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
                       </div>
                       <div>
                         <div className="fw-bold">Police</div>
-                        {/* Modification: Numéro d'urgence en noir */}
                         <div className="emergency-number text-dark">197</div>
                       </div>
                     </div>
@@ -437,7 +584,6 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
                       </div>
                       <div>
                         <div className="fw-bold">Pompiers</div>
-                        {/* Modification: Numéro d'urgence en noir */}
                         <div className="emergency-number text-dark">198</div>
                       </div>
                     </div>
@@ -450,7 +596,6 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
                       </div>
                       <div>
                         <div className="fw-bold">Centre Anti-poison</div>
-                        {/* Modification: Numéro d'urgence en noir */}
                         <div className="emergency-number text-dark">71 335 500</div>
                       </div>
                     </div>
@@ -561,6 +706,7 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
           </ModalFooter>
         )}
       </Modal>
+
 
       <style jsx="true">{`
         .emergency-button:hover {
@@ -675,7 +821,6 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
         .emergency-number {
           font-size: 1.1rem;
           font-weight: bold;
-          /* Modification: Couleur du numéro en noir au lieu de rouge */
         }
         
         .emergency-icon {
