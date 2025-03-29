@@ -1,14 +1,3 @@
-<<<<<<< HEAD
-var express = require('express');
-var router = express.Router();
-
-/* GET users listing. */
-router.get('/', function(req, res, next) {
-  res.send('respond with a resource');
-});
-
-module.exports = router;
-=======
 var express = require("express");
 var router = express.Router();
 const User = require("../Models/Users"); // Import the User model
@@ -239,4 +228,3 @@ router.put("/:identifiant", async function(req, res, next) {
 });
 
 module.exports = router;
->>>>>>> full-Integration

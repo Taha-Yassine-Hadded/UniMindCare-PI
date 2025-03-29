@@ -1,23 +1,5 @@
 import React, { Fragment } from 'react';
 import { Col, Container, Row } from 'reactstrap';
-<<<<<<< HEAD
-import EditMyProfile from './EditmyProfile';
-import MyProfileEdit from './MyProfile';
-import { Breadcrumbs } from '../../../AbstractElements';
-
-const UsersEditContain = () => {
-  return (
-    <Fragment>
-      <Breadcrumbs mainTitle="User Edit" parent="Users" title="User Edit" />
-      <Container fluid={true}>
-        <div className="edit-profile">
-          <Row>
-            <Col xl="4" lg="5">
-              <MyProfileEdit />
-            </Col>
-            <Col xl="8" lg="7">
-              <EditMyProfile />
-=======
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Breadcrumbs } from '../../../AbstractElements';
 import MyProfileEdit from './MyProfile';
@@ -51,7 +33,6 @@ const UsersEditContain = () => {
                   <Route path="change-password" element={<ChangePassword />} />
                 </Routes>
               </div>
->>>>>>> full-Integration
             </Col>
           </Row>
         </div>
@@ -59,8 +40,4 @@ const UsersEditContain = () => {
     </Fragment>
   );
 };
-<<<<<<< HEAD
-=======
-
->>>>>>> full-Integration
 export default UsersEditContain;
