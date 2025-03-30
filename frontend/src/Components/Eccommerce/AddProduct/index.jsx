@@ -1,9 +1,14 @@
-import { Fragment, useState } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Form, FormGroup, Label, Input, Button } from "reactstrap";
 
 const AddEvaluation = () => {
+  const navigate = useNavigate();
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [serverErrors, setServerErrors] = useState([]);
+
   const { control, handleSubmit, formState: { errors } } = useForm({
     defaultValues: {
       nomEtudiant: "",
@@ -22,28 +27,73 @@ const AddEvaluation = () => {
     },
   });
 
-  const navigate = useNavigate();
-  const [serverErrors, setServerErrors] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
+        const response = await fetch("http://localhost:5000/api/users/me", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP ${response.status}`);
+        }
+
+        const userData = await response.json();
+        console.log("Données utilisateur :", userData);
+
+        if (userData.Role && userData.Role.includes("teacher")) {
+          setUserRole("teacher");
+        } else {
+          setUserRole(null);
+        }
+      } catch (err) {
+        console.error("Erreur lors de la récupération du rôle :", err);
+        setUserRole(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserRole();
+  }, [navigate]);
 
   const handleSaveChange = async (data) => {
-    setIsLoading(true);
     setServerErrors([]);
-    console.log("Données avant envoi :", data); // Log pour déboguer
+    console.log("Données avant envoi :", data);
 
     try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
       const response = await fetch("http://localhost:5000/api/evaluation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(data),
       });
 
+      console.log("Statut de la réponse :", response.status); // Log pour débogage
       const responseData = await response.json();
-      console.log("Réponse du serveur :", response.status, responseData); // Log pour déboguer
+      console.log("Réponse du serveur :", responseData);
 
       if (!response.ok) {
-        const { errors } = responseData;
-        setServerErrors(errors || [{ msg: "Erreur inconnue du serveur" }]);
+        const errors = responseData.errors || [{ msg: responseData.message || "Erreur serveur" }];
+        setServerErrors(errors);
         return;
       }
 
@@ -51,16 +101,57 @@ const AddEvaluation = () => {
       navigate("/evaluations/list");
     } catch (error) {
       console.error("Erreur lors de l'enregistrement :", error);
-      setServerErrors([{ msg: "Erreur réseau ou serveur indisponible" }]);
-    } finally {
-      setIsLoading(false);
+      setServerErrors([{ msg: "Erreur réseau ou réponse inattendue du serveur" }]);
     }
   };
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (token) {
+        await fetch("http://localhost:5000/users/logout", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      localStorage.removeItem("login");
+      sessionStorage.removeItem("login");
+      navigate("/login", { replace: true });
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion :", err);
+      navigate("/login", { replace: true });
+    }
+  };
+
+  if (loading) {
+    return <div>Chargement des données utilisateur...</div>;
+  }
+
+  if (!userRole) {
+    return (
+      <Container fluid={true} className="text-center mt-5">
+        <h2>Accès refusé</h2>
+        <p>Seuls les enseignants peuvent ajouter des évaluations.</p>
+        <Button color="secondary" onClick={handleLogout}>
+          Se déconnecter
+        </Button>
+      </Container>
+    );
+  }
 
   return (
     <Fragment>
       <Container fluid={true} className="add-evaluation">
-        <h2>Ajouter une évaluation</h2>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h2>Ajouter une évaluation</h2>
+          <Button color="secondary" onClick={handleLogout}>
+            Se déconnecter
+          </Button>
+        </div>
         <Form onSubmit={handleSubmit(handleSaveChange)}>
           <Row>
             <Col md={6}>
@@ -125,10 +216,7 @@ const AddEvaluation = () => {
                   control={control}
                   rules={{
                     required: "La date est requise",
-                    validate: (value) => {
-                      const date = new Date(value);
-                      return !isNaN(date.getTime()) || "La date est invalide";
-                    },
+                    validate: (value) => !isNaN(new Date(value).getTime()) || "La date est invalide",
                   }}
                   render={({ field }) => (
                     <Input
@@ -343,21 +431,21 @@ const AddEvaluation = () => {
             </Col>
           </Row>
 
-          <Button type="submit" color="primary" disabled={isLoading}>
-            {isLoading ? "Enregistrement..." : "Enregistrer"}
+          <Button type="submit" color="primary" className="mt-3">
+            Enregistrer
           </Button>
-        </Form>
 
-        {serverErrors.length > 0 && (
-          <div className="mt-3">
-            <h5>Erreurs du serveur :</h5>
-            <ul>
-              {serverErrors.map((error, index) => (
-                <li key={index} className="text-danger">{error.msg}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {serverErrors.length > 0 && (
+            <div className="mt-3">
+              <h5>Erreurs du serveur :</h5>
+              <ul>
+                {serverErrors.map((error, index) => (
+                  <li key={index} className="text-danger">{error.msg}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Form>
       </Container>
     </Fragment>
   );
