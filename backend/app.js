@@ -27,7 +27,7 @@ const { spawn } = require("child_process");
 const evaluationRoutes = require("./routes/evalution");
 const crisisRoutes = require("./routes/crisisData"); // Nouvelle route
 const weatherRoutes = require("./routes/weather");
-
+const feedbackRoutes = require("./routes/feedbackRoutes"); // Assurez-vous que le chemin est correct
 // Servir les fichiers statiques depuis le dossier images
 
 var indexRouter = require('./routes/index');
@@ -62,7 +62,7 @@ app.use("/api/users", usersRoutes);
 app.use('/api/posts', postsRouter);
 
 app.use('/api/crisis', crisisRoutes); // Nouvelle route pour la crise
-
+app.use("/api", feedbackRoutes); // Monter les routes de feedback sous /api
 // MongoDB connection
 /*mongoose
   .connect(process.env.MONGO_URI)
