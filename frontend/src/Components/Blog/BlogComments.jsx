@@ -2,18 +2,40 @@ import React, { Fragment, useState, useEffect } from 'react';
 import { Row, Col, Card, CardBody, Form, FormGroup, Input, Button } from 'reactstrap';
 import { H4, H6, Image, LI, P, UL } from '../../AbstractElements';
 import axios from 'axios';
-import Swal from 'sweetalert2'; // Ajout de Swal pour des alertes cohérentes
+import Swal from 'sweetalert2';
 
 const BlogComments = ({ postId }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  
+  // Fetch the current user's data
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (token) {
+        try {
+          const response = await axios.get('http://localhost:5000/api/users/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          console.log('Current User:', response.data);
+          setCurrentUser(response.data);
+        } catch (error) {
+          console.error('Erreur lors de la récupération de l\'utilisateur:', error);
+        }
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  // Fetch comments
   useEffect(() => {
     const fetchComments = async () => {
       try {
         const response = await axios.get(`http://localhost:5000/api/posts/${postId}`);
+        console.log('Comments:', response.data.comments);
         setComments(response.data.comments || []);
       } catch (error) {
         console.error('Erreur lors de la récupération des commentaires:', error);
@@ -77,7 +99,7 @@ const BlogComments = ({ postId }) => {
       const response = await axios.post(
         `http://localhost:5000/api/posts/${postId}/comments/${commentId}/like`,
         {},
-       { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setComments(response.data.comments);
     } catch (error) {
@@ -104,6 +126,46 @@ const BlogComments = ({ postId }) => {
     }
   };
 
+  const handleDelete = async (commentId) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      Swal.fire({ icon: 'warning', title: 'Non connecté', text: 'Veuillez vous connecter pour supprimer un commentaire.' });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Êtes-vous sûr ?',
+      text: 'Vous ne pourrez pas récupérer ce commentaire après suppression.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Oui, supprimer',
+      cancelButtonText: 'Annuler',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const response = await axios.delete(
+          `http://localhost:5000/api/posts/${postId}/comments/${commentId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setComments(response.data.comments);
+        Swal.fire({
+          icon: 'success',
+          title: 'Commentaire supprimé !',
+          text: 'Votre commentaire a été supprimé avec succès.',
+        });
+      } catch (error) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur',
+          text: error.response?.data?.message || 'Une erreur est survenue lors de la suppression.',
+        });
+      }
+    }
+  };
+
   return (
     <Card className="comment-box">
       <CardBody>
@@ -111,36 +173,52 @@ const BlogComments = ({ postId }) => {
         <UL attrUL={{ className: 'simple-list' }}>
           {comments.length > 0 ? (
             comments.map((item, index) => (
-              <LI key={index}>
-                <div className="d-md-flex">
+              <LI key={index} style={{ marginBottom: '20px' }}>
+                <div className="d-md-flex align-items-start">
                   <Image
                     attrImage={{
                       className: 'align-self-center',
-                      src: 'https://via.placeholder.com/50', // Remplacez par une image d'utilisateur si disponible
+                      src: 'https://via.placeholder.com/50',
                       alt: 'User',
+                      style: { marginRight: '15px' },
                     }}
                   />
                   <div className="flex-grow-1">
-                    <H6 attrH6={{ className: 'mt-0' }}>
-                      {item.isAnonymous ? item.anonymousPseudo : item.author?.Name || 'Inconnu'}
-                    </H6>
-                    <P>{item.content}</P>
-                    <small>{new Date(item.createdAt).toLocaleDateString('fr-FR')}</small>
-                    <div className="mt-2">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <H6 attrH6={{ className: 'mt-0' }}>
+                        {item.isAnonymous ? item.anonymousPseudo : item.author?.Name || 'Inconnu'}
+                      </H6>
+                      <small style={{ color: '#888' }}>
+                        {new Date(item.createdAt).toLocaleDateString('fr-FR')}
+                      </small>
+                    </div>
+                    <P style={{ margin: '5px 0' }}>{item.content}</P>
+                    <div className="d-flex align-items-center">
                       <Button
                         color="link"
                         className="p-0 me-2"
                         onClick={() => handleLike(item._id)}
+                        style={{ color: '#007bff' }}
                       >
-                        <i className="fa fa-thumbs-up"></i> {item.likes?.length || 0}
+                        <i className="fa fa-thumbs-up"></i> {(item.likes || []).length}
                       </Button>
                       <Button
                         color="link"
-                        className="p-0"
+                        className="p-0 me-2"
                         onClick={() => handleDislike(item._id)}
+                        style={{ color: '#dc3545' }}
                       >
-                        <i className="fa fa-thumbs-down"></i> {item.dislikes?.length || 0}
+                        <i className="fa fa-thumbs-down"></i> {(item.dislikes || []).length}
                       </Button>
+                      {currentUser && item.author?._id === currentUser._id && (
+                        <Button
+                          color="link"
+                          className="p-0 text-danger"
+                          onClick={() => handleDelete(item._id)}
+                        >
+                          <i className="fa fa-trash"></i> Supprimer
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -161,13 +239,13 @@ const BlogComments = ({ postId }) => {
             />
           </FormGroup>
           <FormGroup check>
-            <Input
-              type="checkbox"
-              checked={isAnonymous}
-              onChange={(e) => setIsAnonymous(e.target.checked)}
-            />
-            {' '}Publier en tant qu'anonyme
-          </FormGroup>
+  <Input
+    type="checkbox"
+    checked={isAnonymous}
+    onChange={(e) => setIsAnonymous(e.target.checked)} // Fix: Update isAnonymous state
+  />
+  {' '}Publier en tant qu'anonyme
+</FormGroup>
           <Button color="primary" type="submit">Publier</Button>
         </Form>
       </CardBody>

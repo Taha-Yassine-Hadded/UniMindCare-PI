@@ -48,7 +48,7 @@ router.get('/:id', async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
       .populate('author', 'Name') // Peupler l'auteur du post
-      .populate('comments.author', 'Name'); // Peupler les auteurs des commentaires
+      .populate('comments.author'); // Peupler les auteurs des commentaires avec tous les champs
     if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
     res.status(200).json(post);
   } catch (error) {
@@ -146,6 +146,36 @@ router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt',
     res.status(200).json(updatedPost);
   } catch (error) {
     console.error('Erreur lors du dislike:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Route to delete a comment
+router.delete('/:postId/comments/:commentId', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Commentaire non trouvé' });
+
+    // Check if the user is the author of the comment
+    if (comment.author.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à supprimer ce commentaire' });
+    }
+
+    // Remove the comment from the comments array
+    post.comments = post.comments.filter(c => c._id.toString() !== req.params.commentId);
+
+    await post.save();
+
+    // Fetch the updated post with populated author data
+    const updatedPost = await Post.findById(req.params.postId)
+      .populate('author', 'Name')
+      .populate('comments.author'); // Populate full author object
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error('Erreur lors de la suppression du commentaire:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
