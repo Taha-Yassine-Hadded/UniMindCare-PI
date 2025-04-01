@@ -86,4 +86,68 @@ router.post('/:id/comments', passport.authenticate('jwt', { session: false }), a
   }
 });
 
+// Route to like a comment
+router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Commentaire non trouvé' });
+
+    const userId = req.user._id;
+
+    // Check if user already liked
+    if (comment.likes.includes(userId)) {
+      // Remove like if already liked
+      comment.likes = comment.likes.filter(id => id.toString() !== userId.toString());
+    } else {
+      // Add like and remove dislike if exists
+      comment.likes.push(userId);
+      comment.dislikes = comment.dislikes.filter(id => id.toString() !== userId.toString());
+    }
+
+    await post.save();
+    const updatedPost = await Post.findById(req.params.postId)
+      .populate('author', 'Name')
+      .populate('comments.author', 'Name');
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error('Erreur lors du like:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Route to dislike a comment
+router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Commentaire non trouvé' });
+
+    const userId = req.user._id;
+
+    // Check if user already disliked
+    if (comment.dislikes.includes(userId)) {
+      // Remove dislike if already disliked
+      comment.dislikes = comment.dislikes.filter(id => id.toString() !== userId.toString());
+    } else {
+      // Add dislike and remove like if exists
+      comment.dislikes.push(userId);
+      comment.likes = comment.likes.filter(id => id.toString() !== userId.toString());
+    }
+
+    await post.save();
+    const updatedPost = await Post.findById(req.params.postId)
+      .populate('author', 'Name')
+      .populate('comments.author', 'Name');
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error('Erreur lors du dislike:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 module.exports = router;

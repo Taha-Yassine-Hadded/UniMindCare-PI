@@ -9,6 +9,7 @@ const BlogComments = ({ postId }) => {
   const [newComment, setNewComment] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
 
+  
   useEffect(() => {
     const fetchComments = async () => {
       try {
@@ -65,6 +66,44 @@ const BlogComments = ({ postId }) => {
     }
   };
 
+  const handleLike = async (commentId) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      Swal.fire({ icon: 'warning', title: 'Non connecté', text: 'Veuillez vous connecter pour réagir.' });
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `http://localhost:5000/api/posts/${postId}/comments/${commentId}/like`,
+        {},
+       { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setComments(response.data.comments);
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Erreur', text: 'Erreur lors du like.' });
+    }
+  };
+
+  const handleDislike = async (commentId) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      Swal.fire({ icon: 'warning', title: 'Non connecté', text: 'Veuillez vous connecter pour réagir.' });
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `http://localhost:5000/api/posts/${postId}/comments/${commentId}/dislike`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setComments(response.data.comments);
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Erreur', text: 'Erreur lors du dislike.' });
+    }
+  };
+
   return (
     <Card className="comment-box">
       <CardBody>
@@ -87,6 +126,22 @@ const BlogComments = ({ postId }) => {
                     </H6>
                     <P>{item.content}</P>
                     <small>{new Date(item.createdAt).toLocaleDateString('fr-FR')}</small>
+                    <div className="mt-2">
+                      <Button
+                        color="link"
+                        className="p-0 me-2"
+                        onClick={() => handleLike(item._id)}
+                      >
+                        <i className="fa fa-thumbs-up"></i> {item.likes?.length || 0}
+                      </Button>
+                      <Button
+                        color="link"
+                        className="p-0"
+                        onClick={() => handleDislike(item._id)}
+                      >
+                        <i className="fa fa-thumbs-down"></i> {item.dislikes?.length || 0}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </LI>

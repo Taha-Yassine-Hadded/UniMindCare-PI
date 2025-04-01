@@ -6,7 +6,9 @@ const commentSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   isAnonymous: { type: Boolean, default: false },
   anonymousPseudo: { type: String },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array of user IDs who liked
+  dislikes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] // Array of user IDs who disliked
 });
 
 const postSchema = new mongoose.Schema({
