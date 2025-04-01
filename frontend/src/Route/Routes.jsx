@@ -116,7 +116,10 @@ import CheckOutContain from "../Components/Eccommerce/CheckOut/index";
 import AddProductName from "../Components/Eccommerce/AddProduct";
 import FileManagerContain from "../Components/FileManager/index"
 import MapJsContain from "../Components/Maps/pigeon-maps";
-
+import DoctorsList from "../Components/AppointementModule/DoctorsList";
+// Add these imports at the top with other imports
+import StudentDashboard from "../Components/AppointementModule/StudentDashboard";
+import PsychologistDashboard from "../Components/AppointementModule/PsychologistDashboard";
 export const routes = [
   //dashboard
 
@@ -257,5 +260,11 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/form-widget/rangepicker`, Component: <RangePicker /> },
   { path: `${process.env.PUBLIC_URL}/ecommerce/checkout`, Component: <CheckOutContain /> },
   { path: `${process.env.PUBLIC_URL}/ecommerce/Add-product`, Component: <AddProductName /> },
+
+// Appointment Module
+  {path : `${process.env.PUBLIC_URL}/appointment/doctor-list`, Component: <DoctorsList />},
+  { path: `${process.env.PUBLIC_URL}/appointment/student-dashboard`, Component: <StudentDashboard /> },
+  { path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
+  
 
 ];

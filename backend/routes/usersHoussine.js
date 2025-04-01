@@ -20,7 +20,8 @@ router.get('/me', async (req, res) => {
             Classe: user.Classe,
             Role: user.Role,
             PhoneNumber: user.PhoneNumber,
-            imageUrl: user.imageUrl
+            imageUrl: user.imageUrl,
+            userId: user._id,
         });
     } catch (error) {
         res.status(500).json({ message: error.message });

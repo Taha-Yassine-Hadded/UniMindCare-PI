@@ -32,6 +32,7 @@ const PrivateRoute = () => {
           Role: data.Role || "",
           PhoneNumber: data.PhoneNumber || "",
           imageUrl: data.imageUrl || "/defaultProfile.png",
+          userId: data.userId || data._id || "",
         };
         setAuthenticated(true);
         setUserData(normalizedData);

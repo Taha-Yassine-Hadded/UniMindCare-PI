@@ -1,0 +1,287 @@
+/* General styling */
+:root {
+    --primary-color: #4361ee;
+    --success-color: #28a745;
+    --light-color: #f8f9fa;
+    --gray-100: #f8f9fa;
+    --gray-200: #e9ecef;
+    --gray-300: #dee2e6;
+    --gray-600: #6c757d;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+  }
+  
+  .doctors-list-container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .page-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .page-header h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .subtitle {
+    color: var(--gray-600);
+  }
+  
+  /* Filters section */
+  .filters-section {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 20px;
+  }
+  
+  .therapist-filter-btn {
+    width: 100%;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+  
+  .gender-filter-container {
+    margin-bottom: 0;
+  }
+  
+  .gender-label {
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    color: var(--gray-600);
+  }
+  
+  .gender-buttons {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .search-bar {
+    box-shadow: var(--shadow-sm);
+    border-radius: 13px;
+    overflow: hidden;
+  }
+  
+  /* Results summary */
+  .results-summary {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 0 15px;
+  }
+  
+  .search-badge {
+    margin-left: 10px;
+  }
+  
+/* Horizontal Doctor Cards */
+.horizontal-doctor-card {
+    margin-bottom: 20px;
+    border: none;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    transition: var(--transition);
+    background-color: white;
+    padding: 15px;
+  }
+  
+  .horizontal-doctor-card .row {
+    align-items: center;
+  }
+  
+  /* Doctor Image Column */
+  .doctor-image-col {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: transparent;
+    padding: 0;
+  }
+  
+  .doctor-image-container {
+    position: relative;
+  }
+  
+  .doctor-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid white;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  /* Name and Badges Block */
+  .name-badges-col {
+    display: flex;
+    align-items: center;
+  }
+  
+  .name-badges-block {
+    padding: 10px 0;
+  }
+  
+  .doctor-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+  
+  /* Rating Block */
+  .rating-col {
+    display: flex;
+    align-items: center;
+  }
+  
+  .rating-block {
+    width: 100%;
+    padding: 0 10px;
+  }
+  
+  .stat-label {
+    margin-bottom: 5px;
+  }
+  /* Progress Bar Styles */
+.progress-container {
+    display: flex;
+    align-items: center;
+  }
+  
+  .progress {
+    flex-grow: 1;
+    height: 8px;
+    margin-right: 10px;
+    background-color: var(--gray-200);
+  }
+  
+  .rating-progress .progress-bar {
+    background-color: var(--success-color); /* Green color for the progress bar */
+  }
+  
+  /* Dashed Progress Bar */
+  .dashed-progress .progress-bar {
+    background-image: linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.2) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.2) 50%,
+      rgba(255, 255, 255, 0.2) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 10px 10px;
+  }
+  
+  /* Appointment Button Block */
+  .appointment-col {
+    display: flex;
+    align-items: center;
+  }
+  
+  .appointment-section {
+    background-color: transparent;
+    padding: 0;
+    width: 100%;
+  }
+  
+  .appointment-button {
+    width: 100%;
+    font-size: 0.9rem;
+  }
+  .button-icon {
+    margin-right: 8px;
+  }
+  
+  /* Loading & Error States */
+  .loading-container,
+  .error-container {
+    text-align: center;
+    padding: 40px;
+  }
+  
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    margin: 0 auto 20px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .error-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #dc3545;
+    color: white;
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+  
+  .no-results {
+    text-align: center;
+    padding: 40px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .no-results-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+  }
+  
+  /* Responsive Adjustments */
+  @media (max-width: 768px) {
+    .gender-filter-container {
+      margin-bottom: 15px;
+    }
+    
+    .horizontal-doctor-card [class*="col-"] {
+      padding: 15px;
+    }
+    
+    .doctor-info {
+      padding: 15px;
+    }
+    
+    .appointment-section {
+      padding: 15px;
+    }
+  }
+  
+  @media (max-width: 576px) {
+    .doctors-list-container {
+      padding: 10px;
+    }
+    
+    .filters-section {
+      padding: 15px;
+    }
+    
+    .doctor-name {
+      font-size: 1.25rem;
+    }
+    
+  }

@@ -4,12 +4,12 @@ const { Schema } = mongoose;
 const appointmentSchema = new Schema({
     studentId: { 
         type: Schema.Types.ObjectId, 
-        ref: 'Student', 
+        ref: 'User', 
         required: true 
     },
     psychologistId: { 
         type: Schema.Types.ObjectId, 
-        ref: 'Psychologist', 
+        ref: 'User', 
         required: true 
     },
     date: { 

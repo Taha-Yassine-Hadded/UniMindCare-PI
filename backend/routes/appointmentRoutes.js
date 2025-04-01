@@ -3,23 +3,19 @@ const router = express.Router();
 const Appointment = require('../Models/Appointment');
 const Availability = require('../Models/Availability');
 const mongoose = require('mongoose'); // Add this line
-
+const User = require('../Models/Users');
 
 // Student/Psychologist: Get all appointments
 router.get('/', async (req, res) => {
     const { studentId, psychologistId } = req.query;
     try {
         const query = {};
-
-        // Validate and cast studentId
         if (studentId) {
             if (!mongoose.Types.ObjectId.isValid(studentId)) {
                 return res.status(400).json({ message: 'Invalid studentId format' });
             }
             query.studentId = studentId;
         }
-
-        // Validate and cast psychologistId
         if (psychologistId) {
             if (!mongoose.Types.ObjectId.isValid(psychologistId)) {
                 return res.status(400).json({ message: 'Invalid psychologistId format' });
@@ -27,19 +23,11 @@ router.get('/', async (req, res) => {
             query.psychologistId = psychologistId;
         }
 
-        // Fetch appointments
-        let appointments = await Appointment.find(query);
+        const appointments = await Appointment.find(query)
+            .populate('studentId', 'Name') // Use 'User' model and 'Name' field
+            .populate('psychologistId', 'Name');
 
-        // Check if Student and Psychologist models exist before populating
-        try {
-            appointments = await Appointment.find(query)
-                .populate('studentId', 'name') // Remove or adjust if no Student model
-                .populate('psychologistId', 'name'); // Remove or adjust if no Psychologist model
-        } catch (populateError) {
-            console.warn('Population failed, returning raw data:', populateError.message);
-            appointments = await Appointment.find(query); // Fallback to raw data
-        }
-
+        console.log('Fetched appointments:', JSON.stringify(appointments, null, 2)); // Debug log
         res.json(appointments);
     } catch (error) {
         console.error('Error fetching appointments:', error);
@@ -196,6 +184,23 @@ router.post('/book', async (req, res) => {
     } catch (error) {
         console.error('Error booking appointment:', error.stack);
         res.status(500).json({ message: 'Error booking appointment', error: error.message });
+    }
+});
+// Get all users with the "psychiatre" role
+router.get('/psychiatres', async (req, res) => {
+    try {
+        const psychiatres = await User.find({ Role: 'psychiatre' })
+            .select('Name Email Role Classe PhoneNumber imageUrl verified createdAt') // Select relevant fields
+            .sort({ createdAt: -1 }); // Sort by creation date, newest first
+
+        if (psychiatres.length === 0) {
+            return res.status(404).json({ message: 'No psychiatres found' });
+        }
+
+        res.json(psychiatres);
+    } catch (error) {
+        console.error('Error fetching psychiatres:', error.stack);
+        res.status(500).json({ message: 'Error fetching psychiatres', error: error.message });
     }
 });
 module.exports = router;
