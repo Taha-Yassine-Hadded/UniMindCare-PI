@@ -46,11 +46,42 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate('author', 'Name');
+    const post = await Post.findById(req.params.id)
+      .populate('author', 'Name') // Peupler l'auteur du post
+      .populate('comments.author', 'Name'); // Peupler les auteurs des commentaires
     if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
     res.status(200).json(post);
   } catch (error) {
     console.error('Erreur lors de la récupération:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Route pour ajouter un commentaire
+router.post('/:id/comments', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  const { content, isAnonymous } = req.body;
+
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
+
+    const comment = {
+      content,
+      author: req.user._id,
+      isAnonymous: isAnonymous || false,
+      anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
+    };
+
+    post.comments.push(comment);
+    await post.save();
+
+    // Peupler les données après l'ajout du commentaire pour renvoyer une réponse complète
+    const updatedPost = await Post.findById(req.params.id)
+      .populate('author', 'Name')
+      .populate('comments.author', 'Name');
+    res.status(201).json(updatedPost);
+  } catch (error) {
+    console.error("Erreur lors de l'ajout du commentaire:", error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });

@@ -71,7 +71,7 @@ const BlogDetailContain = () => {
                             {post.isAnonymous ? post.anonymousPseudo : post.author?.Name || 'Inconnu'}
                           </LI>
                           <LI>
-                            <i className="fa fa-comments-o"></i>{post.comments?.length || 5} Hits
+                            <i className="fa fa-comments-o"></i>{post.comments?.length} Hits
                           </LI>
                           <LI>
                             <i className="fa fa-thumbs-o-up"></i>{post.likes || 2} Like
