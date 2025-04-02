@@ -1,6 +1,6 @@
 // BlogDetailContain.js
 import React, { Fragment, useState, useEffect } from 'react';
-import { Container, Row, Col, Card } from 'reactstrap';
+import { Container, Row, Col, Card, FormGroup, Label, Input } from 'reactstrap';
 import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -23,9 +23,8 @@ const defaultImages = [
 
 // Fonction pour sélectionner une image aléatoire basée sur l'ID du post
 const getRandomImageForPost = (postId) => {
-  // Convertir l'ID en une valeur numérique pour déterminer l'index
   const seed = postId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const randomIndex = seed % defaultImages.length; // Utiliser le modulo pour choisir une image
+  const randomIndex = seed % defaultImages.length;
   return defaultImages[randomIndex];
 };
 
@@ -80,10 +79,17 @@ const cardStyles = {
   footer: {
     marginTop: 'auto',
   },
+  sortContainer: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '20px',
+    gap: '10px',
+  },
 };
 
 const BlogDetailContain = () => {
   const [posts, setPosts] = useState([]);
+  const [sortOption, setSortOption] = useState('date'); // Par défaut : tri par date
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -104,12 +110,58 @@ const BlogDetailContain = () => {
     return { day, month };
   };
 
+  // Fonction pour trier les publications (toujours en ordre décroissant)
+  const sortPosts = (postsToSort) => {
+    const sortedPosts = [...postsToSort]; // Créer une copie du tableau pour éviter de modifier l'original
+
+    if (sortOption === 'date') {
+      sortedPosts.sort((a, b) => {
+        const dateA = new Date(a.createdAt);
+        const dateB = new Date(b.createdAt);
+        return dateB - dateA; // Du plus récent au plus ancien
+      });
+    } else if (sortOption === 'comments') {
+      sortedPosts.sort((a, b) => {
+        const commentsA = a.comments?.length || 0;
+        const commentsB = b.comments?.length || 0;
+        return commentsB - commentsA; // Du plus commenté au moins commenté
+      });
+    }
+
+    return sortedPosts;
+  };
+
+  // Trier les publications avant de les afficher
+  const sortedPosts = sortPosts(posts);
+
   return (
     <Fragment>
       <Container fluid={true} className="blog-page">
+        {/* Interface de tri */}
         <Row>
-          {posts.length > 0 ? (
-            posts.map((post) => (
+          <Col sm="12">
+            <div style={cardStyles.sortContainer}>
+              <FormGroup>
+                <Label for="sortOption">Trier par :</Label>
+                <Input
+                  type="select"
+                  name="sortOption"
+                  id="sortOption"
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value)}
+                >
+                 <option value="date">Date</option>
+                 <option value="comments">Nombre de commentaire</option>
+                </Input>
+              </FormGroup>
+            </div>
+          </Col>
+        </Row>
+
+        {/* Liste des publications */}
+        <Row>
+          {sortedPosts.length > 0 ? (
+            sortedPosts.map((post) => (
               <Col sm="6" xl="3" className="box-col-6 des-xl-50" key={post._id}>
                 <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <Card style={cardStyles.card}>
@@ -119,7 +171,7 @@ const BlogDetailContain = () => {
                           attrImage={{
                             className: 'img-fluid top-radius-blog',
                             style: cardStyles.image,
-                            src: post.imageUrl ? `http://localhost:5000${post.imageUrl}` : getRandomImageForPost(post._id), // Utiliser une image basée sur l'ID
+                            src: post.imageUrl ? `http://localhost:5000${post.imageUrl}` : getRandomImageForPost(post._id),
                             alt: post.title || 'Publication',
                           }}
                         />
@@ -148,7 +200,7 @@ const BlogDetailContain = () => {
                               {post.isAnonymous ? post.anonymousPseudo : post.author?.Name || 'Inconnu'}
                             </LI>
                             <LI>
-                              <i className="fa fa-comments-o"></i>{post.comments?.length} Hits
+                              <i className="fa fa-comments-o"></i>{post.comments?.length || 0} Hits
                             </LI>
                             <LI>
                               <i className="fa fa-thumbs-o-up"></i>{post.likes || 2} Like
