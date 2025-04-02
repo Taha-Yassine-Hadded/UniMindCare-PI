@@ -36,7 +36,7 @@ const BlogSingleContain = () => {
   
   // Style pour l'image de couverture
   const styless = {
-    backgroundImage: `url(${post?.imageUrl || blogSingle})`,
+    backgroundImage: `url(${post?.imageUrl ? `http://localhost:5000${post.imageUrl}` : blogSingle})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     display: 'block',

@@ -17,6 +17,7 @@ const postSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Référence à l'utilisateur
   isAnonymous: { type: Boolean, default: false }, // Nouveau champ pour l'anonymat
   anonymousPseudo: { type: String }, // Pseudo généré si anonyme
+  imageUrl: { type: String, required: false },
   createdAt: { type: Date, default: Date.now },
   comments: [commentSchema] // Ajout du tableau de commentaires
 });

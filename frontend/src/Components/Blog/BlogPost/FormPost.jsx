@@ -2,20 +2,31 @@
 import React, { useState } from 'react';
 import { Form, FormGroup, Label, Input } from 'reactstrap';
 import axios from 'axios';
-import ReactQuill from 'react-quill'; // Importer React-Quill
-import 'react-quill/dist/quill.snow.css'; // Importer les styles
-import Swal from 'sweetalert2'; 
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import Swal from 'sweetalert2';
+import Dropzone from 'react-dropzone-uploader';
+import 'react-dropzone-uploader/dist/styles.css'; // Importer les styles de Dropzone
 
 const FormPost = ({ onPostSuccess }) => {
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState(''); // Contenu sous forme HTML
+  const [content, setContent] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [image, setImage] = useState(null); // État pour stocker le fichier image
+
+  // Fonction appelée lorsque les fichiers changent dans Dropzone
+  const handleChangeStatus = ({ meta, file }, status) => {
+    if (status === 'done') {
+      setImage(file); // Stocker le fichier dans l'état
+    } else if (status === 'removed') {
+      setImage(null); // Réinitialiser l'état si le fichier est supprimé
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-     // Vérification des champs obligatoires
-     if (!title.trim()) {
+    if (!title.trim()) {
       Swal.fire({
         icon: 'warning',
         title: 'Champ requis',
@@ -42,23 +53,31 @@ const FormPost = ({ onPostSuccess }) => {
       });
       return;
     }
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('content', content);
+    formData.append('isAnonymous', isAnonymous);
+    if (image) formData.append('image', image); // Ajoute l'image si elle existe
+
     try {
       const response = await axios.post(
         'http://localhost:5000/api/posts',
-        { title, content, isAnonymous },
+        formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
           },
         }
       );
       setTitle('');
       setContent('');
       setIsAnonymous(false);
+      setImage(null);
 
-       // 🛑 Désactiver l'alerte par défaut du navigateur
-    window.alert = function () {}; // Désactiver tout alert() natif du navigateur
-    
+      window.alert = function () {};
+
       Swal.fire({
         icon: 'success',
         title: 'Publication réussie !',
@@ -74,14 +93,13 @@ const FormPost = ({ onPostSuccess }) => {
     }
   };
 
-  // Modules pour personnaliser la barre d'outils de React-Quill
   const modules = {
     toolbar: [
       [{ header: [1, 2, false] }],
       ['bold', 'italic', 'underline', 'strike'],
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['link'],
-      ['clean'], // Supprime la mise en forme
+      ['clean'],
     ],
   };
 
@@ -95,7 +113,6 @@ const FormPost = ({ onPostSuccess }) => {
           id="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          
         />
       </FormGroup>
       <FormGroup>
@@ -107,6 +124,23 @@ const FormPost = ({ onPostSuccess }) => {
           theme="snow"
         />
       </FormGroup>
+      <FormGroup>
+        <Label for="image">Image (facultatif)</Label>
+        <div className="m-0 dz-message needsclick">
+          <Dropzone
+            onChangeStatus={handleChangeStatus} // Gérer les changements de statut des fichiers
+            maxFiles={1} // Limiter à un seul fichier
+            multiple={false} // Désactiver l'upload multiple
+            canCancel={true} // Permettre de supprimer le fichier
+            inputContent="Glissez une image ici ou cliquez pour sélectionner" // Texte personnalisé
+            styles={{
+              dropzone: { width: '100%', height: 100 }, // Ajuster la taille de la zone
+              dropzoneActive: { borderColor: 'green' }, // Style quand la zone est active
+            }}
+            accept="image/*" // Accepter uniquement les images
+          />
+        </div>
+      </FormGroup>
       <FormGroup check>
         <Label check>
           <Input
@@ -117,7 +151,7 @@ const FormPost = ({ onPostSuccess }) => {
           Publier anonymement
         </Label>
       </FormGroup>
-    
+     
     </Form>
   );
 };

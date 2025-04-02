@@ -50,6 +50,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 
 app.use('/api/posts', postsRouter);
+
+// Dans ton fichier principal (ex: app.js ou server.js)
+app.use('/uploads', express.static('uploads'));
  // Authentication routes
 //app.use('/users', usersRouter);
 

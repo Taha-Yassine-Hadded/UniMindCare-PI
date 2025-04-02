@@ -40,13 +40,13 @@ const BlogDetailContain = () => {
                 <Card>
                   <div className="blog-box blog-grid">
                     <div className="blog-wrraper">
-                      <Image
-                        attrImage={{
-                          className: 'img-fluid top-radius-blog',
-                          src: post.imageUrl || 'https://via.placeholder.com/300x200',
-                          alt: post.title || 'Publication',
-                        }}
-                      />
+                    <Image
+                          attrImage={{
+                            className: 'img-fluid top-radius-blog',
+                            src: post.imageUrl ? `http://localhost:5000${post.imageUrl}` : 'https://via.placeholder.com/300x200',
+                            alt: post.title || 'Publication',
+                          }}
+                        />
                     </div>
                     <div className="blog-details-second">
                       <div className="d-flex justify-content-between align-items-center mb-2">

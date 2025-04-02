@@ -3,6 +3,20 @@ const express = require('express');
 const router = express.Router();
 const Post = require('../Models/Post');
 const passport = require('../routes/passportConfig');
+const multer = require('multer');
+const path = require('path');
+
+// Configuration de multer pour stocker les images
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Dossier où les images seront stockées
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // Nom unique avec timestamp
+  }
+});
+
+const upload = multer({ storage: storage });
 
 // Fonction pour générer un pseudo anonyme
 const generateAnonymousPseudo = () => {
@@ -10,27 +24,30 @@ const generateAnonymousPseudo = () => {
   return `Anonyme${randomNum}`;
 };
 
-// Route pour ajouter une publication
-router.post('/', passport.authenticate('jwt', { session: false }), async (req, res) => {
-  console.log('Requête POST reçue sur /api/posts avec :', req.body);
-  const { title, content, isAnonymous } = req.body; // Ajout de isAnonymous
+// Route pour ajouter une publication avec ou sans image
+router.post('/', 
+  passport.authenticate('jwt', { session: false }), 
+  upload.single('image'), // 'image' est le nom du champ dans le formulaire
+  async (req, res) => {
+    const { title, content, isAnonymous } = req.body;
 
-  try {
-    const post = new Post({
-      title,
-      content,
-      author: req.user._id, // ID de l'utilisateur connecté
-      isAnonymous: isAnonymous || false, // Par défaut false si non fourni
-      anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null // Pseudo si anonyme
-    });
-    await post.save();
-    console.log('Publication créée:', post);
-    res.status(201).json(post);
-  } catch (error) {
-    console.error('Erreur lors de la création:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+    try {
+      const post = new Post({
+        title,
+        content,
+        author: req.user._id,
+        isAnonymous: isAnonymous || false,
+        anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
+        imageUrl: req.file ? `/uploads/${req.file.filename}` : null // URL de l'image si présente
+      });
+      await post.save();
+      res.status(201).json(post);
+    } catch (error) {
+      console.error('Erreur lors de la création:', error);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
   }
-});
+);
 
 // Route pour récupérer toutes les publications
 router.get('/', async (req, res) => {
