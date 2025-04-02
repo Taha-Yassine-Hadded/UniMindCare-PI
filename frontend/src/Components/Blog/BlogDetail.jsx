@@ -1,9 +1,10 @@
 // BlogDetailContain.js
 import React, { Fragment, useState, useEffect } from 'react';
-import { Container, Row, Col, Card, FormGroup, Label, Input } from 'reactstrap';
+import { Container, Row, Col, Card, FormGroup, Label, Input, InputGroup, InputGroupText } from 'reactstrap';
 import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { FaSearch } from 'react-icons/fa';
 
 // Importer les 10 images par défaut
 import defaultImage1 from '../../assets/images/default-image-1.jpg';
@@ -81,15 +82,33 @@ const cardStyles = {
   },
   sortContainer: {
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between', // Placer la recherche à gauche et le tri à droite
+    alignItems: 'center', // Centrer verticalement
     marginBottom: '20px',
     gap: '10px',
+  },
+  searchInput: {
+    width: '250px', // Ajuste la largeur selon tes besoins
+  },
+  formGroup: {
+    marginBottom: 0, // Supprimer la marge par défaut de FormGroup
+    display: 'flex',
+    alignItems: 'center', // Centrer verticalement les éléments à l'intérieur
+  },
+  label: {
+    marginBottom: 0, // Supprimer la marge sous le label
+    marginRight: '10px', // Espacement entre le label et le select
+  },
+  inputGroup: {
+    display: 'flex',
+    alignItems: 'center', // S'assurer que l'InputGroup est centré
   },
 };
 
 const BlogDetailContain = () => {
   const [posts, setPosts] = useState([]);
   const [sortOption, setSortOption] = useState('date'); // Par défaut : tri par date
+  const [searchQuery, setSearchQuery] = useState(''); // État pour la recherche
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -110,9 +129,17 @@ const BlogDetailContain = () => {
     return { day, month };
   };
 
+  // Fonction pour filtrer les publications par titre (commence par la chaîne saisie)
+  const filterPosts = (postsToFilter) => {
+    if (!searchQuery) return postsToFilter; // Si la recherche est vide, retourner toutes les publications
+    return postsToFilter.filter((post) =>
+      post.title?.toLowerCase().startsWith(searchQuery.toLowerCase())
+    );
+  };
+
   // Fonction pour trier les publications (toujours en ordre décroissant)
   const sortPosts = (postsToSort) => {
-    const sortedPosts = [...postsToSort]; // Créer une copie du tableau pour éviter de modifier l'original
+    const sortedPosts = [...postsToSort];
 
     if (sortOption === 'date') {
       sortedPosts.sort((a, b) => {
@@ -131,18 +158,38 @@ const BlogDetailContain = () => {
     return sortedPosts;
   };
 
-  // Trier les publications avant de les afficher
-  const sortedPosts = sortPosts(posts);
+  // Filtrer puis trier les publications
+  const filteredPosts = filterPosts(posts);
+  const sortedPosts = sortPosts(filteredPosts);
 
   return (
     <Fragment>
       <Container fluid={true} className="blog-page">
-        {/* Interface de tri */}
+        {/* Interface de recherche et de tri */}
         <Row>
           <Col sm="12">
             <div style={cardStyles.sortContainer}>
-              <FormGroup>
-                <Label for="sortOption">Trier par :</Label>
+              {/* Champ de recherche */}
+              <FormGroup style={cardStyles.formGroup}>
+                <InputGroup style={cardStyles.inputGroup}>
+                  <InputGroupText>
+                    <FaSearch />
+                  </InputGroupText>
+                  <Input
+                    type="text"
+                    placeholder="Rechercher par titre..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={cardStyles.searchInput}
+                  />
+                </InputGroup>
+              </FormGroup>
+
+              {/* Menu de tri */}
+              <FormGroup style={cardStyles.formGroup}>
+                <Label for="sortOption" style={cardStyles.label}>
+                  Trier:
+                </Label>
                 <Input
                   type="select"
                   name="sortOption"
@@ -150,8 +197,8 @@ const BlogDetailContain = () => {
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value)}
                 >
-                 <option value="date">Date</option>
-                 <option value="comments">Nombre de commentaire</option>
+                  <option value="date">Date</option>
+                  <option value="comments">Nombre de commentaires</option>
                 </Input>
               </FormGroup>
             </div>
