@@ -18,7 +18,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     const [selectedPsychologist, setSelectedPsychologist] = useState(selectedPsychologistId || '');
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [modalType, setModalType] = useState(''); // 'book', 'modify', 'cancel', 'block', 'confirm', 'addAvailability'
+    const [modalType, setModalType] = useState(''); // 'book', 'modify', 'cancel', 'block', 'confirm', 'addAvailability', 'deleteAvailability'
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [formData, setFormData] = useState({
@@ -71,29 +71,28 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                     );
 
                     const appointmentsResponse = await axios.get(
-                        `http://localhost:5000/api/appointments?studentId=${userId}`
+                        `http://localhost:5000/api/appointments?studentId=${userId}&psychologistId=${selectedPsychologist}`
                     );
 
-                    // Format availability data for the calendar
+                    // Format availability data for the calendar - Using empty title to show only borders
                     setAvailability(availabilityResponse.data.map(slot => ({
                         id: slot._id,
-                        title: slot.status === 'blocked' ? 'Not Available' : 'Available',
+                        title: '', // Empty title to show only the border
                         start: new Date(slot.startTime),
                         end: new Date(slot.endTime),
                         status: slot.status,
+                        reason: slot.reason,
                         resource: 'availability'
                     })));
 
                     // Format appointments data for the calendar
                     setEvents(appointmentsResponse.data.map(appointment => ({
                         id: appointment._id,
-                        title: role === 'student'
-                            ? `Appointment with Dr. ${appointment.psychologistId?.Name || 'Unknown'}`
-                            : `Appointment with ${appointment.studentId?.Name || 'Student'}`,
+                        title: `Appointment with Dr. ${appointment.psychologistId?.Name || 'Unknown'}`,
                         start: new Date(appointment.date),
                         end: new Date(new Date(appointment.date).getTime() + 60 * 60 * 1000),
                         status: appointment.status,
-                        studentId: appointment.studentId,
+                        psychologistId: appointment.psychologistId,
                         priority: appointment.priority,
                         resource: 'appointment'
                     })));
@@ -107,9 +106,10 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                         `http://localhost:5000/api/appointments?psychologistId=${userId}`
                     );
 
+                    // Format availability data for the calendar - Using empty title to show only borders
                     setAvailability(availabilityResponse.data.map(slot => ({
                         id: slot._id,
-                        title: slot.status === 'blocked' ? 'Blocked' : 'Available',
+                        title: '', // Empty title to show only the border
                         start: new Date(slot.startTime),
                         end: new Date(slot.endTime),
                         status: slot.status,
@@ -140,25 +140,42 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         fetchData();
     }, [role, userId, selectedPsychologist]);
 
-    // Handle slot selection (for booking or adding availability)
-    const handleSelectSlot = ({ start, end }) => {
-        // Don't allow selecting slots in the past
-        if (start < new Date()) {
-            toast.error("Cannot select time slots in the past");
-            return;
-        }
+   // Handle slot selection (for booking or adding availability)
+const handleSelectSlot = ({ start, end }) => {
+    // Don't allow selecting slots in the past
+    if (start < new Date()) {
+        toast.error("Cannot select time slots in the past");
+        return;
+    }
 
-        setSelectedSlot({ start, end });
+    // Check if this slot has existing availability
+    const existingAvailability = availability.find(slot => 
+        slot.start <= end && slot.end >= start
+    );
 
-        if (role === 'student') {
-            // Check if this slot overlaps with an available time slot
-            const isAvailable = availability.some(slot =>
-                slot.status === 'available' &&
-                moment(start).isSameOrAfter(moment(slot.start)) &&
-                moment(end).isSameOrBefore(moment(slot.end))
-            );
-
-            if (isAvailable) {
+    if (existingAvailability) {
+        // If this slot already has availability, select that event instead
+        setSelectedEvent(existingAvailability);
+        
+        if (role === 'psychiatre') {
+            if (existingAvailability.status === 'available') {
+                setModalType('modifyAvailability');
+                setFormData({
+                    startTime: existingAvailability.start.toISOString(),
+                    endTime: existingAvailability.end.toISOString(),
+                    status: existingAvailability.status,
+                    reason: existingAvailability.reason || ''
+                });
+            } else {
+                setModalType('unblockAvailability');
+                setFormData({
+                    reason: existingAvailability.reason || ''
+                });
+            }
+            setShowModal(true);
+        } else if (role === 'student') {
+            // For students, check if the slot is available for booking
+            if (existingAvailability.status === 'available') {
                 setModalType('book');
                 setFormData({
                     date: start.toISOString(),
@@ -169,8 +186,14 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             } else {
                 toast.info('This time slot is not available for booking');
             }
+        }
+    } else {
+        // No existing availability - proceed as before
+        setSelectedSlot({ start, end });
+
+        if (role === 'student') {
+            toast.info('This time slot is not available for booking');
         } else if (role === 'psychiatre') {
-            // Psychologists can add availability or block time slots
             setModalType('addAvailability');
             setFormData({
                 startTime: start.toISOString(),
@@ -180,7 +203,8 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             });
             setShowModal(true);
         }
-    };
+    }
+};
 
     // Handle event selection (for modifying or canceling appointments)
     const handleSelectEvent = (event) => {
@@ -297,7 +321,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
 
                     setAvailability([...availability, {
                         id: availabilityResponse.data._id,
-                        title: 'Available',
+                        title: '', // Empty title to show only the border
                         start: new Date(formData.startTime),
                         end: new Date(formData.endTime),
                         status: 'available',
@@ -322,7 +346,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                             slot.id === selectedEvent.id
                                 ? {
                                     ...slot,
-                                    title: 'Blocked',
+                                    title: '', // Empty title to show only the border
                                     status: 'blocked',
                                     reason: formData.reason,
                                     start: new Date(formData.startTime),
@@ -357,7 +381,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                         slot.id === selectedEvent.id
                             ? {
                                 ...slot,
-                                title: 'Available',
+                                title: '', // Empty title to show only the border
                                 status: 'available',
                                 reason: null
                             }
@@ -365,6 +389,16 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                     ));
 
                     toast.success('Time slot is now available');
+                    break;
+
+                case 'deleteAvailability':
+                    // Remove a time slot
+                    await axios.delete(`http://localhost:5000/api/availability/${selectedEvent.id}`);
+                    
+                    // Remove from local state
+                    setAvailability(availability.filter(slot => slot.id !== selectedEvent.id));
+                    
+                    toast.success('Time slot removed successfully');
                     break;
 
                 case 'confirmAppointment':
@@ -389,52 +423,126 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     };
 
     // Custom event styling based on status
-    const eventPropGetter = (event) => {
-        let style = {
-            borderRadius: '4px',
-            opacity: 0.9,
-            border: '0px',
-            display: 'block',
-            color: 'white'
+const eventPropGetter = (event) => {
+    let style = {
+        borderRadius: '4px',
+        opacity: 1,
+        display: 'block',
+    };
+
+    if (event.resource === 'availability') {
+        // Make availability events completely invisible
+        style = {
+            ...style,
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+            color: 'transparent',
+            display: 'none', // This hides them completely
+            pointerEvents: 'none' // Make them non-interactive
         };
-
-        if (event.resource === 'availability') {
-            // Styling for availability slots
-            if (event.status === 'blocked') {
-                style.backgroundColor = '#6c757d'; // Gray for blocked slots
-                style.opacity = 0.7;
-                style.background = 'repeating-linear-gradient(45deg, #6c757d, #6c757d 10px, #5a6268 10px, #5a6268 20px)';
-            } else {
-                style.backgroundColor = '#20c997'; // Teal for available slots
-                style.border = '1px dashed #0f9d7a';
-            }
-        } else {
-            // Styling for appointments
-            switch (event.status) {
-                case 'confirmed':
-                    style.backgroundColor = '#28a745'; // Green for confirmed
-                    break;
-                case 'pending':
-                    style.backgroundColor = '#ffc107'; // Yellow for pending
-                    style.color = '#212529';
-                    break;
-                case 'cancelled':
-                    style.backgroundColor = '#dc3545'; // Red for cancelled
-                    style.opacity = 0.6;
-                    break;
-                default:
-                    style.backgroundColor = '#007bff'; // Blue default
-            }
-
-            // Highlight emergency appointments
-            if (event.priority === 'emergency') {
-                style.border = '2px solid #dc3545';
-                style.fontWeight = 'bold';
-            }
+    } else {
+        // Regular styling for appointments (unchanged)
+        switch (event.status) {
+            case 'confirmed':
+                style.backgroundColor = '#28a745';
+                style.color = 'white';
+                style.zIndex = 3;
+                break;
+            case 'pending':
+                style.backgroundColor = '#ffc107';
+                style.color = '#212529';
+                style.zIndex = 3;
+                break;
+            case 'cancelled':
+                style.backgroundColor = '#dc3545';
+                style.opacity = 0.6;
+                style.color = 'white';
+                style.zIndex = 3;
+                break;
+            default:
+                style.backgroundColor = '#007bff';
+                style.color = 'white';
+                style.zIndex = 3;
         }
 
-        return { style };
-    };
+        if (event.priority === 'emergency') {
+            style.border = '2px solid #dc3545';
+            style.fontWeight = 'bold';
+        }
+    }
+
+    return { style };
+};
+
+// Custom component for time slot cells
+const TimeSlotWrapper = ({ value, children }) => {
+    // Check if this time slot overlaps with any availability
+    const slotStart = new Date(value);
+    const slotEnd = new Date(new Date(value).setMinutes(value.getMinutes() + 30)); // Assume 30-min slots
+    
+    let availableSlot = null;
+    let blockedSlot = null;
+    
+    // Find if this time slot is within any availability period
+    for (const slot of availability) {
+        if (slot.start <= slotEnd && slot.end >= slotStart) {
+            if (slot.status === 'available') {
+                availableSlot = slot;
+            } else if (slot.status === 'blocked') {
+                blockedSlot = slot;
+            }
+        }
+    }
+    
+    // Determine the class to apply
+    let cellClass = '';
+    if (blockedSlot) {
+        cellClass = 'blocked-time-slot';
+    } else if (availableSlot) {
+        cellClass = 'available-time-slot';
+    }
+    
+    return (
+        <div className={`rbc-time-slot ${cellClass}`}>
+            {children}
+        </div>
+    );
+};
+
+// Custom component for date cells in month view
+const DateCellWrapper = ({ value, children }) => {
+    const date = new Date(value);
+    const dayStart = new Date(date.setHours(0, 0, 0, 0));
+    const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+    
+    let hasAvailable = false;
+    let hasBlocked = false;
+    
+    // Find if this day has any availability or blocked periods
+    for (const slot of availability) {
+        if (slot.start <= dayEnd && slot.end >= dayStart) {
+            if (slot.status === 'available') {
+                hasAvailable = true;
+            } else if (slot.status === 'blocked') {
+                hasBlocked = true;
+            }
+        }
+    }
+    
+    // Determine the class to apply
+    let cellClass = '';
+    if (hasBlocked) {
+        cellClass = 'blocked-date-cell';
+    } else if (hasAvailable) {
+        cellClass = 'available-date-cell';
+    }
+    
+    return (
+        <div className={`rbc-day-bg ${cellClass}`}>
+            {children}
+        </div>
+    );
+};
 
     if (loading) return (
         <div className="loading-container">
@@ -468,45 +576,61 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                 </div>
             )}
 
-            {/* Calendar legend */}
-            <div className="calendar-legend mb-3">
-                <div className="d-flex justify-content-between flex-wrap">
-                    <div className="legend-item">
-                        <span className="legend-color" style={{ backgroundColor: '#20c997' }}></span>
-                        <span>Available</span>
-                    </div>
-                    <div className="legend-item">
-                        <span className="legend-color" style={{ backgroundColor: '#6c757d', opacity: 0.7 }}></span>
-                        <span>Blocked</span>
-                    </div>
-                    <div className="legend-item">
-                        <span className="legend-color" style={{ backgroundColor: '#ffc107' }}></span>
-                        <span>Pending Appointment</span>
-                    </div>
-                    <div className="legend-item">
-                        <span className="legend-color" style={{ backgroundColor: '#28a745' }}></span>
-                        <span>Confirmed Appointment</span>
-                    </div>
-                </div>
-            </div>
-
+           {/* Calendar legend */}
+           <div className="calendar-legend mb-3">
+    <div className="d-flex justify-content-between flex-wrap">
+        <div className="legend-item">
+            <div className="legend-color legend-available"></div>
+            <span>Available Time</span>
+        </div>
+        <div className="legend-item">
+            <div className="legend-color legend-blocked"></div>
+            <span>Blocked Time</span>
+        </div>
+        <div className="legend-item">
+            <span className="legend-color" style={{ backgroundColor: '#ffc107', borderRadius: '4px' }}></span>
+            <span>Pending Appointment</span>
+        </div>
+        <div className="legend-item">
+            <span className="legend-color" style={{ backgroundColor: '#28a745', borderRadius: '4px' }}></span>
+            <span>Confirmed Appointment</span>
+        </div>
+    </div>
+</div>
             {/* Calendar view */}
             <div className="calendar-container">
-                <Calendar
-                    localizer={localizer}
-                    events={[...events, ...availability]}
-                    startAccessor="start"
-                    endAccessor="end"
-                    style={{ height: 500 }}
-                    selectable
-                    onSelectSlot={handleSelectSlot}
-                    onSelectEvent={handleSelectEvent}
-                    eventPropGetter={eventPropGetter}
-                    defaultView={Views.WEEK}
-                    views={['month', 'week', 'day']}
-                    min={new Date(new Date().setHours(8, 0, 0, 0))}
-                    max={new Date(new Date().setHours(18, 0, 0, 0))}
-                />
+            <Calendar
+    localizer={localizer}
+    events={[...events, ...availability]}
+    startAccessor="start"
+    endAccessor="end"
+    style={{ height: 500 }}
+    selectable
+    onSelectSlot={handleSelectSlot}
+    onSelectEvent={handleSelectEvent}
+    eventPropGetter={eventPropGetter}
+    defaultView={Views.WEEK}
+    views={['month', 'week', 'day']}
+    min={new Date(new Date().setHours(8, 0, 0, 0))}
+    max={new Date(new Date().setHours(18, 0, 0, 0))}
+    components={{
+        dateCellWrapper: DateCellWrapper,
+        timeSlotWrapper: TimeSlotWrapper,
+        event: (props) => {
+            return (
+                <div 
+                    data-resource={props.event.resource}
+                    data-status={props.event.status}
+                    className={`rbc-event ${props.event.resource}`}
+                >
+                    {props.event.resource === 'appointment' && (
+                        <div className="rbc-event-content">{props.title}</div>
+                    )}
+                </div>
+            );
+        }
+    }}
+/>
             </div>
 
             {/* Dynamic Modal for various actions */}
@@ -519,6 +643,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                         {modalType === 'addAvailability' && 'Add Availability'}
                         {modalType === 'modifyAvailability' && 'Modify Availability'}
                         {modalType === 'unblockAvailability' && 'Unblock Time Slot'}
+                        {modalType === 'deleteAvailability' && 'Remove Time Slot'}
                         {modalType === 'confirmAppointment' && 'Confirm Appointment'}
                     </Modal.Title>
                 </Modal.Header>
@@ -620,6 +745,11 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                             </>
                         )}
 
+                        {/* Delete Availability Confirmation */}
+                        {modalType === 'deleteAvailability' && (
+                            <p>Are you sure you want to remove this time slot from your schedule?</p>
+                        )}
+
                         {/* Cancellation Forms */}
                         {(modalType === 'cancelAppointment') && (
                             <Form.Group className="mb-3">
@@ -655,7 +785,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
 
                     <Button
                         variant={
-                            modalType === 'cancelAppointment' ? 'danger' :
+                            modalType === 'cancelAppointment' || modalType === 'deleteAvailability' ? 'danger' :
                             modalType === 'confirmAppointment' ? 'success' :
                             'primary'
                         }
@@ -667,6 +797,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                         {modalType === 'addAvailability' && 'Add Availability'}
                         {modalType === 'modifyAvailability' && 'Save Changes'}
                         {modalType === 'unblockAvailability' && 'Make Available'}
+                        {modalType === 'deleteAvailability' && 'Remove Time Slot'}
                         {modalType === 'confirmAppointment' && 'Confirm Appointment'}
                     </Button>
 
@@ -680,6 +811,18 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                             }}
                         >
                             Cancel Appointment
+                        </Button>
+                    )}
+                    
+                    {/* Add Remove Time Slot button for Modify Availability */}
+                    {modalType === 'modifyAvailability' && (
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                setModalType('deleteAvailability');
+                            }}
+                        >
+                            Remove Time Slot
                         </Button>
                     )}
                 </Modal.Footer>
