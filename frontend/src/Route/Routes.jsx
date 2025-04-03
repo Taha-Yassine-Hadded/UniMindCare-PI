@@ -117,6 +117,7 @@ import FileManagerContain from "../Components/FileManager/index";
 import MapJsContain from "../Components/Maps/pigeon-maps";
 import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
 import EmergencyClaim from "../Components/EmergencyClaim/EmergencyClaimButton"; // Importation du nouveau composant
+import EmergencyDashboard from "../Components/EmergencyClaim/EmergencyDashboard";
 
 
 
@@ -124,6 +125,7 @@ export const routes = [
   // Emergency Claim
     {path: `${process.env.PUBLIC_URL}/emergency-claim`, Component: <EmergencyClaim />}, // Ajout de la route pour EmergencyClaim
 
+    { path: `${process.env.PUBLIC_URL}/emergency-dashboard`, Component: <EmergencyDashboard /> }, // Add this line
 
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },

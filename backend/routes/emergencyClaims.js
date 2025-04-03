@@ -7,34 +7,29 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
-const jwt = require('jsonwebtoken'); // Ajout de jwt qui manquait
-const User = require('../Models/Users'); // Chemin correct vers le modèle User
+const jwt = require('jsonwebtoken');
+const User = require('../Models/Users');
 const nodemailer = require('nodemailer');
 
-// Middleware d'authentification simplifié (sans dépendance externe)
+// Middleware d'authentification simplifié
 const authenticateToken = async (req, res, next) => {
   try {
-    // Récupérer l'en-tête d'autorisation
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: "Token d'authentification requis" });
     }
     
-    // Extraire le token
     const token = authHeader.split(' ')[1];
     
-    // Vérifier le token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'votre_clé_secrète_jwt');
     
-    // Récupérer les infos utilisateur
     const user = await User.findOne({ Identifiant: decoded.identifiant });
     
     if (!user) {
       return res.status(401).json({ message: "Utilisateur non trouvé" });
     }
     
-    // Attacher les infos utilisateur à la requête
     req.user = {
       identifiant: user.Identifiant,
       email: user.Email,
@@ -54,7 +49,6 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = 'uploads/emergency';
     
-    // Créer le dossier s'il n'existe pas
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -96,6 +90,8 @@ const EmergencyClaim = mongoose.model('EmergencyClaim', new mongoose.Schema({
     required: true 
   },
   location: String,
+  latitude: Number,  // Ajout de champ directement au modèle
+  longitude: Number, // Ajout de champ directement au modèle
   coordinates: {
     lat: Number,
     lng: Number
@@ -111,6 +107,15 @@ const EmergencyClaim = mongoose.model('EmergencyClaim', new mongoose.Schema({
     type: String, 
     enum: ['pending', 'processing', 'resolved', 'rejected'], 
     default: 'pending' 
+  },
+  severity: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  severityScore: {
+    type: Number,
+    default: 0
   },
   createdAt: { 
     type: Date, 
@@ -141,7 +146,7 @@ const extractUserIdentifier = (req, res, next) => {
     next();
   } catch (err) {
     console.error("Erreur d'extraction d'identifiant:", err);
-    next(); // Continuer même en cas d'erreur
+    next();
   }
 };
 
@@ -175,22 +180,37 @@ router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
   try {
     const { description, location, symptoms, identifiant, latitude, longitude } = req.body;
     
-    // Vérifier que les champs requis sont présents
     if (!description || !identifiant) {
       return res.status(400).json({ message: "La description et l'identifiant sont obligatoires" });
     }
     
-    // Créer une nouvelle réclamation avec coordonnées GPS
+    // Analyser les symptômes pour calculer un score de sévérité
+    const parsedSymptoms = symptoms ? JSON.parse(symptoms) : [];
+    const severityScore = calculateSeverityScore(parsedSymptoms);
+    
+    // Déterminer le niveau de sévérité basé sur le score
+    let severityLevel = 'medium';
+    if (severityScore > 8) {
+      severityLevel = 'high';
+    } else if (severityScore < 5) {
+      severityLevel = 'low';
+    }
+    
+    // Créer une nouvelle réclamation avec coordonnées GPS et score de sévérité
     const emergencyClaim = new EmergencyClaim({
       identifiant,
       description,
       location,
+      latitude: latitude ? parseFloat(latitude) : null,
+      longitude: longitude ? parseFloat(longitude) : null,
       coordinates: {
         lat: latitude ? parseFloat(latitude) : null,
         lng: longitude ? parseFloat(longitude) : null
       },
-      symptoms: symptoms ? JSON.parse(symptoms) : [],
+      symptoms: parsedSymptoms,
       imageUrl: req.file ? `/uploads/emergency/${req.file.filename}` : null,
+      severity: severityLevel,
+      severityScore: severityScore,
       createdAt: new Date()
     });
     
@@ -214,7 +234,6 @@ router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
         // Liste des symptômes pour l'email
         let symptomsForEmail = '';
         if (symptoms) {
-          const parsedSymptoms = JSON.parse(symptoms);
           if (parsedSymptoms.length > 0) {
             symptomsForEmail = parsedSymptoms.map(s => 
               `<span style="display:inline-block; margin:2px 5px; padding:3px 8px; background-color:${getSeverityColor(s.severity)}; color:black; border-radius:4px; font-size:12px;">
@@ -228,27 +247,23 @@ router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
 
         // Section carte Google Maps
         let googleMapsSection = '';
-        if (emergencyClaim.coordinates && emergencyClaim.coordinates.lat && emergencyClaim.coordinates.lng) {
+        if (latitude && longitude) {
           // Icône personnalisée pour Google Maps représentant une personne malade
-          const personIcon = 'https://i.imgur.com/qgtR0v3.png'; // URL d'une icône de personne malade
-          
-          // Générer l'image statique de la carte
-          const mapImageUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${emergencyClaim.coordinates.lat},${emergencyClaim.coordinates.lng}&zoom=15&size=600x300&maptype=roadmap&markers=icon:${personIcon}|${emergencyClaim.coordinates.lat},${emergencyClaim.coordinates.lng}&key=AIzaSyDxNmY6XebyJbi8eb0LkQhOCCTPh4x71D8`;
+          const personIcon = 'https://i.imgur.com/qgtR0v3.png';
           
           // URL pour ouvrir Google Maps directement
-          const googleMapsUrl = `https://www.google.com/maps?q=${emergencyClaim.coordinates.lat},${emergencyClaim.coordinates.lng}`;
+          const googleMapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
           
           googleMapsSection = `
             <div style="margin: 15px 0;">
               <h4 style="color: #333;"></h4>
               <div style="text-align: center;">
-                
                 <div style="margin-top: 10px;">
                   <a href="${googleMapsUrl}" 
                      target="_blank" 
                      style="background-color: #4285F4; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">
                     <img src="https://i.imgur.com/q6jYcD5.png" alt="Maps" style="height: 18px; vertical-align: middle; margin-right: 8px;"/>
-                    Voir sur Google Maps-
+                    Voir sur Google Maps
                   </a>
                 </div>
               </div>
@@ -284,8 +299,6 @@ router.post('/submit', upload.single('emergencyImage'), async (req, res) => {
                 <h4 style="color: #333;">Description:</h4>
                 <p style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; color: #333;">${description}</p>
               </div>
-              
-             
               
               <div style="text-align: center; margin-top: 20px;">
                 <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/emergency-claims/${emergencyClaim._id}" 
@@ -339,7 +352,7 @@ router.get('/user/:identifiant', authenticateToken, async (req, res) => {
     }
     
     const claims = await EmergencyClaim.find({ identifiant })
-      .sort({ createdAt: -1 }) // Trier par date décroissante
+      .sort({ createdAt: -1 })
       .lean();
     
     res.json(claims);
@@ -395,6 +408,39 @@ router.get('/all', authenticateToken, async (req, res) => {
   }
 });
 
+// Nouvelle route pour récupérer TOUS les cas d'urgence pour la carte
+router.get('/all-claims', authenticateToken, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur a les droits nécessaires
+    const allowedRoles = ['admin', 'psychologist', 'teacher'];
+    let hasPermission = false;
+    
+    if (req.user && req.user.Role) {
+      // Gérer à la fois le cas où Role est un tableau et où c'est une chaîne
+      if (Array.isArray(req.user.Role)) {
+        hasPermission = req.user.Role.some(role => allowedRoles.includes(role));
+      } else if (typeof req.user.Role === 'string') {
+        hasPermission = allowedRoles.includes(req.user.Role);
+      }
+    }
+    
+    if (!hasPermission) {
+      return res.status(403).json({ message: "Accès non autorisé" });
+    }
+    
+    // Récupérer tous les cas avec coordonnées, limités aux derniers 100 cas
+    const claims = await EmergencyClaim.find()
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .select('_id identifiant description latitude longitude location status severity severityScore symptoms createdAt');
+    
+    res.json(claims);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des cas d\'urgence:', error);
+    res.status(500).json({ message: "Une erreur est survenue lors de la récupération des données" });
+  }
+});
+
 // Route pour mettre à jour le statut d'une réclamation (accès admin, psychologue et enseignant)
 router.put('/:id/status', authenticateToken, async (req, res) => {
   try {
@@ -446,18 +492,16 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
       if (student && student.Email) {
         // Section Google Maps pour l'email de mise à jour
         let googleMapsSection = '';
-        if (updatedClaim.coordinates && updatedClaim.coordinates.lat && updatedClaim.coordinates.lng) {
-          const personIcon = 'https://i.imgur.com/qgtR0v3.png'; // URL de l'icône de personne malade
-          const mapImageUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${updatedClaim.coordinates.lat},${updatedClaim.coordinates.lng}&zoom=15&size=600x300&maptype=roadmap&markers=icon:${personIcon}|${updatedClaim.coordinates.lat},${updatedClaim.coordinates.lng}&key=AIzaSyDxNmY6XebyJbi8eb0LkQhOCCTPh4x71D8`;
-          const googleMapsUrl = `https://www.google.com/maps?q=${updatedClaim.coordinates.lat},${updatedClaim.coordinates.lng}`;
+        if (updatedClaim.latitude && updatedClaim.longitude) {
+          const googleMapsUrl = `https://www.google.com/maps?q=${updatedClaim.latitude},${updatedClaim.longitude}`;
           
           googleMapsSection = `
             <div style="margin: 15px 0;">
               <h4 style="color: #333;">Votre localisation:</h4>
               <div style="text-align: center;">
-                <img src="${mapImageUrl}" 
-                     alt="Localisation de l'urgence" 
-                     style="max-width: 100%; height: auto; border-radius: 5px; border: 1px solid #ddd;" />
+                <a href="${googleMapsUrl}" target="_blank" style="color: #0066cc;">
+                  Voir votre position sur Google Maps
+                </a>
               </div>
             </div>
           `;
@@ -519,6 +563,266 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erreur serveur", error: err.message });
   }
 });
+
+// Route pour récupérer les cas prioritaires en attente
+router.get('/pending-prioritized', authenticateToken, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur a les droits nécessaires
+    const allowedRoles = ['admin', 'psychologist', 'teacher'];
+    let hasPermission = false;
+    
+    if (req.user && req.user.Role) {
+      // Gérer à la fois le cas où Role est un tableau et où c'est une chaîne
+      if (Array.isArray(req.user.Role)) {
+        hasPermission = req.user.Role.some(role => allowedRoles.includes(role));
+      } else if (typeof req.user.Role === 'string') {
+        hasPermission = allowedRoles.includes(req.user.Role);
+      }
+    }
+    
+    if (!hasPermission) {
+      return res.status(403).json({ message: "Accès non autorisé" });
+    }
+    
+    // Récupérer tous les cas en attente
+    const pendingClaims = await EmergencyClaim.find({ status: 'pending' })
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    // Analyser la gravité des symptômes pour chaque réclamation
+    const prioritizedClaims = pendingClaims.map(claim => {
+      // Calculer un score de priorité basé sur les symptômes
+      const severityScore = claim.severityScore || calculateSeverityScore(claim.symptoms);
+      
+      return {
+        ...claim,
+        severityScore,
+        timeElapsed: Date.now() - new Date(claim.createdAt).getTime()
+      };
+    });
+    
+    // Trier par score de sévérité (décroissant) et par temps écoulé (décroissant)
+    prioritizedClaims.sort((a, b) => {
+      // D'abord par score de sévérité
+      if (b.severityScore !== a.severityScore) {
+        return b.severityScore - a.severityScore;
+      }
+      // Ensuite par temps écoulé
+      return b.timeElapsed - a.timeElapsed;
+    });
+    
+    // Renvoyer les résultats
+    res.json(prioritizedClaims);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des cas prioritaires:", err);
+    res.status(500).json({ message: "Erreur serveur", error: err.message });
+  }
+});
+
+// Route pour obtenir des statistiques sur les urgences
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur a les droits nécessaires
+    const allowedRoles = ['admin', 'psychologist', 'teacher'];
+    let hasPermission = false;
+    
+    if (req.user && req.user.Role) {
+      // Gérer à la fois le cas où Role est un tableau et où c'est une chaîne
+      if (Array.isArray(req.user.Role)) {
+        hasPermission = req.user.Role.some(role => allowedRoles.includes(role));
+      } else if (typeof req.user.Role === 'string') {
+        hasPermission = allowedRoles.includes(req.user.Role);
+      }
+    }
+    
+    if (!hasPermission) {
+      return res.status(403).json({ message: "Accès non autorisé" });
+    }
+    
+    // Statistiques par statut
+    const statsByStatus = await EmergencyClaim.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Statistiques par sévérité
+    const severityStats = await EmergencyClaim.aggregate([
+      {
+        $group: {
+          _id: "$severity",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Statistiques des dernières 24 heures
+    const last24Hours = new Date();
+    last24Hours.setHours(last24Hours.getHours() - 24);
+    
+    const recentStats = await EmergencyClaim.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: last24Hours }
+        }
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Statistiques quotidiennes des 30 derniers jours
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const dailyStatsResults = await EmergencyClaim.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: thirtyDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            day: { $dayOfMonth: "$createdAt" }
+          },
+          count: { $sum: 1 },
+          date: { $first: "$createdAt" }
+        }
+      },
+      {
+        $sort: { date: -1 }
+      }
+    ]);
+    
+    // Formater les statistiques quotidiennes
+    const dailyStats = dailyStatsResults.map(item => ({
+      date: item.date,
+      year: item._id.year,
+      month: item._id.month,
+      day: item._id.day,
+      count: item.count
+    }));
+    
+    // Statistiques mensuelles de la dernière année
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    
+    const monthlyStatsResults = await EmergencyClaim.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: twelveMonthsAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" }
+          },
+          count: { $sum: 1 },
+          date: { $first: "$createdAt" }
+        }
+      },
+      {
+        $sort: { date: -1 }
+      }
+    ]);
+    
+    // Formater les statistiques mensuelles
+    const monthlyStats = monthlyStatsResults.map(item => ({
+      date: item.date,
+      year: item._id.year,
+      month: item._id.month,
+      count: item.count
+    }));
+    
+    // Cas non résolus par symptôme (pour identifier les tendances)
+    const unresolvedBySymptom = await EmergencyClaim.aggregate([
+      {
+        $match: {
+          status: { $in: ['pending', 'processing'] }
+        }
+      },
+      {
+        $unwind: "$symptoms"
+      },
+      {
+        $group: {
+          _id: "$symptoms.name",
+          count: { $sum: 1 },
+          highSeverity: {
+            $sum: {
+              $cond: [
+                { $in: ["$symptoms.severity", ["high", "grave"]] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        $sort: { highSeverity: -1, count: -1 }
+      }
+    ]);
+    
+    res.json({
+      statsByStatus,
+      severityStats,
+      recentStats,
+      dailyStats,
+      monthlyStats,
+      unresolvedBySymptom
+    });
+  } catch (err) {
+    console.error("Erreur lors de la récupération des statistiques:", err);
+    res.status(500).json({ message: "Erreur serveur", error: err.message });
+  }
+});
+
+// Fonction pour calculer un score de sévérité basé sur les symptômes
+function calculateSeverityScore(symptoms) {
+  if (!symptoms || !Array.isArray(symptoms) || symptoms.length === 0) {
+    return 0;
+  }
+  
+  let totalScore = 0;
+  
+  for (const symptom of symptoms) {
+    switch (symptom.severity?.toLowerCase()) {
+      case 'high':
+      case 'grave':
+        totalScore += 10;
+        break;
+      case 'medium':
+      case 'modéré':
+        totalScore += 5;
+        break;
+      case 'low':
+      case 'léger':
+        totalScore += 2;
+        break;
+      default:
+        totalScore += 1;
+    }
+    
+    // Donner plus de poids aux symptômes de certaines catégories
+    if (symptom.category?.toLowerCase() === 'mental') {
+      totalScore += 2; // Les problèmes mentaux sont prioritaires dans ce contexte
+    }
+  }
+  
+  return totalScore;
+}
 
 // Fonction pour obtenir une couleur selon le statut
 function getStatusColor(status) {

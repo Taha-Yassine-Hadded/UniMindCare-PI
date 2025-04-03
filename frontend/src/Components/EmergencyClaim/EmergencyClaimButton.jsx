@@ -174,7 +174,7 @@ const EmergencyClaimButton = ({ userIdentifiant }) => {
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDxNmY6XebyJbi8eb0LkQhOCCTPh4x71D8&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDdL6W-ZWFsrcYoxx2LLPg8NUDOZOhr4RY&libraries=places`;
     script.async = true;
     script.defer = true;
     

@@ -28,6 +28,7 @@ import {
   Users,
   Zap,
   ShoppingBag,
+  AlertTriangle,
 } from "react-feather";
 
 export const MENU = [
@@ -130,8 +131,16 @@ export const MENU = [
             title: "Wishlist",
             type: "link",
           },
+          {
+            url: `${process.env.PUBLIC_URL}/emergency-dashboard`,
+            title: "Emergency Dashboard",
+            type: "link",
+            bookmark: true,
+
+          },
         ],
       },
+    
     ],
   },
   {
