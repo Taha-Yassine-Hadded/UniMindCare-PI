@@ -4,8 +4,8 @@ import moment from 'moment';
 import axios from 'axios';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { toast, ToastContainer } from 'react-toastify';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-toastify/dist/ReactToastify.css';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
 import './AppointmentCalendar.css';
 
 // Setup the localizer for react-big-calendar
@@ -422,58 +422,62 @@ const handleSelectSlot = ({ start, end }) => {
         }
     };
 
-    // Custom event styling based on status
+// Custom event styling based on status and priority
 const eventPropGetter = (event) => {
     let style = {
         borderRadius: '4px',
-        opacity: 1,
+        border: '2px solid', // Solid border for all events
         display: 'block',
+        boxShadow: '0 2px 3px rgba(0,0,0,0.1)',
+        zIndex: 5, // Ensure events are above other elements
     };
 
     if (event.resource === 'availability') {
-        // Make availability events completely invisible
+        // Keep availability events invisible
         style = {
             ...style,
             backgroundColor: 'transparent',
             borderColor: 'transparent',
             color: 'transparent',
-            display: 'none', // This hides them completely
-            pointerEvents: 'none' // Make them non-interactive
+            display: 'none', // Hide them completely
+            pointerEvents: 'none', // Make them non-interactive
         };
     } else {
-        // Regular styling for appointments (unchanged)
+        // Appointment styling based on status
         switch (event.status) {
             case 'confirmed':
-                style.backgroundColor = '#28a745';
-                style.color = 'white';
-                style.zIndex = 3;
+                style.backgroundColor = '#28a745'; // Green for confirmed
+                style.borderColor = '#1e7e34'; // Darker green border
+                style.color = '#212529';
+                style.opacity = 1; // Fully opaque
                 break;
             case 'pending':
-                style.backgroundColor = '#ffc107';
-                style.color = '#212529';
-                style.zIndex = 3;
+                style.backgroundColor = '#fdfd96'; // Yellow for pending
+                style.borderColor = '#fdfd96'; // Darker yellow border
+                style.color = '#fdfd96';
+                style.opacity = 1; // Fully opaque
                 break;
             case 'cancelled':
-                style.backgroundColor = '#dc3545';
-                style.opacity = 0.6;
-                style.color = 'white';
-                style.zIndex = 3;
+                style.backgroundColor = '#f8d7da'; // Pink for cancelled (matching the image)
+                style.borderColor = '#dc3545'; // Red border
+                style.color = '#721c24'; // Darker text color for contrast
+                style.opacity = 0.8; // Slightly transparent for cancelled
                 break;
             default:
-                style.backgroundColor = '#007bff';
-                style.color = 'white';
-                style.zIndex = 3;
+                style.backgroundColor = '#007bff'; // Fallback blue (shouldn't be used)
+                style.borderColor = '#0056b3';
+                style.color = '#212529';
+                style.opacity = 1;
         }
 
+        // Add priority styling
         if (event.priority === 'emergency') {
-            style.border = '2px solid #dc3545';
-            style.fontWeight = 'bold';
+            style.borderBottom = '4px solid #dc3545'; // Red bottom border for urgent
         }
     }
 
     return { style };
 };
-
 // Custom component for time slot cells
 const TimeSlotWrapper = ({ value, children }) => {
     // Check if this time slot overlaps with any availability
@@ -578,27 +582,61 @@ const DateCellWrapper = ({ value, children }) => {
 
            {/* Calendar legend */}
            <div className="calendar-legend mb-3">
-    <div className="d-flex justify-content-between flex-wrap">
-        <div className="legend-item">
-            <div className="legend-color legend-available"></div>
-            <span>Available Time</span>
+    <div className="d-flex flex-wrap">
+        <div className="legend-section me-4">
+            <h6>Availability</h6>
+            <div className="d-flex flex-column">
+                <div className="legend-item mb-1">
+                    <div className="legend-color legend-available"></div>
+                    <span>Available Time</span>
+                </div>
+                <div className="legend-item">
+                    <div className="legend-color legend-blocked"></div>
+                    <span>Blocked Time</span>
+                </div>
+            </div>
         </div>
-        <div className="legend-item">
-            <div className="legend-color legend-blocked"></div>
-            <span>Blocked Time</span>
+
+        <div className="legend-section me-4">
+            <h6>Appointment Status</h6>
+            <div className="d-flex flex-column">
+                <div className="legend-item mb-1">
+                    <div className="legend-color" style={{ backgroundColor: '#fdfd96', border: '2px solid #fef86c', borderRadius: '4px' }}></div>
+                    <span>Pending</span>
+                </div>
+                <div className="legend-item mb-1">
+                    <div className="legend-color" style={{ backgroundColor: '#b0f2b6', border: '2px solid #75da7e', borderRadius: '4px' }}></div>
+                    <span>Confirmed</span>
+                </div>
+                <div className="legend-item">
+                    <div className="legend-color" style={{ backgroundColor: '#ff9e93', border: '2px solid #ff847a', borderRadius: '4px', opacity: 0.8 }}></div>
+                    <span>Cancelled</span>
+                </div>
+            </div>
         </div>
-        <div className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: '#ffc107', borderRadius: '4px' }}></span>
-            <span>Pending Appointment</span>
-        </div>
-        <div className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: '#28a745', borderRadius: '4px' }}></span>
-            <span>Confirmed Appointment</span>
+
+        <div className="legend-section">
+            <h6>Priority</h6>
+            <div className="d-flex flex-column">
+                <div className="legend-item mb-1">
+                <span className="priority-indicator">⚠️</span>
+
+                    <span>Urgent</span>
+                </div>
+                <div className="legend-item">
+                    <div className="legend-color" style={{
+                        backgroundColor: '#fdfd96',
+                        border: '2px solid #fef86c',
+                        borderRadius: '4px'
+                    }}></div>
+                    <span>Regular</span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
             {/* Calendar view */}
-            <div className="calendar-container">
+            <div className="my-calendar">
             <Calendar
     localizer={localizer}
     events={[...events, ...availability]}
@@ -609,26 +647,67 @@ const DateCellWrapper = ({ value, children }) => {
     onSelectSlot={handleSelectSlot}
     onSelectEvent={handleSelectEvent}
     eventPropGetter={eventPropGetter}
-    defaultView={Views.WEEK}
+    defaultView={Views.MONTH}
     views={['month', 'week', 'day']}
-    min={new Date(new Date().setHours(8, 0, 0, 0))}
-    max={new Date(new Date().setHours(18, 0, 0, 0))}
+    min={new Date(new Date().setHours(0, 0, 0, 0))}
+    max={new Date(new Date().setHours(23, 59, 59, 999))}
+    
     components={{
         dateCellWrapper: DateCellWrapper,
         timeSlotWrapper: TimeSlotWrapper,
-        event: (props) => {
-            return (
-                <div 
-                    data-resource={props.event.resource}
-                    data-status={props.event.status}
-                    className={`rbc-event ${props.event.resource}`}
-                >
-                    {props.event.resource === 'appointment' && (
-                        <div className="rbc-event-content">{props.title}</div>
-                    )}
-                </div>
-            );
-        }
+      // Update the event component part of your Calendar component
+      event: (props) => {
+        const statusColor =
+            props.event.status === 'pending' ? '#fdfd96' :
+            props.event.status === 'confirmed' ? '#28a745' :
+            props.event.status === 'cancelled' ? '#f8d7da' :
+            '#007bff'; // Fallback (shouldn't be used)
+    
+        const borderColor =
+            props.event.status === 'pending' ? '#fdfd96' :
+            props.event.status === 'confirmed' ? '#1e7e34' :
+            props.event.status === 'cancelled' ? '#dc3545' :
+            '#0056b3';
+    
+        const textColor =
+            props.event.status === 'pending' ? '#fdfd96' :
+            props.event.status === 'confirmed' ? '#212529' :
+            props.event.status === 'cancelled' ? '#721c24' :
+            '#212529';
+    
+        const priorityBorder = props.event.priority === 'emergency' ? '4px solid #dc3545' : 'none';
+    
+        const inlineStyle = {
+            backgroundColor: statusColor,
+            border: `2px solid ${borderColor}`,
+            borderBottom: priorityBorder,
+            color: textColor,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+            borderRadius: '4px',
+            zIndex: 5,
+            opacity: props.event.status === 'cancelled' ? 0.8 : 1, // Slightly transparent for cancelled
+        };
+    
+        return (
+            <div
+                data-resource={props.event.resource || ''}
+                data-status={props.event.status || ''}
+                data-priority={props.event.priority || ''}
+                className={`rbc-event ${props.event.resource || ''}`}
+                style={inlineStyle}
+            >
+                {props.event.resource === 'appointment' && (
+                    <div className="rbc-event-content">
+                         {props.event.priority === 'emergency' && (
+                            <span className="priority-indicator">⚠️</span>
+                        )}
+                        {props.title}
+                       
+                    </div>
+                )}
+            </div>
+        );
+    }
     }}
 />
             </div>

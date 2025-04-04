@@ -20,8 +20,7 @@ import GalleryProvider from "./Helper/Gallery/GalleryProvider"
 import GoogleChartProvider from "./Helper/GoogleChart/GoogleChartProvider"
 import ChartistProvider from "./Helper/Chartist/ChartistProvider"
 import AnimationThemeProvider from './Helper/AnimationTheme/AnimationThemeProvider'
-import 'react-toastify/dist/ReactToastify.css'; // Toastify CSS
-import 'react-big-calendar/lib/css/react-big-calendar.css'; // Calendar CSS
+
 
 const App = () => {
   return (
