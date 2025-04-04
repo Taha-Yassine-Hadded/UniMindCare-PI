@@ -14,15 +14,13 @@ const userSchema = new mongoose.Schema({
       message: 'L\'email doit se terminer par "@esprit.tn"'
     }
   },
-  //Password: { type: String, required: true },
   Password: { 
     type: String,
     required: function() {
-      // Requis seulement si pas d'authentification Google
       return !this.googleId; 
     }
   },
-  googleId: { type: String, unique: true, sparse: true }, // Ajouter ce champ
+  googleId: { type: String, unique: true, sparse: true },
   Classe: { type: String },
   Role: {
     type: [String],
@@ -36,9 +34,11 @@ const userSchema = new mongoose.Schema({
   otp: { type: String },
   otpExpires: { type: Date },
   loginAttempts: { type: Number, default: 0 },
-  twoFactorSecret: String,        // Secret 2FA permanent
-    twoFactorSecretTemp: String,    // Secret temporaire avant activation
-    twoFactorEnabled: { type: Boolean, default: false } // Statut 2FA
+  twoFactorSecret: String,
+  twoFactorSecretTemp: String,
+  twoFactorEnabled: { type: Boolean, default: false },
+  // Nouveau champ pour les enseignants
+  enableExitRequestSorting: { type: Boolean, default: false }, // Ajouté  // champ ajouté pour la vérification de l'email
 }, { 
   collection: 'users',
   timestamps: true,
@@ -46,3 +46,4 @@ const userSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);
+

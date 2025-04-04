@@ -117,8 +117,8 @@ import FileManagerContain from "../Components/FileManager/index";
 import MapJsContain from "../Components/Maps/pigeon-maps";
 import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
 import Feedback from "../Components/FormFARAH/FeedbackEtudiant";
-
-
+import StudentDashboard from "../Components/StudentDashboard";
+import TeacherDashboard from "../Components/TeacherDashboard";
 
 export const routes = [
     //Weather
@@ -126,6 +126,9 @@ export const routes = [
     
   //Feedback
   { path: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`, Component: <Feedback /> },
+
+  { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard /> },
+  { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
 
 
   // dashboard

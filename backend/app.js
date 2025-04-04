@@ -14,6 +14,7 @@ const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
 const UserVerification = require('./Models/UserVerification'); 
 const User = require('./Models/Users');
+
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
 const crypto = require('crypto');
@@ -29,12 +30,11 @@ const crisisRoutes = require("./routes/crisisData"); // Nouvelle route
 const weatherRoutes = require("./routes/weather");
 const feedbackRoutes = require("./routes/feedbackRoutes"); // Assurez-vous que le chemin est correct
 // Servir les fichiers statiques depuis le dossier images
-
 var indexRouter = require('./routes/index');
 var usersRoutes = require('./routes/users');
-
 const passport = require('./routes/passportConfig'); // Import the configured passport instance
 const usersRouter = require('./routes/usersRouter');
+const exitRequestRoutes = require('./routes/exitRequests'); // Chemin correct vers tes routes
 
 // Initialize Express app
 var app = express();
@@ -47,6 +47,7 @@ app.use(bodyParser.json());
 // view engine setup
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
+app.use("/api", exitRequestRoutes);
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -60,7 +61,6 @@ app.use("/api", (req, res, next) => {
 app.use("/api/users", usersRoutes);
 
 app.use('/api/posts', postsRouter);
-
 app.use('/api/crisis', crisisRoutes); // Nouvelle route pour la crise
 app.use("/api", feedbackRoutes); // Monter les routes de feedback sous /api
 // MongoDB connection

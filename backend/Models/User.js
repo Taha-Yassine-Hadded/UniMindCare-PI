@@ -7,10 +7,12 @@ const userSchema = new mongoose.Schema({
   Password: String,
   Classe: String,
   Role: String,
-  PhoneNumber: String,  // éviter les espaces dans le nom de champ
+  PhoneNumber: String,
   imageUrl: String,
   enabled: { type: Boolean, default: false },
-  verified: { type: Boolean, default: false }  // champ ajouté pour la vérification de l'email
+  verified: { type: Boolean, default: false },
+  enableExitRequestSorting: { type: Boolean, default: false },
 }, { timestamps: true });
 
-module.exports = mongoose.model('User', userSchema);
+// Exporter le modèle existant s'il est déjà compilé sinon le compiler
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);

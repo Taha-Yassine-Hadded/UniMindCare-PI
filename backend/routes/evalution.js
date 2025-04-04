@@ -1,6 +1,6 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
-const Evaluation = require("../models/evaluations");
+const Evaluation = require("../Models/evaluations");
 const router = express.Router();
 
 // Middleware personnalisé pour le logging (optionnel)
