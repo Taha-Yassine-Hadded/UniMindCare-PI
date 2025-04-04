@@ -74,6 +74,38 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Route pour liker une publication
+router.post('/:id/like', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    console.log(`Requête de like reçue pour le post ${req.params.id} par l'utilisateur ${req.user._id}`);
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      console.log('Publication non trouvée');
+      return res.status(404).json({ message: 'Publication non trouvée' });
+    }
+
+    const userId = req.user._id;
+
+    if (post.likes.includes(userId)) {
+      post.likes = post.likes.filter(id => id.toString() !== userId.toString());
+      console.log(`Like retiré pour le post ${post._id}`);
+    } else {
+      post.likes.push(userId);
+      console.log(`Like ajouté pour le post ${post._id}`);
+    }
+
+    await post.save();
+    const updatedPost = await Post.findById(req.params.id)
+      .populate('author', 'Name')
+      .populate('comments.author');
+    console.log('Post mis à jour:', updatedPost);
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error('Erreur lors du like:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 // Route pour ajouter un commentaire
 router.post('/:id/comments', passport.authenticate('jwt', { session: false }), async (req, res) => {
   const { content, isAnonymous } = req.body;

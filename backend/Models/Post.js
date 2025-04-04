@@ -19,7 +19,8 @@ const postSchema = new mongoose.Schema({
   anonymousPseudo: { type: String }, // Pseudo généré si anonyme
   imageUrl: { type: String, required: false },
   createdAt: { type: Date, default: Date.now },
-  comments: [commentSchema] // Ajout du tableau de commentaires
+  comments: [commentSchema],
+  likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Ajout du tableau de commentaires
 });
 
 module.exports = mongoose.model('Post', postSchema);

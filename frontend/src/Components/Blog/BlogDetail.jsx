@@ -4,7 +4,7 @@ import { Container, Row, Col, Card, FormGroup, Label, Input, InputGroup, InputGr
 import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaHeart } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 // Importer les 10 images par défaut
@@ -31,9 +31,10 @@ const getRandomImageForPost = (postId) => {
 };
 
 // Ajoute des styles CSS personnalisés
+// Ajoute des styles CSS personnalisés
 const cardStyles = {
   card: {
-    height: '400px',
+    height: '450px', // Augmenter la hauteur pour donner plus d'espace
     display: 'flex',
     flexDirection: 'column',
   },
@@ -80,6 +81,7 @@ const cardStyles = {
   },
   footer: {
     marginTop: 'auto',
+    minHeight: '60px', 
   },
   sortContainer: {
     display: 'flex',
@@ -104,6 +106,19 @@ const cardStyles = {
     display: 'flex',
     alignItems: 'center',
   },
+  likeIcon: {
+    marginRight: '5px',
+  },
+  userContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    whiteSpace: 'normal', // Permettre au texte de s'étendre sur plusieurs lignes
+    overflow: 'visible', // Éviter que le texte soit coupé
+    maxWidth: '100%', // S'assurer que le conteneur ne dépasse pas la largeur disponible
+  },
+  userIcon: {
+    marginRight: '5px', // Espace entre l'icône et le texte
+  },
 };
 
 const BlogDetailContain = () => {
@@ -117,6 +132,7 @@ const BlogDetailContain = () => {
     const fetchCurrentUser = async () => {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (!token) {
+        console.log('Aucun token trouvé, utilisateur non connecté');
         setCurrentUser(null);
         return;
       }
@@ -127,6 +143,7 @@ const BlogDetailContain = () => {
             Authorization: `Bearer ${token}`,
           },
         });
+        console.log('Utilisateur connecté:', response.data);
         setCurrentUser(response.data);
       } catch (error) {
         console.error('Erreur lors de la récupération de l\'utilisateur:', error.response?.data || error.message);
@@ -142,9 +159,10 @@ const BlogDetailContain = () => {
     const fetchPosts = async () => {
       try {
         const response = await axios.get('http://localhost:5000/api/posts');
+        console.log('Publications récupérées:', response.data);
         setPosts(response.data);
       } catch (error) {
-        console.error('Erreur lors de la récupération:', error.response?.data || error.message);
+        console.error('Erreur lors de la récupération des posts:', error.response?.data || error.message);
       }
     };
     fetchPosts();
@@ -157,18 +175,15 @@ const BlogDetailContain = () => {
     return { day, month };
   };
 
-  // Fonction pour filtrer les publications par titre et par auteur (si "Mes posts" est sélectionné)
   const filterPosts = (postsToFilter) => {
     let filtered = [...postsToFilter];
 
-    // Filtrer par titre (commence par la chaîne saisie)
     if (searchQuery) {
       filtered = filtered.filter((post) =>
         post.title?.toLowerCase().startsWith(searchQuery.toLowerCase())
       );
     }
 
-    // Filtrer par auteur si "Mes posts" est sélectionné
     if (sortOption === 'myPosts') {
       if (!currentUser) {
         Swal.fire({
@@ -176,8 +191,8 @@ const BlogDetailContain = () => {
           title: 'Non connecté',
           text: 'Veuillez vous connecter pour voir vos publications.',
         });
-        setSortOption('date'); // Revenir à l'option par défaut
-        return postsToFilter; // Retourner toutes les publications si non connecté
+        setSortOption('date');
+        return postsToFilter;
       }
 
       filtered = filtered.filter((post) =>
@@ -188,7 +203,6 @@ const BlogDetailContain = () => {
     return filtered;
   };
 
-  // Fonction pour trier les publications (toujours en ordre décroissant)
   const sortPosts = (postsToSort) => {
     const sortedPosts = [...postsToSort];
 
@@ -196,31 +210,28 @@ const BlogDetailContain = () => {
       sortedPosts.sort((a, b) => {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
-        return dateB - dateA; // Du plus récent au plus ancien
+        return dateB - dateA;
       });
     } else if (sortOption === 'comments') {
       sortedPosts.sort((a, b) => {
         const commentsA = a.comments?.length || 0;
         const commentsB = b.comments?.length || 0;
-        return commentsB - commentsA; // Du plus commenté au moins commenté
+        return commentsB - commentsA;
       });
     }
 
     return sortedPosts;
   };
 
-  // Filtrer puis trier les publications
   const filteredPosts = filterPosts(posts);
   const sortedPosts = sortPosts(filteredPosts);
 
   return (
     <Fragment>
       <Container fluid={true} className="blog-page">
-        {/* Interface de recherche et de tri */}
         <Row>
           <Col sm="12">
             <div style={cardStyles.sortContainer}>
-              {/* Champ de recherche */}
               <FormGroup style={cardStyles.formGroup}>
                 <InputGroup style={cardStyles.inputGroup}>
                   <InputGroupText>
@@ -236,7 +247,6 @@ const BlogDetailContain = () => {
                 </InputGroup>
               </FormGroup>
 
-              {/* Menu de tri */}
               <FormGroup style={cardStyles.formGroup}>
                 <Label for="sortOption" style={cardStyles.label}>
                   Trier:
@@ -257,61 +267,70 @@ const BlogDetailContain = () => {
           </Col>
         </Row>
 
-        {/* Liste des publications */}
         <Row>
           {sortedPosts.length > 0 ? (
-            sortedPosts.map((post) => (
-              <Col sm="6" xl="3" className="box-col-6 des-xl-50" key={post._id}>
-                <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <Card style={cardStyles.card}>
-                    <div className="blog-box blog-grid">
-                      <div className="blog-wrraper">
-                        <Image
-                          attrImage={{
-                            className: 'img-fluid top-radius-blog',
-                            style: cardStyles.image,
-                            src: post.imageUrl ? `http://localhost:5000${post.imageUrl}` : getRandomImageForPost(post._id),
-                            alt: post.title || 'Publication',
-                          }}
-                        />
-                      </div>
-                      <div className="blog-details-second" style={cardStyles.content}>
-                        <div style={cardStyles.dateContainer}>
-                          <div className="blog-post-date" style={cardStyles.date}>
-                            <span className="blg-month">{formatDate(post.createdAt).month}</span>
-                            <span className="blg-date">{formatDate(post.createdAt).day}</span>
+            sortedPosts.map((post) => {
+              console.log('Post dans BlogDetailContain:', post); // Log pour inspecter les données
+              return (
+                <Col sm="6" xl="3" className="box-col-6 des-xl-50" key={post._id}>
+                  <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <Card style={cardStyles.card}>
+                      <div className="blog-box blog-grid">
+                        <div className="blog-wrraper">
+                          <Image
+                            attrImage={{
+                              className: 'img-fluid top-radius-blog',
+                              style: cardStyles.image,
+                              src: post.imageUrl ? `http://localhost:5000${post.imageUrl}` : getRandomImageForPost(post._id),
+                              alt: post.title || 'Publication',
+                            }}
+                          />
+                        </div>
+                        <div className="blog-details-second" style={cardStyles.content}>
+                          <div style={cardStyles.dateContainer}>
+                            <div className="blog-post-date" style={cardStyles.date}>
+                              <span className="blg-month">{formatDate(post.createdAt).month}</span>
+                              <span className="blg-date">{formatDate(post.createdAt).day}</span>
+                            </div>
+                            <span className="badge bg-warning text-dark" style={cardStyles.badge}>
+                              {formatDate(post.createdAt).day}
+                            </span>
                           </div>
-                          <span className="badge bg-warning text-dark" style={cardStyles.badge}>
-                            {formatDate(post.createdAt).day}
-                          </span>
-                        </div>
-                        <H6 attrH6={{ className: 'blog-bottom-details', style: cardStyles.title }}>
-                          {post.title || 'Titre non disponible'}
-                        </H6>
-                        <div
-                          style={cardStyles.body}
-                          dangerouslySetInnerHTML={{ __html: post.content || 'Contenu non disponible' }}
-                        />
-                        <div className="detail-footer" style={cardStyles.footer}>
-                          <UL attrUL={{ className: 'social-list simple-list flex-row' }}>
-                            <LI>
-                              <i className="fa fa-user-o"></i>
-                              {post.isAnonymous ? post.anonymousPseudo : post.author?.Name || 'Inconnu'}
-                            </LI>
-                            <LI>
-                              <i className="fa fa-comments-o"></i>{post.comments?.length || 0} Hits
-                            </LI>
-                            <LI>
-                              <i className="fa fa-thumbs-o-up"></i>{post.likes || 2} Like
-                            </LI>
-                          </UL>
+                          <H6 attrH6={{ className: 'blog-bottom-details', style: cardStyles.title }}>
+                            {post.title || 'Titre non disponible'}
+                          </H6>
+                          <div
+                            style={cardStyles.body}
+                            dangerouslySetInnerHTML={{ __html: post.content || 'Contenu non disponible' }}
+                          />
+                          <div className="detail-footer" style={cardStyles.footer}>
+                            <ul style={{ display: 'flex', listStyle: 'none', padding: 0, margin: 0 }}>
+                            <li style={{ marginRight: '15px', color: 'black !important', visibility: 'visible', fontSize: '16px' }}>
+  <div style={cardStyles.userContainer}>
+    <i className="fa fa-user-o" style={cardStyles.userIcon}></i>
+    {(() => {
+      const isAnonymousBool = post.isAnonymous === true || post.isAnonymous === 'true';
+      console.log('Affichage auteur - Post:', post.title, 'isAnonymous:', post.isAnonymous, 'isAnonymousBool:', isAnonymousBool, 'anonymousPseudo:', post.anonymousPseudo, 'author:', post.author);
+      return isAnonymousBool ? (post.anonymousPseudo || 'Anonyme') : (post.author?.Name || 'Inconnu');
+    })()}
+  </div>
+</li>
+                              <li style={{ marginRight: '15px' }}>
+                                <i className="fa fa-comments-o"></i>{post.comments?.length || 0} 
+                              </li>
+                              <li>
+                                <FaHeart style={cardStyles.likeIcon} />
+                                {post.likes?.length || 0} 
+                              </li>
+                            </ul>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
-                </Link>
-              </Col>
-            ))
+                    </Card>
+                  </Link>
+                </Col>
+              );
+            })
           ) : (
             <Col sm="6" xl="3">
               <p className="text-center">Aucune publication disponible.</p>
