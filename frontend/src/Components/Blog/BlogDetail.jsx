@@ -5,6 +5,7 @@ import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { FaSearch } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 
 // Importer les 10 images par défaut
 import defaultImage1 from '../../assets/images/default-image-1.jpg';
@@ -82,34 +83,61 @@ const cardStyles = {
   },
   sortContainer: {
     display: 'flex',
-    justifyContent: 'space-between', // Placer la recherche à gauche et le tri à droite
-    alignItems: 'center', // Centrer verticalement
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: '20px',
     gap: '10px',
   },
   searchInput: {
-    width: '250px', // Ajuste la largeur selon tes besoins
+    width: '250px',
   },
   formGroup: {
-    marginBottom: 0, // Supprimer la marge par défaut de FormGroup
+    marginBottom: 0,
     display: 'flex',
-    alignItems: 'center', // Centrer verticalement les éléments à l'intérieur
+    alignItems: 'center',
   },
   label: {
-    marginBottom: 0, // Supprimer la marge sous le label
-    marginRight: '10px', // Espacement entre le label et le select
+    marginBottom: 0,
+    marginRight: '10px',
   },
   inputGroup: {
     display: 'flex',
-    alignItems: 'center', // S'assurer que l'InputGroup est centré
+    alignItems: 'center',
   },
 };
 
 const BlogDetailContain = () => {
   const [posts, setPosts] = useState([]);
-  const [sortOption, setSortOption] = useState('date'); // Par défaut : tri par date
-  const [searchQuery, setSearchQuery] = useState(''); // État pour la recherche
+  const [sortOption, setSortOption] = useState('date');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
 
+  // Récupérer l'utilisateur connecté
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setCurrentUser(null);
+        return;
+      }
+
+      try {
+        const response = await axios.get('http://localhost:5000/api/users/me', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setCurrentUser(response.data);
+      } catch (error) {
+        console.error('Erreur lors de la récupération de l\'utilisateur:', error.response?.data || error.message);
+        setCurrentUser(null);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  // Récupérer les publications
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -129,19 +157,42 @@ const BlogDetailContain = () => {
     return { day, month };
   };
 
-  // Fonction pour filtrer les publications par titre (commence par la chaîne saisie)
+  // Fonction pour filtrer les publications par titre et par auteur (si "Mes posts" est sélectionné)
   const filterPosts = (postsToFilter) => {
-    if (!searchQuery) return postsToFilter; // Si la recherche est vide, retourner toutes les publications
-    return postsToFilter.filter((post) =>
-      post.title?.toLowerCase().startsWith(searchQuery.toLowerCase())
-    );
+    let filtered = [...postsToFilter];
+
+    // Filtrer par titre (commence par la chaîne saisie)
+    if (searchQuery) {
+      filtered = filtered.filter((post) =>
+        post.title?.toLowerCase().startsWith(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filtrer par auteur si "Mes posts" est sélectionné
+    if (sortOption === 'myPosts') {
+      if (!currentUser) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Non connecté',
+          text: 'Veuillez vous connecter pour voir vos publications.',
+        });
+        setSortOption('date'); // Revenir à l'option par défaut
+        return postsToFilter; // Retourner toutes les publications si non connecté
+      }
+
+      filtered = filtered.filter((post) =>
+        post.author?._id.toString() === currentUser._id.toString()
+      );
+    }
+
+    return filtered;
   };
 
   // Fonction pour trier les publications (toujours en ordre décroissant)
   const sortPosts = (postsToSort) => {
     const sortedPosts = [...postsToSort];
 
-    if (sortOption === 'date') {
+    if (sortOption === 'date' || sortOption === 'myPosts') {
       sortedPosts.sort((a, b) => {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
@@ -199,6 +250,7 @@ const BlogDetailContain = () => {
                 >
                   <option value="date">Date</option>
                   <option value="comments">Nombre de commentaires</option>
+                  <option value="myPosts">Mes posts</option>
                 </Input>
               </FormGroup>
             </div>
