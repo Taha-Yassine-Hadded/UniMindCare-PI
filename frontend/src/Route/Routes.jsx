@@ -116,10 +116,12 @@ import CheckOutContain from "../Components/Eccommerce/CheckOut/index";
 import AddProductName from "../Components/Eccommerce/AddProduct";
 import FileManagerContain from "../Components/FileManager/index"
 import MapJsContain from "../Components/Maps/pigeon-maps";
+import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 
 export const routes = [
   //dashboard
-
+  //<Route path="/notifications" element={<NotificationsPage />} />,
+  { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/default`, Component: <Default /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/ecommerce`, Component: <Ecommerce /> },

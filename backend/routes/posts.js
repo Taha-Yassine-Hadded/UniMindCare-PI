@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const Post = require('../Models/Post');
+const Notification = require('../Models/Notification');
 const passport = require('../routes/passportConfig');
 const multer = require('multer');
 const path = require('path');
@@ -9,25 +10,26 @@ const path = require('path');
 // Configuration de multer pour stocker les images
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Dossier où les images seront stockées
+    cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Nom unique avec timestamp
-  }
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
 });
 
 const upload = multer({ storage: storage });
 
 // Fonction pour générer un pseudo anonyme
 const generateAnonymousPseudo = () => {
-  const randomNum = Math.floor(Math.random() * 1000); // Nombre aléatoire entre 0 et 999
+  const randomNum = Math.floor(Math.random() * 1000);
   return `Anonyme${randomNum}`;
 };
 
 // Route pour ajouter une publication avec ou sans image
-router.post('/', 
-  passport.authenticate('jwt', { session: false }), 
-  upload.single('image'), // 'image' est le nom du champ dans le formulaire
+router.post(
+  '/',
+  passport.authenticate('jwt', { session: false }),
+  upload.single('image'),
   async (req, res) => {
     const { title, content, isAnonymous } = req.body;
 
@@ -38,7 +40,7 @@ router.post('/',
         author: req.user._id,
         isAnonymous: isAnonymous || false,
         anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
-        imageUrl: req.file ? `/uploads/${req.file.filename}` : null // URL de l'image si présente
+        imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
       });
       await post.save();
       res.status(201).json(post);
@@ -52,7 +54,7 @@ router.post('/',
 // Route pour récupérer toutes les publications
 router.get('/', async (req, res) => {
   try {
-    const posts = await Post.find().populate('author', 'Name'); // Récupère le nom de l'auteur
+    const posts = await Post.find().populate('author', 'Name');
     console.log('Publications récupérées:', posts);
     res.status(200).json(posts);
   } catch (error) {
@@ -64,8 +66,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate('author', 'Name') // Peupler l'auteur du post
-      .populate('comments.author'); // Peupler les auteurs des commentaires avec tous les champs
+      .populate('author', 'Name')
+      .populate('comments.author');
     if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
     res.status(200).json(post);
   } catch (error) {
@@ -86,12 +88,25 @@ router.post('/:id/like', passport.authenticate('jwt', { session: false }), async
 
     const userId = req.user._id;
 
+    let notification;
     if (post.likes.includes(userId)) {
-      post.likes = post.likes.filter(id => id.toString() !== userId.toString());
+      post.likes = post.likes.filter((id) => id.toString() !== userId.toString());
       console.log(`Like retiré pour le post ${post._id}`);
     } else {
       post.likes.push(userId);
       console.log(`Like ajouté pour le post ${post._id}`);
+
+      // Créer une notification pour l'auteur de la publication (sauf si c'est l'utilisateur lui-même)
+      if (post.author.toString() !== userId.toString()) {
+        notification = new Notification({
+          recipient: post.author,
+          sender: userId,
+          type: 'like_post',
+          post: post._id,
+          isAnonymous: false, // Les likes ne sont pas anonymes
+        });
+        await notification.save();
+      }
     }
 
     await post.save();
@@ -124,7 +139,20 @@ router.post('/:id/comments', passport.authenticate('jwt', { session: false }), a
     post.comments.push(comment);
     await post.save();
 
-    // Peupler les données après l'ajout du commentaire pour renvoyer une réponse complète
+    // Créer une notification pour l'auteur de la publication (sauf si c'est l'utilisateur lui-même)
+    if (post.author.toString() !== req.user._id.toString()) {
+      const notification = new Notification({
+        recipient: post.author,
+        sender: req.user._id,
+        type: 'comment',
+        post: post._id,
+        comment: comment._id,
+        isAnonymous: isAnonymous || false,
+        anonymousPseudo: isAnonymous ? comment.anonymousPseudo : null,
+      });
+      await notification.save();
+    }
+
     const updatedPost = await Post.findById(req.params.id)
       .populate('author', 'Name')
       .populate('comments.author', 'Name');
@@ -146,14 +174,24 @@ router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { 
 
     const userId = req.user._id;
 
-    // Check if user already liked
     if (comment.likes.includes(userId)) {
-      // Remove like if already liked
-      comment.likes = comment.likes.filter(id => id.toString() !== userId.toString());
+      comment.likes = comment.likes.filter((id) => id.toString() !== userId.toString());
     } else {
-      // Add like and remove dislike if exists
       comment.likes.push(userId);
-      comment.dislikes = comment.dislikes.filter(id => id.toString() !== userId.toString());
+      comment.dislikes = comment.dislikes.filter((id) => id.toString() !== userId.toString());
+
+      // Créer une notification pour l'auteur du commentaire (sauf si c'est l'utilisateur lui-même)
+      if (comment.author.toString() !== userId.toString()) {
+        const notification = new Notification({
+          recipient: comment.author,
+          sender: userId,
+          type: 'like_comment',
+          post: post._id,
+          comment: comment._id,
+          isAnonymous: false, // Les likes ne sont pas anonymes
+        });
+        await notification.save();
+      }
     }
 
     await post.save();
@@ -168,6 +206,7 @@ router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { 
 });
 
 // Route to dislike a comment
+// Route to dislike a comment
 router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -178,14 +217,24 @@ router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt',
 
     const userId = req.user._id;
 
-    // Check if user already disliked
     if (comment.dislikes.includes(userId)) {
-      // Remove dislike if already disliked
-      comment.dislikes = comment.dislikes.filter(id => id.toString() !== userId.toString());
+      comment.dislikes = comment.dislikes.filter((id) => id.toString() !== userId.toString());
     } else {
-      // Add dislike and remove like if exists
       comment.dislikes.push(userId);
-      comment.likes = comment.likes.filter(id => id.toString() !== userId.toString());
+      comment.likes = comment.likes.filter((id) => id.toString() !== userId.toString());
+
+      // Créer une notification pour l'auteur du commentaire (sauf si c'est l'utilisateur lui-même)
+      if (comment.author.toString() !== userId.toString()) {
+        const notification = new Notification({
+          recipient: comment.author,
+          sender: userId,
+          type: 'dislike_comment',
+          post: post._id,
+          comment: comment._id,
+          isAnonymous: false, // Les dislikes ne sont pas anonymes
+        });
+        await notification.save();
+      }
     }
 
     await post.save();
@@ -208,20 +257,17 @@ router.delete('/:postId/comments/:commentId', passport.authenticate('jwt', { ses
     const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ message: 'Commentaire non trouvé' });
 
-    // Check if the user is the author of the comment
     if (comment.author.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à supprimer ce commentaire' });
+      return res.status(403).json({ message: "Vous n'êtes pas autorisé à supprimer ce commentaire" });
     }
 
-    // Remove the comment from the comments array
-    post.comments = post.comments.filter(c => c._id.toString() !== req.params.commentId);
+    post.comments = post.comments.filter((c) => c._id.toString() !== req.params.commentId);
 
     await post.save();
 
-    // Fetch the updated post with populated author data
     const updatedPost = await Post.findById(req.params.postId)
       .populate('author', 'Name')
-      .populate('comments.author'); // Populate full author object
+      .populate('comments.author');
     res.status(200).json(updatedPost);
   } catch (error) {
     console.error('Erreur lors de la suppression du commentaire:', error);

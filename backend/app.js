@@ -24,7 +24,7 @@ const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
 const transporter = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
-
+const notificationsRoutes = require('./routes/notifications');
 var indexRouter = require('./routes/index');
 //var usersRouter = require('./routes/users');
 
@@ -55,7 +55,7 @@ app.use('/api/posts', postsRouter);
 app.use('/uploads', express.static('uploads'));
  // Authentication routes
 //app.use('/users', usersRouter);
-
+app.use('/api/notifications', notificationsRoutes);
 
 // MongoDB connection
 /*mongoose
