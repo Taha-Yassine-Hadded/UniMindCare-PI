@@ -1,4 +1,3 @@
-// routes/posts.js
 const express = require('express');
 const router = express.Router();
 const Post = require('../Models/Post');
@@ -103,9 +102,15 @@ router.post('/:id/like', passport.authenticate('jwt', { session: false }), async
           sender: userId,
           type: 'like_post',
           post: post._id,
-          isAnonymous: false, // Les likes ne sont pas anonymes
+          isAnonymous: false,
         });
         await notification.save();
+
+        // Émettre une notification via WebSocket au destinataire
+        const populatedNotification = await Notification.findById(notification._id)
+          .populate('sender', 'Name')
+          .populate('post', 'title');
+        req.io.to(post.author.toString()).emit('new_notification', populatedNotification);
       }
     }
 
@@ -151,6 +156,12 @@ router.post('/:id/comments', passport.authenticate('jwt', { session: false }), a
         anonymousPseudo: isAnonymous ? comment.anonymousPseudo : null,
       });
       await notification.save();
+
+      // Émettre une notification via WebSocket
+      const populatedNotification = await Notification.findById(notification._id)
+        .populate('sender', 'Name')
+        .populate('post', 'title');
+      req.io.to(post.author.toString()).emit('new_notification', populatedNotification);
     }
 
     const updatedPost = await Post.findById(req.params.id)
@@ -188,9 +199,15 @@ router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { 
           type: 'like_comment',
           post: post._id,
           comment: comment._id,
-          isAnonymous: false, // Les likes ne sont pas anonymes
+          isAnonymous: false,
         });
         await notification.save();
+
+        // Émettre une notification via WebSocket
+        const populatedNotification = await Notification.findById(notification._id)
+          .populate('sender', 'Name')
+          .populate('post', 'title');
+        req.io.to(comment.author.toString()).emit('new_notification', populatedNotification);
       }
     }
 
@@ -205,7 +222,6 @@ router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { 
   }
 });
 
-// Route to dislike a comment
 // Route to dislike a comment
 router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
@@ -231,9 +247,15 @@ router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt',
           type: 'dislike_comment',
           post: post._id,
           comment: comment._id,
-          isAnonymous: false, // Les dislikes ne sont pas anonymes
+          isAnonymous: false,
         });
         await notification.save();
+
+        // Émettre une notification via WebSocket
+        const populatedNotification = await Notification.findById(notification._id)
+          .populate('sender', 'Name')
+          .populate('post', 'title');
+        req.io.to(comment.author.toString()).emit('new_notification', populatedNotification);
       }
     }
 

@@ -3,10 +3,36 @@ import { Container, Row, Col, Card, CardBody } from 'reactstrap';
 import { Breadcrumbs, H4, P, UL } from '../../../AbstractElements';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Heart, MessageSquare, ThumbsDown } from 'react-feather'; // Ajout de ThumbsDown
+import { Heart, MessageSquare, ThumbsDown } from 'react-feather';
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:5000', {
+  transports: ['websocket'],
+  reconnection: true,
+});
 
 const NotificationsPage = () => {
   const [notifications, setNotifications] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  const fetchCurrentUser = async () => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      console.log('Aucun token trouvé, utilisateur non connecté');
+      return;
+    }
+
+    try {
+      const response = await axios.get('http://localhost:5000/api/users/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setCurrentUserId(response.data._id);
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'utilisateur:', error.response?.data || error.message);
+    }
+  };
 
   const fetchNotifications = async () => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -29,8 +55,24 @@ const NotificationsPage = () => {
   };
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchNotifications();
   }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    socket.emit('join', currentUserId);
+
+    socket.on('new_notification', (notification) => {
+      console.log('Nouvelle notification reçue via WebSocket:', notification);
+      setNotifications((prevNotifications) => [notification, ...prevNotifications]);
+    });
+
+    return () => {
+      socket.off('new_notification');
+    };
+  }, [currentUserId]);
 
   const markAsRead = async (notificationId) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -40,9 +82,7 @@ const NotificationsPage = () => {
     }
 
     try {
-      console.log('Token utilisé:', token);
-      console.log('Envoi de la requête PUT pour marquer la notification comme lue:', notificationId);
-      const response = await axios.put(
+      await axios.put(
         `http://localhost:5000/api/notifications/${notificationId}/read`,
         {},
         {
@@ -51,14 +91,14 @@ const NotificationsPage = () => {
           },
         }
       );
-      console.log('Réponse de la requête PUT:', response.data);
-      await fetchNotifications();
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((notif) =>
+          notif._id === notificationId ? { ...notif, read: true } : notif
+        )
+      );
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de la notification:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
+      console.error('Erreur lors de la mise à jour de la notification:', error.response?.data || error.message);
+      await fetchNotifications();
     }
   };
 
@@ -109,7 +149,7 @@ const NotificationsPage = () => {
                             {notif.type === 'like_post' || notif.type === 'like_comment' ? (
                               <Heart />
                             ) : notif.type === 'dislike_comment' ? (
-                              <ThumbsDown /> // Icône pour dislike
+                              <ThumbsDown />
                             ) : (
                               <MessageSquare />
                             )}

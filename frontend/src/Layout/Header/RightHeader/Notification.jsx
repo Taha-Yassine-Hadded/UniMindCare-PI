@@ -1,12 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Heart, MessageSquare, ThumbsDown } from 'react-feather'; // Ajout de ThumbsDown
+import { Bell, Heart, MessageSquare, ThumbsDown } from 'react-feather';
 import { P } from '../../../AbstractElements';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import io from 'socket.io-client'; // Importer Socket.IO client
+
+const socket = io('http://localhost:5000', {
+  transports: ['websocket'], // Assurer que WebSocket est utilisé
+  reconnection: true, // Activer la reconnexion automatique
+});
+
+socket.on('connect', () => {
+  console.log('Connecté au serveur WebSocket avec l\'ID:', socket.id);
+});
+
+socket.on('connect_error', (error) => {
+  console.error('Erreur de connexion WebSocket:', error);
+});
 
 const Notification = ({ active, setActive }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  // Récupérer l'utilisateur connecté pour obtenir son ID
+  const fetchCurrentUser = async () => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      console.log('Aucun token trouvé, utilisateur non connecté');
+      return;
+    }
+
+    try {
+      const response = await axios.get('http://localhost:5000/api/users/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log('Utilisateur connecté:', response.data);
+      setCurrentUserId(response.data._id);
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'utilisateur:', error.response?.data || error.message);
+    }
+  };
 
   const fetchNotifications = async () => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -30,8 +66,29 @@ const Notification = ({ active, setActive }) => {
   };
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchNotifications();
   }, []);
+
+  // Configurer WebSocket
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    // Rejoindre la salle de l'utilisateur
+    socket.emit('join', currentUserId);
+
+    // Écouter les nouvelles notifications
+    socket.on('new_notification', (notification) => {
+      console.log('Nouvelle notification reçue via WebSocket:', notification);
+      setNotifications((prevNotifications) => [notification, ...prevNotifications]);
+      setUnreadCount((prevCount) => prevCount + 1);
+    });
+
+    // Nettoyage lors de la déconnexion
+    return () => {
+      socket.off('new_notification');
+    };
+  }, [currentUserId]);
 
   const markAsRead = async (notificationId) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -116,7 +173,7 @@ const Notification = ({ active, setActive }) => {
                   {notif.type === 'like_post' || notif.type === 'like_comment' ? (
                     <Heart />
                   ) : notif.type === 'dislike_comment' ? (
-                    <ThumbsDown /> // Icône pour dislike
+                    <ThumbsDown />
                   ) : (
                     <MessageSquare />
                   )}
