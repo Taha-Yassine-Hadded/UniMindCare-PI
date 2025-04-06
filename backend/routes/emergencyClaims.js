@@ -620,6 +620,7 @@ router.get('/pending-prioritized', authenticateToken, async (req, res) => {
 });
 
 // Route pour obtenir des statistiques sur les urgences
+// Route pour obtenir des statistiques sur les urgences
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
     // Vérifier que l'utilisateur a les droits nécessaires
@@ -649,15 +650,59 @@ router.get('/stats', authenticateToken, async (req, res) => {
       }
     ]);
     
-    // Statistiques par sévérité
-    const severityStats = await EmergencyClaim.aggregate([
+    // Statistiques par symptôme (au lieu de sévérité)
+    const symptomStats = await EmergencyClaim.aggregate([
+      {
+        $unwind: {
+          path: "$symptoms",
+          preserveNullAndEmptyArrays: true
+        }
+      },
       {
         $group: {
-          _id: "$severity",
+          _id: {
+            $cond: [
+              { $ifNull: ["$symptoms.category", false] },
+              "$symptoms.category", 
+              "Autre"
+            ]
+          },
           count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: {
+            $cond: [
+              { $eq: ["$_id", ""] },
+              "Autre",
+              "$_id"
+            ]
+          },
+          count: 1
         }
       }
     ]);
+    
+    // Si pas de catégories, créer des valeurs par défaut
+    if (!symptomStats || symptomStats.length === 0) {
+      symptomStats.push({ _id: 'stress', count: 0 });
+      symptomStats.push({ _id: 'depression', count: 0 });
+      symptomStats.push({ _id: 'physical', count: 0 });
+    }
+    
+    // S'assurer que toutes les catégories principales existent
+    const existingCategories = symptomStats.map(s => s._id);
+    
+    if (!existingCategories.includes('stress')) {
+      symptomStats.push({ _id: 'stress', count: 0 });
+    }
+    if (!existingCategories.includes('depression')) {
+      symptomStats.push({ _id: 'depression', count: 0 });
+    }
+    if (!existingCategories.includes('physical')) {
+      symptomStats.push({ _id: 'physical', count: 0 });
+    }
     
     // Statistiques des dernières 24 heures
     const last24Hours = new Date();
@@ -777,7 +822,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
     
     res.json({
       statsByStatus,
-      severityStats,
+      symptomStats,      // Remplacé severityStats par symptomStats
       recentStats,
       dailyStats,
       monthlyStats,

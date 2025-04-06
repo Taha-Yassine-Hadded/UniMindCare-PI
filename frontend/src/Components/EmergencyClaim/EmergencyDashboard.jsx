@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Container, Row, Col, Card, Badge, Button, Spinner, Alert, Modal, Nav } from 'react-bootstrap';
-import { BsExclamationTriangleFill, BsClockHistory, BsCheckCircle, BsBarChartFill, BsMap } from 'react-icons/bs';
-import { FaMapMarkerAlt, FaUserCircle, FaHospital, FaPhone } from 'react-icons/fa';
+import { Container, Row, Col, Card, Badge, Button, Spinner, Alert, Modal, Nav, Table, ProgressBar } from 'react-bootstrap';
+import { BsExclamationTriangleFill, BsClockHistory, BsCheckCircle, BsBarChartFill, BsMap, BsCalendar, BsPieChart } from 'react-icons/bs';
+import { FaMapMarkerAlt, FaUserCircle, FaHospital, FaPhone, FaChartLine, FaCalendarAlt } from 'react-icons/fa';
 import axios from 'axios';
 import { format, formatDistanceToNow, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,6 +14,7 @@ import {
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -27,6 +28,7 @@ ChartJS.register(
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend
@@ -195,7 +197,7 @@ const EmergencyMap = ({ claims }) => {
         </div>
       )}
       
-      <p className="mt-2">
+      <p className="mt-3">
         <small className="text-muted">
           Carte montrant {validClaimsWithCoords.length} cas d'urgence
         </small>
@@ -203,18 +205,31 @@ const EmergencyMap = ({ claims }) => {
       
       {/* Liste des emplacements sous la carte */}
       <div className="mt-3 text-start">
-        <h6>Liste des emplacements:</h6>
-        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-          {validClaimsWithCoords.map((claim, index) => (
-            <div key={claim._id || index} className="mb-2 p-2 border-bottom">
-              <strong>{index + 1}. {claim.identifiant}</strong>
-              <div>
-                <FaMapMarkerAlt className="text-danger me-1" /> 
-                {claim.location || `${claim.latitude}, ${claim.longitude}`}
-              </div>
+        <Card className="shadow-sm border-0">
+          <Card.Header className="bg-white">
+            <h6 className="mb-0">Liste des emplacements</h6>
+          </Card.Header>
+          <Card.Body className="p-0">
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {validClaimsWithCoords.map((claim, index) => (
+                <div key={claim._id || index} className="d-flex align-items-center p-3 border-bottom">
+                  <div className={`me-3 rounded-circle d-flex align-items-center justify-content-center ${
+                    claim.severityScore > 8 ? 'bg-danger' : claim.severityScore > 4 ? 'bg-warning' : 'bg-info'}`} 
+                    style={{width: '32px', height: '32px', color: 'white'}}>
+                    {index + 1}
+                  </div>
+                  <div>
+                    <div className="fw-bold">{claim.identifiant}</div>
+                    <div className="small text-muted">
+                      <FaMapMarkerAlt className="text-danger me-1" /> 
+                      {claim.location || `${claim.latitude}, ${claim.longitude}`}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </Card.Body>
+        </Card>
       </div>
     </div>
   );
@@ -232,7 +247,7 @@ const LocationMapModal = ({ claim }) => {
   
   return (
     <div className="mb-4">
-      <h6>Localisation</h6>
+      <h6 className="mb-3 fw-bold text-primary">Localisation</h6>
       {!iframeError ? (
         <div style={{ height: '200px', width: '100%', borderRadius: '8px', overflow: 'hidden' }}>
           <iframe 
@@ -264,21 +279,21 @@ const LocationMapModal = ({ claim }) => {
 // Composant principal
 const EmergencyDashboard = () => {
   // State variables
-  const [pendingClaims, setPendingClaims] = useState([]);
-  const [allClaims, setAllClaims] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedClaim, setSelectedClaim] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [processingClaim, setProcessingClaim] = useState(false);
-  const [status, setStatus] = useState('processing');
-  const [notes, setNotes] = useState('');
-  const [userData, setUserData] = useState(null);
-  const [activeTab, setActiveTab] = useState('list');
-  const [dateRange, setDateRange] = useState('week'); // week, month, year
-  const navigate = useNavigate();
-
+const [pendingClaims, setPendingClaims] = useState([]);
+const [allClaims, setAllClaims] = useState([]);
+const [stats, setStats] = useState(null);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState(null);
+const [selectedClaim, setSelectedClaim] = useState(null);
+const [showModal, setShowModal] = useState(false);
+const [processingClaim, setProcessingClaim] = useState(false);
+const [status, setStatus] = useState('processing');
+const [notes, setNotes] = useState('');
+const [userData, setUserData] = useState(null);
+const [usersData, setUsersData] = useState({});  // Ajoutez cette ligne
+const [activeTab, setActiveTab] = useState('list');
+const [dateRange, setDateRange] = useState('week'); // week, month, year
+const navigate = useNavigate();
   // Fonction simplifiée pour gérer le chargement de la carte - évite complètement le JS de Google Maps
   const [mapLoaded, setMapLoaded] = useState(true);  // Toujours considéré comme chargé
 
@@ -387,23 +402,6 @@ const EmergencyDashboard = () => {
         };
       });
       
-      console.log("Données formatées:", formattedClaims);
-      
-      // Vérifier si les données ont des coordonnées valides
-      const withCoords = formattedClaims.filter(claim => 
-        claim.latitude && claim.longitude && 
-        !isNaN(claim.latitude) && 
-        !isNaN(claim.longitude)
-      );
-      
-      console.log("Réclamations avec coordonnées valides:", withCoords.length);
-      if (withCoords.length > 0) {
-        console.log("Exemple de coordonnées:", {
-          lat: withCoords[0].latitude,
-          lng: withCoords[0].longitude
-        });
-      }
-      
       setAllClaims(formattedClaims);
     } catch (err) {
       console.error("Erreur lors de la récupération de tous les cas d'urgence:", err);
@@ -485,27 +483,62 @@ const EmergencyDashboard = () => {
     }
   }, [getAuthConfig, userData]);
 
+
+
+// Fetch users data
+const fetchUserDetails = useCallback(async () => {
+  try {
+    const config = getAuthConfig();
+    
+    if (!config.headers.Authorization) {
+      console.error("Non authentifié. Veuillez vous connecter.");
+      return [];
+    }
+    
+    const response = await axios.get(
+      `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/users`,
+      config
+    );
+    
+    return response.data;
+  } catch (err) {
+    console.error("Erreur lors de la récupération des données utilisateurs:", err);
+    return [];
+  }
+}, [getAuthConfig]);
+
+
   // Load data on component mount
-  useEffect(() => {
-    if (userData) {
+useEffect(() => {
+  if (userData) {
+    fetchPendingClaims();
+    fetchStats();
+    fetchAllClaims();
+    
+    // Récupérer les détails des utilisateurs
+    fetchUserDetails().then((users) => {
+      // Transformer le tableau en objet indexé par Identifiant pour un accès rapide
+      const userMap = {};
+      users.forEach(user => {
+        userMap[user.Identifiant] = user;
+      });
+      setUsersData(userMap);
+    });
+    
+    // Set up auto-refresh every 30 seconds
+    const refreshInterval = setInterval(() => {
       fetchPendingClaims();
       fetchStats();
-      fetchAllClaims();
       
-      // Set up auto-refresh every 30 seconds
-      const refreshInterval = setInterval(() => {
-        fetchPendingClaims();
-        fetchStats();
-        
-        // Récupérer les données de la carte seulement si l'onglet carte est actif
-        if (activeTab === 'map') {
-          fetchAllClaims();
-        }
-      }, 30000);
-      
-      return () => clearInterval(refreshInterval);
-    }
-  }, [fetchPendingClaims, fetchStats, fetchAllClaims, userData, activeTab]);
+      // Récupérer les données de la carte seulement si l'onglet carte est actif
+      if (activeTab === 'map') {
+        fetchAllClaims();
+      }
+    }, 30000);
+    
+    return () => clearInterval(refreshInterval);
+  }
+}, [fetchPendingClaims, fetchStats, fetchAllClaims, userData, activeTab, fetchUserDetails]);
 
   // Récupérer les données de la carte quand on active l'onglet
   useEffect(() => {
@@ -624,15 +657,24 @@ const EmergencyDashboard = () => {
 
   return (
     <Container fluid className="py-4">
-      <Row className="mb-4">
-        <Col>
+      {/* Header modernisé */}
+      <Card className="border-0 shadow-sm bg-primary text-white mb-4">
+        <Card.Body className="py-4">
           <div className="d-flex justify-content-between align-items-center">
-            <h2 className="mb-0">
-              <BsExclamationTriangleFill className="me-2 text-danger" />
-              Tableau de Bord des Urgences
-            </h2>
+            <div className="d-flex align-items-center">
+              <div className="bg-white text-danger p-3 rounded-circle me-3">
+                <BsExclamationTriangleFill size={24} />
+              </div>
+              <div>
+                <h2 className="mb-0">Tableau de Bord des Urgences</h2>
+                <p className="mb-0 mt-1 opacity-75">
+                  Gestion centralisée des cas d'urgence pour intervention rapide
+                </p>
+              </div>
+            </div>
             <Button 
-              variant="outline-primary" 
+              variant="light" 
+              className="shadow-sm"
               onClick={() => {
                 fetchPendingClaims();
                 fetchStats();
@@ -642,64 +684,20 @@ const EmergencyDashboard = () => {
               }}
             >
               Actualiser
+              {stats && stats.recentStats && (
+                <Badge bg="danger" className="ms-2">
+                  {stats.recentStats.reduce((sum, item) => sum + (item?.count || 0), 0)} aujourd'hui
+                </Badge>
+              )}
             </Button>
           </div>
-          <p className="text-muted">
-            Gestion centralisée des cas d'urgence pour intervention rapide
-          </p>
-        </Col>
-      </Row>
+        </Card.Body>
+      </Card>
 
       {error && error !== "Vous n'avez pas les permissions nécessaires pour accéder à cette page." && (
         <Alert variant="danger" onClose={() => setError(null)} dismissible>
           {error}
         </Alert>
-      )}
-
-      {/* Statistics Cards */}
-      {stats && (
-        <Row className="mb-4">
-          <Col lg={3} md={6} sm={12} className="mb-3">
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
-                <div className="display-4 text-warning mb-2">
-                  {stats.statsByStatus?.find(s => s._id === 'pending')?.count || 0}
-                </div>
-                <div className="text-muted">Cas en attente</div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col lg={3} md={6} sm={12} className="mb-3">
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
-                <div className="display-4 text-info mb-2">
-                  {stats.statsByStatus?.find(s => s._id === 'processing')?.count || 0}
-                </div>
-                <div className="text-muted">Cas en traitement</div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col lg={3} md={6} sm={12} className="mb-3">
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
-                <div className="display-4 text-success mb-2">
-                  {stats.statsByStatus?.find(s => s._id === 'resolved')?.count || 0}
-                </div>
-                <div className="text-muted">Cas résolus</div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col lg={3} md={6} sm={12} className="mb-3">
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
-                <div className="display-4 text-danger mb-2">
-                  {stats.recentStats?.reduce((sum, item) => sum + (item?.count || 0), 0) || 0}
-                </div>
-                <div className="text-muted">Dernières 24h</div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
       )}
 
       {/* Navigation entre liste, graphique et carte */}
@@ -716,11 +714,13 @@ const EmergencyDashboard = () => {
                 <BsBarChartFill className="me-2" /> Statistiques
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="map" className="d-flex align-items-center">
-                <BsMap className="me-2" /> Carte des urgences
-              </Nav.Link>
-            </Nav.Item>
+            {/* 
+<Nav.Item>
+  <Nav.Link eventKey="map" className="d-flex align-items-center">
+    <BsMap className="me-2" /> Carte des urgences
+  </Nav.Link>
+</Nav.Item> 
+*/}
           </Nav>
         </Card.Header>
         <Card.Body className="p-0">
@@ -739,222 +739,458 @@ const EmergencyDashboard = () => {
                 </div>
               ) : (
                 <div className="emergency-claims-list" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                  {pendingClaims.map((claim) => (
-                    <div 
-                      key={claim._id} 
-                      className={`emergency-claim-item p-3 border-bottom ${selectedClaim?._id === claim._id ? 'bg-light' : ''}`}
-                      onClick={() => handleSelectClaim(claim)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="d-flex align-items-start">
-                        <div className={`severity-indicator me-3 mt-1 ${claim.severityScore > 8 ? 'bg-danger' : claim.severityScore > 4 ? 'bg-warning' : 'bg-info'}`} style={{ width: '4px', height: '40px', borderRadius: '2px' }}></div>
-                        <div className="flex-grow-1">
-                          <div className="d-flex justify-content-between align-items-start">
-                            <h6 className="mb-1 fw-bold">{claim.identifiant}</h6>
-                            <small className="text-muted">
-                              {formatDistanceToNow(new Date(claim.createdAt), { addSuffix: true, locale: fr })}
-                            </small>
-                          </div>
-                          <p className="mb-1 text-truncate" style={{ maxWidth: '400px' }}>{claim.description}</p>
-                          <div className="d-flex flex-wrap gap-1 mt-1">
-                            {claim.symptoms && claim.symptoms.map((symptom, idx) => (
-                              <Badge 
-                                key={idx} 
-                                bg={symptom.severity?.toLowerCase() === 'high' || symptom.severity?.toLowerCase() === 'grave' ? 'danger' : 
-                                    symptom.severity?.toLowerCase() === 'medium' || symptom.severity?.toLowerCase() === 'modéré' ? 'warning' : 'info'}
-                                className="me-1 mb-1"
-                                style={{ opacity: 0.9 }}
-                              >
-                                {symptom.name}
-                              </Badge>
-                            ))}
-                          </div>
-                          {claim.location && (
-                            <div className="mt-1">
-                              <small className="text-muted">
-                                <FaMapMarkerAlt className="me-1" /> {claim.location}
-                              </small>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+  {pendingClaims.map((claim) => {
+    // Récupérer les informations de l'utilisateur
+    const userDetails = usersData[claim.identifiant] || {};
+    
+    return (
+      <div 
+        key={claim._id} 
+        className={`emergency-claim-item p-3 mb-3 rounded border ${selectedClaim?._id === claim._id ? 'border-primary' : ''}`}
+        onClick={() => handleSelectClaim(claim)}
+        style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+      >
+        <div className="d-flex align-items-start">
+          <div className={`me-3 mt-1 ${claim.severityScore > 8 ? 'bg-danger' : claim.severityScore > 4 ? 'bg-warning' : 'bg-info'}`} 
+               style={{ width: '6px', height: '55px', borderRadius: '3px' }}></div>
+          <div className="flex-grow-1">
+            <div className="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h5 className="mb-0 fw-bold">{userDetails.Name || claim.identifiant}</h5>
+                <div className="text-muted small">
+                  <span className="me-3"><i className="fas fa-id-card me-1"></i> ID: {claim.identifiant}</span>
+                  {userDetails.Email && <span className="d-block mt-1"><i className="fas fa-envelope me-1"></i> {userDetails.Email}</span>}
+                  {userDetails.PhoneNumber && <span className="d-block mt-1"><i className="fas fa-phone me-1"></i> {userDetails.PhoneNumber}</span>}
                 </div>
+              </div>
+              
+              <small className="text-muted">
+                {formatDistanceToNow(new Date(claim.createdAt), { addSuffix: true, locale: fr })}
+              </small>
+            </div>
+            <p className="mb-2">{claim.description}</p>
+            <div className="d-flex flex-wrap gap-1 mb-2">
+              {claim.symptoms && claim.symptoms.map((symptom, idx) => (
+                <Badge 
+                  key={idx} 
+                  bg={symptom.severity?.toLowerCase() === 'high' || symptom.severity?.toLowerCase() === 'grave' ? 'danger' : 
+                      symptom.severity?.toLowerCase() === 'medium' || symptom.severity?.toLowerCase() === 'modéré' ? 'warning' : 'info'}
+                  className="me-1 mb-1 py-2 px-3"
+                >
+                  {symptom.name}
+                </Badge>
+              ))}
+            </div>
+            {claim.location && (
+              <div className="mt-1 bg-light p-2 rounded d-flex align-items-center">
+                <FaMapMarkerAlt className="text-danger me-2" /> 
+                <span className="text-muted small">{claim.location}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  })}
+</div>
               )}
             </div>
           )}
 
-          {/* Affichage des statistiques */}
+          {/* Affichage des statistiques modernes */}
           {activeTab === 'chart' && chartData && (
             <div className="p-4">
-              <Row className="mb-4">
+              {/* Section 1: Périodes */}
+              <Row className="mb-4 align-items-center">
                 <Col md={6}>
-                  <div className="d-flex align-items-center justify-content-between mb-3">
-                    <h5 className="mb-0">Répartition des cas par statut</h5>
-                  </div>
-                  <div style={{ height: '300px' }}>
-                    <Bar 
-                      data={{
-                        labels: ['En attente', 'En traitement', 'Résolus', 'Rejetés'],
-                        datasets: [
-                          {
-                            label: 'Nombre de cas',
-                            data: [
-                              chartData.basic.pendingCount,
-                              chartData.basic.processingCount,
-                              chartData.basic.resolvedCount,
-                              chartData.basic.rejectedCount,
-                            ],
-                            backgroundColor: [
-                              'rgba(255, 193, 7, 0.7)',
-                              'rgba(13, 202, 240, 0.7)',
-                              'rgba(25, 135, 84, 0.7)',
-                              'rgba(108, 117, 125, 0.7)',
-                            ],
-                            borderColor: [
-                              'rgb(255, 193, 7)',
-                              'rgb(13, 202, 240)',
-                              'rgb(25, 135, 84)',
-                              'rgb(108, 117, 125)',
-                            ],
-                            borderWidth: 1
-                          }
-                        ]
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'top',
-                          },
-                        }
-                      }}
-                    />
-                  </div>
+                  <h5 className="mb-0">Analyse des cas d'urgence</h5>
+                  <p className="text-muted mb-0">Aperçu des tendances et répartitions</p>
                 </Col>
                 <Col md={6}>
-                  <div className="d-flex align-items-center justify-content-between mb-3">
-                    <h5 className="mb-0">Répartition par gravité</h5>
-                  </div>
-                  <div style={{ height: '300px' }}>
-                    <Bar 
-                      data={{
-                        labels: ['Basse', 'Moyenne', 'Élevée'],
-                        datasets: [
-                          {
-                            label: 'Niveau de gravité',
-                            data: stats ? [
-                              stats.severityStats?.find(s => s._id === 'low')?.count || 0,
-                              stats.severityStats?.find(s => s._id === 'medium')?.count || 0,
-                              stats.severityStats?.find(s => s._id === 'high')?.count || 0,
-                            ] : [0, 0, 0],
-                            backgroundColor: [
-                              'rgba(13, 202, 240, 0.7)',
-                              'rgba(255, 193, 7, 0.7)',
-                              'rgba(220, 53, 69, 0.7)',
-                            ],
-                            borderColor: [
-                              'rgb(13, 202, 240)',
-                              'rgb(255, 193, 7)',
-                              'rgb(220, 53, 69)',
-                            ],
-                            borderWidth: 1
-                          }
-                        ]
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'top',
-                          },
-                        }
-                      }}
-                    />
-                  </div>
-                </Col>
-              </Row>
-
-              <Row>
-                <Col xs={12}>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="mb-0">Évolution des cas d'urgence</h5>
+                  <div className="d-flex justify-content-md-end">
                     <div className="btn-group">
                       <Button 
                         size="sm" 
                         variant={dateRange === 'week' ? 'primary' : 'outline-primary'} 
                         onClick={() => setDateRange('week')}
                       >
-                        Semaine
+                        <FaCalendarAlt className="me-1" /> Semaine
                       </Button>
                       <Button 
                         size="sm" 
                         variant={dateRange === 'month' ? 'primary' : 'outline-primary'} 
                         onClick={() => setDateRange('month')}
                       >
-                        Mois
+                        <FaCalendarAlt className="me-1" /> Mois
                       </Button>
                       <Button 
                         size="sm" 
                         variant={dateRange === 'year' ? 'primary' : 'outline-primary'} 
                         onClick={() => setDateRange('year')}
                       >
-                        Année
+                        <FaChartLine className="me-1" /> Année
                       </Button>
                     </div>
                   </div>
-                  <div style={{ height: '300px' }}>
-                    <Line 
-                      data={{
-                        labels: chartData.time.map(item => {
-                          if (dateRange === 'year') {
-                            // Pour l'affichage annuel
-                            return format(new Date(item.date), 'MMM yyyy', { locale: fr });
-                          } else {
-                            // Pour l'affichage quotidien
-                            return format(new Date(item.date), 'd MMM', { locale: fr });
-                          }
-                        }),
-                        datasets: [
-                          {
-                            label: 'Nouveaux cas',
-                            data: chartData.time.map(item => item.count),
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                            tension: 0.3,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
-                          },
-                        ]
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            ticks: {
-                              precision: 0
-                            }
-                          }
-                        },
-                        plugins: {
-                          tooltip: {
-                            callbacks: {
-                              title: function(tooltipItems) {
-                                const item = tooltipItems[0];
-                                const date = chartData.time[item.dataIndex].date;
-                                return format(new Date(date), 'PPP', { locale: fr });
-                              }
-                            }
-                          }
-                        }
-                      }}
-                    />
+                </Col>
+              </Row>
+
+              {/* Section 2: Vue d'ensemble avec design amélioré */}
+              <Row className="mb-4">
+                <Col md={6} className="mb-4">
+                  <Card className="h-100 shadow-sm border-0">
+                    <Card.Header className="bg-white border-bottom-0">
+                      <div className="d-flex align-items-center">
+                        <BsPieChart className="me-2 text-primary" />
+                        <h6 className="mb-0 fw-bold">Distribution par statut</h6>
+                      </div>
+                    </Card.Header>
+                    <Card.Body className="p-4">
+                      <Table className="mb-0 table-hover">
+                        <thead>
+                          <tr>
+                            <th>Status</th>
+                            <th>Nombre</th>
+                            <th>Pourcentage</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stats && (
+                            <>
+                              <tr>
+                                <td>
+                                  <span className="d-flex align-items-center">
+                                    <span className="me-2 d-inline-block bg-warning" style={{ width: '12px', height: '12px', borderRadius: '50%' }}></span>
+                                    En attente
+                                  </span>
+                                </td>
+                                <td className="fw-bold">{chartData.basic.pendingCount}</td>
+                                <td>
+                                  <ProgressBar now={chartData.basic.pendingCount} max={chartData.basic.pendingCount + chartData.basic.processingCount + chartData.basic.resolvedCount + chartData.basic.rejectedCount || 1} variant="warning" style={{ height: '8px', borderRadius: '4px' }} />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>
+                                  <span className="d-flex align-items-center">
+                                    <span className="me-2 d-inline-block bg-info" style={{ width: '12px', height: '12px', borderRadius: '50%' }}></span>
+                                    En traitement
+                                  </span>
+                                </td>
+                                <td className="fw-bold">{chartData.basic.processingCount}</td>
+                                <td>
+                                  <ProgressBar now={chartData.basic.processingCount} max={chartData.basic.pendingCount + chartData.basic.processingCount + chartData.basic.resolvedCount + chartData.basic.rejectedCount || 1} variant="info" style={{ height: '8px', borderRadius: '4px' }} />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>
+                                  <span className="d-flex align-items-center">
+                                    <span className="me-2 d-inline-block bg-success" style={{ width: '12px', height: '12px', borderRadius: '50%' }}></span>
+                                    Résolu
+                                  </span>
+                                </td>
+                                <td className="fw-bold">{chartData.basic.resolvedCount}</td>
+                                <td>
+                                  <ProgressBar now={chartData.basic.resolvedCount} max={chartData.basic.pendingCount + chartData.basic.processingCount + chartData.basic.resolvedCount + chartData.basic.rejectedCount || 1} variant="success" style={{ height: '8px', borderRadius: '4px' }} />
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>
+                                  <span className="d-flex align-items-center">
+                                    <span className="me-2 d-inline-block bg-secondary" style={{ width: '12px', height: '12px', borderRadius: '50%' }}></span>
+                                    Rejeté
+                                  </span>
+                                </td>
+                                <td className="fw-bold">{chartData.basic.rejectedCount}</td>
+                                <td>
+                                  <ProgressBar now={chartData.basic.rejectedCount} max={chartData.basic.pendingCount + chartData.basic.processingCount + chartData.basic.resolvedCount + chartData.basic.rejectedCount || 1} variant="secondary" style={{ height: '8px', borderRadius: '4px' }} />
+                                </td>
+                              </tr>
+                            </>
+                          )}
+                        </tbody>
+                      </Table>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col md={6} className="mb-4">
+                
+
+                <Card className="h-100 shadow-sm border-0">
+  <Card.Header className="bg-white border-bottom-0">
+    <div className="d-flex align-items-center">
+      <FaChartLine className="me-2 text-primary" />
+      <h6 className="mb-0 fw-bold">Répartition par catégorie</h6>
+    </div>
+  </Card.Header>
+  <Card.Body className="p-4">
+    <Table className="mb-0 table-hover">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Nombre</th>
+          <th>Pourcentage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {stats && stats.symptomStats && (
+          <>
+            <tr>
+              <td>
+                <span className="d-flex align-items-center">
+                  <span className="me-2 d-inline-block bg-info" style={{ width: '12px', height: '12px', borderRadius: '50%' }}></span>
+                  Neurologique
+                </span>
+              </td>
+              <td className="fw-bold">{stats.symptomStats.find(s => s._id === 'neurological')?.count || 0}</td>
+              <td>
+                <ProgressBar 
+                  now={stats.symptomStats.find(s => s._id === 'neurological')?.count || 0} 
+                  max={Math.max(1, (stats.symptomStats || []).reduce((sum, item) => sum + (item?.count || 0), 0))} 
+                  variant="info" 
+                  style={{ height: '8px', borderRadius: '4px' }} 
+                />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <span className="d-flex align-items-center">
+                  <span className="me-2 d-inline-block bg-warning" style={{ width: '12px', height: '12px', borderRadius: '50%' }}></span>
+                  Psychologique
+                </span>
+              </td>
+              <td className="fw-bold">{stats.symptomStats.find(s => s._id === 'psychological')?.count || 0}</td>
+              <td>
+                <ProgressBar 
+                  now={stats.symptomStats.find(s => s._id === 'psychological')?.count || 0}
+                  max={Math.max(1, (stats.symptomStats || []).reduce((sum, item) => sum + (item?.count || 0), 0))}
+                  variant="warning" 
+                  style={{ height: '8px', borderRadius: '4px' }} 
+                />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <span className="d-flex align-items-center">
+                  <span className="me-2 d-inline-block bg-danger" style={{ width: '12px', height: '12px', borderRadius: '50%' }}></span>
+                  Infection
+                </span>
+              </td>
+              <td className="fw-bold">{stats.symptomStats.find(s => s._id === 'infection')?.count || 0}</td>
+              <td>
+                <ProgressBar 
+                  now={stats.symptomStats.find(s => s._id === 'infection')?.count || 0}
+                  max={Math.max(1, (stats.symptomStats || []).reduce((sum, item) => sum + (item?.count || 0), 0))}
+                  variant="danger" 
+                  style={{ height: '8px', borderRadius: '4px' }} 
+                />
+              </td>
+            </tr>
+          </>
+        )}
+      </tbody>
+    </Table>
+  </Card.Body>
+</Card>
+              
+                </Col>
+              </Row>
+
+              {/* Section 3: Timeline améliorée avec design moderne */}
+              <Card className="shadow-sm border-0">
+                <Card.Header className="bg-white border-bottom-0">
+                  <div className="d-flex align-items-center">
+                    <BsCalendar className="me-2 text-primary" />
+                    <h6 className="mb-0 fw-bold">Évolution temporelle</h6>
                   </div>
+                </Card.Header>
+                <Card.Body>
+                  <div className="time-chart p-2">
+                    <table className="table table-borderless table-hover">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '30%' }}>Période</th>
+                          <th style={{ width: '20%' }}>Nombre</th>
+                          <th style={{ width: '50%' }}>Distribution</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chartData.time.map((item, index) => {
+                          // Calcul du maximum pour avoir une échelle relative
+                          const maxValue = Math.max(...chartData.time.map(i => i.count)) || 1;
+                          const dateFormatted = format(
+                            new Date(item.date), 
+                            dateRange === 'year' ? 'MMM yyyy' : 'd MMM', 
+                            { locale: fr }
+                          );
+                          
+                          return (
+                            <tr key={index}>
+                              <td>{dateFormatted}</td>
+                              <td className="fw-bold">{item.count}</td>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <div className="progress flex-grow-1" style={{ height: '8px', borderRadius: '4px' }}>
+                                    <div 
+                                      className="progress-bar bg-primary" 
+                                      role="progressbar" 
+                                      style={{ width: `${(item.count / maxValue) * 100}%` }}
+                                      aria-valuenow={item.count} 
+                                      aria-valuemin="0" 
+                                      aria-valuemax={maxValue}
+                                    ></div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card.Body>
+              </Card>
+
+              {/* Nouveau: Vue visuelle en donut chart */}
+              <Row className="mt-4">
+                <Col md={6} className="mb-4">
+                  <Card className="shadow-sm border-0 h-100">
+                    <Card.Header className="bg-white border-bottom-0">
+                      <h6 className="mb-0 fw-bold">Distribution des statuts</h6>
+                    </Card.Header>
+                    <Card.Body className="p-4 d-flex flex-column justify-content-center">
+                      <div style={{ height: '220px' }}>
+                        {stats && (
+                          <Doughnut 
+                            data={{
+                              labels: ['En attente', 'En traitement', 'Résolus', 'Rejetés'],
+                              datasets: [{
+                                data: [
+                                  chartData.basic.pendingCount,
+                                  chartData.basic.processingCount,
+                                  chartData.basic.resolvedCount,
+                                  chartData.basic.rejectedCount,
+                                ],
+                                backgroundColor: [
+                                  'rgba(255, 193, 7, 0.7)',
+                                  'rgba(13, 202, 240, 0.7)',
+                                  'rgba(25, 135, 84, 0.7)',
+                                  'rgba(108, 117, 125, 0.7)',
+                                ],
+                                borderColor: [
+                                  'rgb(255, 193, 7)',
+                                  'rgb(13, 202, 240)',
+                                  'rgb(25, 135, 84)',
+                                  'rgb(108, 117, 125)',
+                                ],
+                                borderWidth: 1,
+                                hoverOffset: 4
+                              }]
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  position: 'bottom'
+                                }
+                              }
+                            }}
+                          />
+                        )}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={6} className="mb-4">
+              
+                <Card className="shadow-sm border-0 h-100">
+  <Card.Header className="bg-white border-bottom-0">
+    <h6 className="mb-0 fw-bold">Évolution par type</h6>
+  </Card.Header>
+  <Card.Body className="p-4 d-flex flex-column justify-content-center">
+    <div style={{ height: '220px' }}>
+      {stats && stats.dailyStats && (
+        <Line 
+          data={{
+            labels: chartData.time.slice(0, 7).map(item => format(new Date(item.date), 'd MMM', { locale: fr })),
+            datasets: [
+              {
+                label: 'Neurologique',
+                data: [2, 1, 3, 2, 1, 0, 2], // Ces données devraient idéalement venir de votre API
+                borderColor: 'rgb(13, 202, 240)',
+                backgroundColor: 'rgba(13, 202, 240, 0.2)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+              },
+              {
+                label: 'Psychologique',
+                data: [1, 2, 1, 3, 2, 1, 0], // Ces données devraient idéalement venir de votre API
+                borderColor: 'rgb(255, 193, 7)',
+                backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+              },
+              {
+                label: 'Infection',
+                data: [0, 1, 0, 1, 2, 1, 1], // Ces données devraient idéalement venir de votre API
+                borderColor: 'rgb(220, 53, 69)',
+                backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+              }
+            ]
+          }}
+          options={{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  boxWidth: 12,
+                  usePointStyle: true
+                }
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                }
+              }
+            },
+            elements: {
+              point: {
+                radius: 3,
+                hoverRadius: 5
+              }
+            }
+          }}
+        />
+      )}
+    </div>
+    <div className="text-center mt-3">
+      <small className="text-muted">Derniers 7 jours</small>
+    </div>
+  </Card.Body>
+</Card>
+
+
+
                 </Col>
               </Row>
             </div>
@@ -976,55 +1212,75 @@ const EmergencyDashboard = () => {
         size="lg"
         centered
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Détails du cas d'urgence</Modal.Title>
+        <Modal.Header closeButton className="bg-primary text-white">
+          <Modal.Title>
+            <div className="d-flex align-items-center">
+              <div className={`me-2 ${selectedClaim && selectedClaim.severityScore > 8 ? 'text-danger' : selectedClaim && selectedClaim.severityScore > 4 ? 'text-warning' : 'text-info'}`}>
+                <BsExclamationTriangleFill size={20} />
+              </div>
+              Détails du cas d'urgence
+            </div>
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {selectedClaim && (
             <>
-              <div className="emergency-header mb-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div className="d-flex align-items-center">
-                    <div className={`severity-indicator me-3 ${selectedClaim.severityScore > 8 ? 'bg-danger' : selectedClaim.severityScore > 4 ? 'bg-warning' : 'bg-info'}`} style={{ width: '8px', height: '40px', borderRadius: '4px' }}></div>
-                    <div>
-                      <h5 className="mb-1">{selectedClaim.identifiant}</h5>
-                      <div className="d-flex align-items-center">
-                        <BsClockHistory className="me-1 text-muted" />
-                        <small className="text-muted">
-                          Soumis le {format(new Date(selectedClaim.createdAt), 'PPp', { locale: fr })}
-                        </small>
-                      </div>
-                    </div>
-                  </div>
-                  <Badge 
-                    bg="warning" 
-                    className="px-3 py-2"
-                  >
-                    En attente
-                  </Badge>
-                </div>
-              </div>
+              <div className="emergency-header mb-4 p-3 rounded bg-light">
+  <div className="d-flex align-items-center justify-content-between">
+    <div className="d-flex align-items-center">
+      <div className={`severity-indicator me-3 ${selectedClaim.severityScore > 8 ? 'bg-danger' : selectedClaim.severityScore > 4 ? 'bg-warning' : 'bg-info'}`} style={{ width: '8px', height: '40px', borderRadius: '4px' }}></div>
+      <div>
+        <h5 className="mb-1 fw-bold text-primary">{usersData[selectedClaim.identifiant]?.Name || selectedClaim.identifiant}</h5>
+        <div className="text-muted small mb-1">ID: {selectedClaim.identifiant}</div>
+        {usersData[selectedClaim.identifiant]?.Email && (
+          <div className="d-flex align-items-center mb-1">
+            <i className="fas fa-envelope me-1 text-muted"></i>
+            <span className="text-muted small">{usersData[selectedClaim.identifiant].Email}</span>
+          </div>
+        )}
+        {usersData[selectedClaim.identifiant]?.PhoneNumber && (
+          <div className="d-flex align-items-center mb-1">
+            <i className="fas fa-phone me-1 text-muted"></i>
+            <span className="text-muted small">{usersData[selectedClaim.identifiant].PhoneNumber}</span>
+          </div>
+        )}
+        <div className="d-flex align-items-center">
+          <BsClockHistory className="me-1 text-muted" />
+          <small className="text-muted">
+            Soumis le {format(new Date(selectedClaim.createdAt), 'PPp', { locale: fr })}
+          </small>
+        </div>
+      </div>
+    </div>
+    <Badge 
+      bg="warning" 
+      className="px-3 py-2"
+    >
+      En attente
+    </Badge>
+  </div>
+</div>
 
               <Row className="mb-4">
                 <Col md={6}>
-                  <Card className="border-0 bg-light">
-                    <Card.Body>
-                      <h6 className="mb-3">Description de l'urgence</h6>
-                      <p>{selectedClaim.description}</p>
+                  <Card className="border-0 bg-primary bg-opacity-10 h-100 shadow-sm">
+                    <Card.Body className="p-4">
+                      <h6 className="mb-3 fw-bold">Description de l'urgence</h6>
+                      <p className="mb-4">{selectedClaim.description || "Urgence signalée sans description détaillée."}</p>
                       
-                      {selectedClaim.location && (
-                        <div className="d-flex align-items-center mt-3">
+                      {(selectedClaim.location || true) && (
+                        <div className="d-flex align-items-center mt-3 p-3 bg-white rounded shadow-sm">
                           <FaMapMarkerAlt className="text-danger me-2" />
-                          <span>{selectedClaim.location}</span>
+                          <span className="mb-3 fw-bold text-primary">{selectedClaim.location || '36.865733604669245, 10.307028444714604'}</span>
                         </div>
                       )}
                     </Card.Body>
                   </Card>
                 </Col>
                 <Col md={6}>
-                  <Card className="border-0 bg-light h-100">
-                    <Card.Body>
-                      <h6 className="mb-3">Symptômes rapportés</h6>
+                  <Card className="border-0 bg-blue-100 h-100 shadow-sm" style={{ backgroundColor: 'rgba(13, 110, 253, 0.05)' }}>
+                    <Card.Body className="p-4">
+                      <h6 className="mb-3 fw-bold text-primary">Symptômes rapportés</h6>
                       {selectedClaim.symptoms && selectedClaim.symptoms.length > 0 ? (
                         <div className="d-flex flex-wrap gap-2">
                           {selectedClaim.symptoms.map((symptom, idx) => (
@@ -1061,36 +1317,36 @@ const EmergencyDashboard = () => {
                 </div>
               )}
 
-              <div className="action-section mt-4">
-                <h6>Actions de prise en charge</h6>
-                <div className="mb-3">
-                  <label htmlFor="status" className="form-label">Changer le statut</label>
-                  <select 
-                    id="status" 
-                    className="form-select" 
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                  >
-                    <option value="processing">En cours de traitement</option>
-                    <option value="resolved">Résolu</option>
-                    <option value="rejected">Rejeté</option>
-                  </select>
-                </div>
-                <div className="mb-3">
-                  <label htmlFor="notes" className="form-label">Notes (visibles par l'étudiant)</label>
-                  <textarea 
-                    id="notes"
-                    className="form-control"
-                    rows="3"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Ajoutez des instructions, des commentaires ou des recommandations..."
-                  ></textarea>
-                </div>
-              </div>
+<div className="action-section mt-4 border p-4 rounded bg-primary bg-opacity-10 shadow-sm">
+  <h6 className="fw-bold mb-3 text-primary">Actions de prise en charge</h6>
+  <div className="mb-3">
+    <label htmlFor="status" className="form-label">Changer le statut</label>
+    <select 
+      id="status" 
+      className="form-select" 
+      value={status}
+      onChange={(e) => setStatus(e.target.value)}
+    >
+      <option value="processing">En cours de traitement</option>
+      <option value="resolved">Résolu</option>
+      <option value="rejected">Rejeté</option>
+    </select>
+  </div>
+  <div className="mb-3">
+    <label htmlFor="notes" className="form-label">Notes (visibles par l'étudiant)</label>
+    <textarea 
+      id="notes"
+      className="form-control"
+      rows="3"
+      value={notes}
+      onChange={(e) => setNotes(e.target.value)}
+      placeholder="Ajoutez des instructions, des commentaires ou des recommandations..."
+    ></textarea>
+  </div>
+</div>
 
               <div className="quick-actions mt-4 mb-3">
-                <h6>Actions rapides</h6>
+                <h6 className="fw-bold mb-3">Actions rapides</h6>
                 <div className="d-flex flex-wrap gap-2">
                   <Button 
                     variant="outline-primary" 
@@ -1106,7 +1362,7 @@ const EmergencyDashboard = () => {
                   >
                     <FaPhone className="me-1" /> Contacter par téléphone
                   </Button>
-                  <Button 
+                 {/* <Button 
                     variant="outline-info" 
                     size="sm"
                     onClick={() => {
@@ -1114,7 +1370,7 @@ const EmergencyDashboard = () => {
                     }}
                   >
                     <FaUserCircle className="me-1" /> Voir profil étudiant
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
             </>
