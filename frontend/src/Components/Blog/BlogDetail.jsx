@@ -1,10 +1,9 @@
-// BlogDetailContain.js
 import React, { Fragment, useState, useEffect } from 'react';
 import { Container, Row, Col, Card, FormGroup, Label, Input, InputGroup, InputGroupText } from 'reactstrap';
 import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { FaSearch, FaHeart } from 'react-icons/fa';
+import { FaSearch, FaHeart, FaUser } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 // Importer les 10 images par défaut
@@ -30,46 +29,78 @@ const getRandomImageForPost = (postId) => {
   return defaultImages[randomIndex];
 };
 
-// Ajoute des styles CSS personnalisés
-// Ajoute des styles CSS personnalisés
+// Styles CSS personnalisés
 const cardStyles = {
   card: {
-    height: '450px', // Augmenter la hauteur pour donner plus d'espace
+    height: '480px',
     display: 'flex',
     flexDirection: 'column',
+    borderRadius: '15px',
+    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.1)',
+    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+    background: 'linear-gradient(145deg, #ffffff, #f0f4f8)',
+    overflow: 'hidden',
+  },
+  cardHover: {
+    transform: 'translateY(-10px)',
+    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
   },
   image: {
     width: '100%',
-    height: '200px',
+    height: '220px',
     objectFit: 'cover',
+    borderTopLeftRadius: '15px',
+    borderTopRightRadius: '15px',
+    transition: 'transform 0.3s ease',
+  },
+  imageHover: {
+    transform: 'scale(1.05)',
   },
   content: {
     flex: '1 1 auto',
     display: 'flex',
     flexDirection: 'column',
-    padding: '15px',
+    padding: '20px',
+    background: '#fff',
+    borderBottomLeftRadius: '15px',
+    borderBottomRightRadius: '15px',
   },
   dateContainer: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '10px',
-    minHeight: '40px',
+    marginBottom: '15px',
   },
   date: {
     display: 'flex',
     flexDirection: 'column',
     whiteSpace: 'nowrap',
+    background: 'linear-gradient(90deg, #6a11cb, #2575fc)',
+    color: '#fff',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    textAlign: 'center',
   },
   badge: {
-    fontSize: '14px',
-    padding: '5px 10px',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    padding: '8px 12px',
+    background: '#f7c948',
+    color: '#333',
+    borderRadius: '8px',
   },
   title: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#333',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     marginBottom: '10px',
+    transition: 'color 0.3s ease',
+  },
+  titleHover: {
+    color: '#2575fc',
   },
   body: {
     flex: '1 1 auto',
@@ -77,21 +108,39 @@ const cardStyles = {
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
-    marginBottom: '10px',
+    marginBottom: '15px',
+    color: '#666',
+    fontSize: '14px',
+    lineHeight: '1.5',
   },
   footer: {
     marginTop: 'auto',
-    minHeight: '60px', 
+    minHeight: '50px',
+    borderTop: '1px solid #eee',
+    paddingTop: '10px',
   },
   sortContainer: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '20px',
-    gap: '10px',
+    marginBottom: '30px',
+    gap: '15px',
+    background: '#f8f9fa',
+    padding: '15px',
+    borderRadius: '10px',
+    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.05)',
   },
   searchInput: {
-    width: '250px',
+    width: '300px',
+    borderRadius: '25px',
+    border: '1px solid #ddd',
+    padding: '10px 15px',
+    boxShadow: 'inset 0 2px 5px rgba(0, 0, 0, 0.05)',
+    transition: 'border-color 0.3s ease',
+  },
+  searchInputFocus: {
+    borderColor: '#2575fc',
+    outline: 'none',
   },
   formGroup: {
     marginBottom: 0,
@@ -101,23 +150,45 @@ const cardStyles = {
   label: {
     marginBottom: 0,
     marginRight: '10px',
+    fontWeight: '500',
+    color: '#333',
   },
   inputGroup: {
     display: 'flex',
     alignItems: 'center',
   },
+  select: {
+    borderRadius: '25px',
+    padding: '8px 15px',
+    border: '1px solid #ddd',
+    background: '#fff',
+    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.05)',
+    transition: 'border-color 0.3s ease',
+  },
+  selectFocus: {
+    borderColor: '#2575fc',
+    outline: 'none',
+  },
   likeIcon: {
     marginRight: '5px',
+    color: '#ff4d4f',
+    transition: 'color 0.3s ease',
+  },
+  likeIconHover: {
+    color: '#e63946',
   },
   userContainer: {
     display: 'flex',
     alignItems: 'center',
-    whiteSpace: 'normal', // Permettre au texte de s'étendre sur plusieurs lignes
-    overflow: 'visible', // Éviter que le texte soit coupé
-    maxWidth: '100%', // S'assurer que le conteneur ne dépasse pas la largeur disponible
+    whiteSpace: 'normal',
+    overflow: 'visible',
+    maxWidth: '100%',
+    color: '#555',
+    fontSize: '14px',
   },
   userIcon: {
-    marginRight: '5px', // Espace entre l'icône et le texte
+    marginRight: '5px',
+    color: '#6a11cb',
   },
 };
 
@@ -126,6 +197,8 @@ const BlogDetailContain = () => {
   const [sortOption, setSortOption] = useState('date');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const [hoveredCard, setHoveredCard] = useState(null); // État pour gérer le survol des cartes
+  const [hoveredLike, setHoveredLike] = useState(null); // État pour gérer le survol des icônes de cœur
 
   // Récupérer l'utilisateur connecté
   useEffect(() => {
@@ -243,6 +316,8 @@ const BlogDetailContain = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     style={cardStyles.searchInput}
+                    onFocus={(e) => (e.target.style.borderColor = cardStyles.searchInputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = '1px solid #ddd')}
                   />
                 </InputGroup>
               </FormGroup>
@@ -257,6 +332,9 @@ const BlogDetailContain = () => {
                   id="sortOption"
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value)}
+                  style={cardStyles.select}
+                  onFocus={(e) => (e.target.style.borderColor = cardStyles.selectFocus.borderColor)}
+                  onBlur={(e) => (e.target.style.borderColor = '1px solid #ddd')}
                 >
                   <option value="date">Date</option>
                   <option value="comments">Nombre de commentaires</option>
@@ -270,17 +348,29 @@ const BlogDetailContain = () => {
         <Row>
           {sortedPosts.length > 0 ? (
             sortedPosts.map((post) => {
-              console.log('Post dans BlogDetailContain:', post); // Log pour inspecter les données
+              console.log('Post dans BlogDetailContain:', post);
+              const isHovered = hoveredCard === post._id;
+              const isLikeHovered = hoveredLike === post._id;
               return (
                 <Col sm="6" xl="3" className="box-col-6 des-xl-50" key={post._id}>
                   <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <Card style={cardStyles.card}>
+                    <Card
+                      style={{
+                        ...cardStyles.card,
+                        ...(isHovered ? cardStyles.cardHover : {}),
+                      }}
+                      onMouseEnter={() => setHoveredCard(post._id)}
+                      onMouseLeave={() => setHoveredCard(null)}
+                    >
                       <div className="blog-box blog-grid">
                         <div className="blog-wrraper">
                           <Image
                             attrImage={{
                               className: 'img-fluid top-radius-blog',
-                              style: cardStyles.image,
+                              style: {
+                                ...cardStyles.image,
+                                ...(isHovered ? cardStyles.imageHover : {}),
+                              },
                               src: post.imageUrl ? `http://localhost:5000${post.imageUrl}` : getRandomImageForPost(post._id),
                               alt: post.title || 'Publication',
                             }}
@@ -296,7 +386,15 @@ const BlogDetailContain = () => {
                               {formatDate(post.createdAt).day}
                             </span>
                           </div>
-                          <H6 attrH6={{ className: 'blog-bottom-details', style: cardStyles.title }}>
+                          <H6
+                            attrH6={{
+                              className: 'blog-bottom-details',
+                              style: {
+                                ...cardStyles.title,
+                                ...(isHovered ? cardStyles.titleHover : {}),
+                              },
+                            }}
+                          >
                             {post.title || 'Titre non disponible'}
                           </H6>
                           <div
@@ -305,22 +403,30 @@ const BlogDetailContain = () => {
                           />
                           <div className="detail-footer" style={cardStyles.footer}>
                             <ul style={{ display: 'flex', listStyle: 'none', padding: 0, margin: 0 }}>
-                            <li style={{ marginRight: '15px', color: 'black !important', visibility: 'visible', fontSize: '16px' }}>
-  <div style={cardStyles.userContainer}>
-    <i className="fa fa-user-o" style={cardStyles.userIcon}></i>
-    {(() => {
-      const isAnonymousBool = post.isAnonymous === true || post.isAnonymous === 'true';
-      console.log('Affichage auteur - Post:', post.title, 'isAnonymous:', post.isAnonymous, 'isAnonymousBool:', isAnonymousBool, 'anonymousPseudo:', post.anonymousPseudo, 'author:', post.author);
-      return isAnonymousBool ? (post.anonymousPseudo || 'Anonyme') : (post.author?.Name || 'Inconnu');
-    })()}
-  </div>
-</li>
-                              <li style={{ marginRight: '15px' }}>
-                                <i className="fa fa-comments-o"></i>{post.comments?.length || 0} 
+                              <li style={{ marginRight: '15px', color: 'black !important', visibility: 'visible', fontSize: '16px' }}>
+                                <div style={cardStyles.userContainer}>
+                                  <FaUser style={cardStyles.userIcon} />
+                                  {(() => {
+                                    const isAnonymousBool = post.isAnonymous === true || post.isAnonymous === 'true';
+                                    console.log('Affichage auteur - Post:', post.title, 'isAnonymous:', post.isAnonymous, 'isAnonymousBool:', isAnonymousBool, 'anonymousPseudo:', post.anonymousPseudo, 'author:', post.author);
+                                    return isAnonymousBool ? (post.anonymousPseudo || 'Anonyme') : (post.author?.Name || 'Inconnu');
+                                  })()}
+                                </div>
                               </li>
-                              <li>
-                                <FaHeart style={cardStyles.likeIcon} />
-                                {post.likes?.length || 0} 
+                              <li style={{ marginRight: '15px' }}>
+                                <i className="fa fa-comments-o"></i> {post.comments?.length || 0}
+                              </li>
+                              <li
+                                onMouseEnter={() => setHoveredLike(post._id)}
+                                onMouseLeave={() => setHoveredLike(null)}
+                              >
+                                <FaHeart
+                                  style={{
+                                    ...cardStyles.likeIcon,
+                                    ...(isLikeHovered ? cardStyles.likeIconHover : {}),
+                                  }}
+                                />
+                                {post.likes?.length || 0}
                               </li>
                             </ul>
                           </div>
@@ -332,8 +438,10 @@ const BlogDetailContain = () => {
               );
             })
           ) : (
-            <Col sm="6" xl="3">
-              <p className="text-center">Aucune publication disponible.</p>
+            <Col sm="12">
+              <p className="text-center" style={{ color: '#666', fontSize: '16px' }}>
+                Aucune publication disponible.
+              </p>
             </Col>
           )}
         </Row>

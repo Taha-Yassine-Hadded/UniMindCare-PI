@@ -1,13 +1,14 @@
+// Notification.js
 import React, { useState, useEffect } from 'react';
 import { Bell, Heart, MessageSquare, ThumbsDown } from 'react-feather';
 import { P } from '../../../AbstractElements';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import io from 'socket.io-client'; // Importer Socket.IO client
+import io from 'socket.io-client';
 
 const socket = io('http://localhost:5000', {
-  transports: ['websocket'], // Assurer que WebSocket est utilisé
-  reconnection: true, // Activer la reconnexion automatique
+  transports: ['websocket'],
+  reconnection: true,
 });
 
 socket.on('connect', () => {
@@ -23,7 +24,6 @@ const Notification = ({ active, setActive }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState(null);
 
-  // Récupérer l'utilisateur connecté pour obtenir son ID
   const fetchCurrentUser = async () => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
@@ -70,21 +70,23 @@ const Notification = ({ active, setActive }) => {
     fetchNotifications();
   }, []);
 
-  // Configurer WebSocket
   useEffect(() => {
     if (!currentUserId) return;
 
-    // Rejoindre la salle de l'utilisateur
     socket.emit('join', currentUserId);
 
-    // Écouter les nouvelles notifications
     socket.on('new_notification', (notification) => {
       console.log('Nouvelle notification reçue via WebSocket:', notification);
-      setNotifications((prevNotifications) => [notification, ...prevNotifications]);
-      setUnreadCount((prevCount) => prevCount + 1);
+      console.log('Destinataire de la notification:', notification.recipient);
+      console.log('Utilisateur connecté:', currentUserId);
+      if (notification.recipient.toString() === currentUserId.toString()) {
+        setNotifications((prevNotifications) => [notification, ...prevNotifications]);
+        setUnreadCount((prevCount) => prevCount + 1);
+      } else {
+        console.log('Notification ignorée: destinataire incorrect');
+      }
     });
 
-    // Nettoyage lors de la déconnexion
     return () => {
       socket.off('new_notification');
     };

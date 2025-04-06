@@ -1,3 +1,4 @@
+// routes/posts.js
 const express = require('express');
 const router = express.Router();
 const Post = require('../Models/Post');
@@ -98,19 +99,22 @@ router.post('/:id/like', passport.authenticate('jwt', { session: false }), async
       // Créer une notification pour l'auteur de la publication (sauf si c'est l'utilisateur lui-même)
       if (post.author.toString() !== userId.toString()) {
         notification = new Notification({
-          recipient: post.author,
-          sender: userId,
+          recipient: post.author, // Correct: Post author (e.g., "Baha")
+          sender: userId, // User who liked the post (e.g., "Farah")
           type: 'like_post',
           post: post._id,
-          isAnonymous: false,
+          isAnonymous: post.isAnonymous,
+          anonymousPseudo: post.isAnonymous ? post.anonymousPseudo : null,
         });
         await notification.save();
+        console.log('Notification créée pour like_post:', notification);
 
         // Émettre une notification via WebSocket au destinataire
         const populatedNotification = await Notification.findById(notification._id)
           .populate('sender', 'Name')
           .populate('post', 'title');
         req.io.to(post.author.toString()).emit('new_notification', populatedNotification);
+        console.log(`Notification émise via WebSocket à ${post.author.toString()}`);
       }
     }
 
@@ -139,29 +143,36 @@ router.post('/:id/comments', passport.authenticate('jwt', { session: false }), a
       author: req.user._id,
       isAnonymous: isAnonymous || false,
       anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
+      likes: [],
+      dislikes: [],
     };
 
     post.comments.push(comment);
     await post.save();
 
+    // Récupérer l'ID du commentaire nouvellement créé
+    const newComment = post.comments[post.comments.length - 1];
+
     // Créer une notification pour l'auteur de la publication (sauf si c'est l'utilisateur lui-même)
     if (post.author.toString() !== req.user._id.toString()) {
       const notification = new Notification({
-        recipient: post.author,
-        sender: req.user._id,
+        recipient: post.author, // Correct: Post author (e.g., "Baha")
+        sender: req.user._id, // User who commented (e.g., "Farah")
         type: 'comment',
         post: post._id,
-        comment: comment._id,
+        comment: newComment._id, // ID du commentaire (subdocument)
         isAnonymous: isAnonymous || false,
         anonymousPseudo: isAnonymous ? comment.anonymousPseudo : null,
       });
       await notification.save();
+      console.log('Notification créée pour comment:', notification);
 
       // Émettre une notification via WebSocket
       const populatedNotification = await Notification.findById(notification._id)
         .populate('sender', 'Name')
         .populate('post', 'title');
       req.io.to(post.author.toString()).emit('new_notification', populatedNotification);
+      console.log(`Notification émise via WebSocket à ${post.author.toString()}`);
     }
 
     const updatedPost = await Post.findById(req.params.id)
@@ -194,20 +205,23 @@ router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { 
       // Créer une notification pour l'auteur du commentaire (sauf si c'est l'utilisateur lui-même)
       if (comment.author.toString() !== userId.toString()) {
         const notification = new Notification({
-          recipient: comment.author,
-          sender: userId,
+          recipient: comment.author, // Correct: Comment author (e.g., "Baha")
+          sender: userId, // User who liked the comment (e.g., "Farah")
           type: 'like_comment',
           post: post._id,
-          comment: comment._id,
-          isAnonymous: false,
+          comment: comment._id, // ID du commentaire (subdocument)
+          isAnonymous: comment.isAnonymous,
+          anonymousPseudo: comment.isAnonymous ? comment.anonymousPseudo : null,
         });
         await notification.save();
+        console.log('Notification créée pour like_comment:', notification);
 
         // Émettre une notification via WebSocket
         const populatedNotification = await Notification.findById(notification._id)
           .populate('sender', 'Name')
           .populate('post', 'title');
         req.io.to(comment.author.toString()).emit('new_notification', populatedNotification);
+        console.log(`Notification émise via WebSocket à ${comment.author.toString()}`);
       }
     }
 
@@ -242,20 +256,23 @@ router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt',
       // Créer une notification pour l'auteur du commentaire (sauf si c'est l'utilisateur lui-même)
       if (comment.author.toString() !== userId.toString()) {
         const notification = new Notification({
-          recipient: comment.author,
-          sender: userId,
+          recipient: comment.author, // Correct: Comment author (e.g., "Baha")
+          sender: userId, // User who disliked the comment (e.g., "Farah")
           type: 'dislike_comment',
           post: post._id,
-          comment: comment._id,
-          isAnonymous: false,
+          comment: comment._id, // ID du commentaire (subdocument)
+          isAnonymous: comment.isAnonymous,
+          anonymousPseudo: comment.isAnonymous ? comment.anonymousPseudo : null,
         });
         await notification.save();
+        console.log('Notification créée pour dislike_comment:', notification);
 
         // Émettre une notification via WebSocket
         const populatedNotification = await Notification.findById(notification._id)
           .populate('sender', 'Name')
           .populate('post', 'title');
         req.io.to(comment.author.toString()).emit('new_notification', populatedNotification);
+        console.log(`Notification émise via WebSocket à ${comment.author.toString()}`);
       }
     }
 
