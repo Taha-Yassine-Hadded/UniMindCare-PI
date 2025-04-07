@@ -71,6 +71,7 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // Gestion des connexions WebSocket
 io.on('connection', (socket) => {
   console.log('Un utilisateur s\'est connecté via WebSocket:', socket.id);
@@ -687,6 +688,19 @@ app.get('/image/:filename', async (req, res) => {
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
+const programRoutes = require('./routes/TeacherTrainingRoutes/trainingProgram');
+const contentRoutes = require('./routes/TeacherTrainingRoutes/trainingContentRoutes');
+const progressRoutes = require('./routes/TeacherTrainingRoutes/userProgress');
+const certificateRoutes = require('./routes/TeacherTrainingRoutes/certificateRoutes');
+
+
+app.use('/api/programs', programRoutes);
+app.use('/api/training-content', contentRoutes);
+app.use('/api/progress', progressRoutes);
+app.use('/api/certificates', certificateRoutes);
+
+
+
 
 
 const fetchUsers = async () => {
