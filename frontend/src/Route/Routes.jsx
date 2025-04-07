@@ -119,11 +119,16 @@ import WeatherDashboard from "../Components/Weather/WeatherDashboard";
 import Feedback from "../Components/FormFARAH/FeedbackEtudiant";
 import StudentDashboard from "../Components/StudentDashboard";
 import TeacherDashboard from "../Components/TeacherDashboard";
+import Statistics from "../Components/Statistics";
 
 export const routes = [
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
     
+    //statistics
+    { path: `${process.env.PUBLIC_URL}/dashboard/statistics`, Component: <Statistics /> },
+
+
   //Feedback
   { path: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`, Component: <Feedback /> },
 

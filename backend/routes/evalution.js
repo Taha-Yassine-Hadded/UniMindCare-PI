@@ -120,5 +120,112 @@ router.post(
     }
   }
 );
+// Nouvelle route pour les statistiques par classe
+router.get("/statistics", async (req, res) => {
+  try {
+    const stats = await Evaluation.aggregate([
+      {
+        $group: {
+          _id: "$classe", // Grouper par classe
+          totalEvaluations: { $sum: 1 }, // Nombre total d'évaluations
+          avgConcentration: { $avg: "$concentration" }, // Moyenne de la concentration
+          presenceStats: { $push: "$presence" }, // Collecter les données de présence
+          participationStats: { $push: "$participationOrale" }, // Collecter les données de participation
+          stressStats: { $push: "$gestionStress" }, // Collecter les données de stress
+          engagementStats: { $push: "$engagement" }, // Collecter les données d'engagement
+        },
+      },
+      {
+        $project: {
+          totalEvaluations: 1,
+          avgConcentration: { $round: ["$avgConcentration", 2] }, // Arrondir à 2 décimales
+          presenceDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: ["Toujours à l’heure", "Souvent en retard", "Absences fréquentes"],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$presenceStats", cond: { $eq: ["$$this", "$$key"] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          participationDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: ["Très active", "Moyenne", "Faible", "Nulle"],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$participationStats", cond: { $eq: ["$$this", "$$key"] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          stressDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: ["Calme", "Anxieux", "Très stressé"],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$stressStats", cond: { $eq: ["$$this", "$$key"] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          engagementDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: [
+                  "Très impliqué",
+                  "Moyennement impliqué",
+                  "Peu impliqué",
+                  "Pas du tout impliqué",
+                ],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$engagementStats", cond: { $eq: ["$$this", "$$key"] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      {
+        $sort: { _id: 1 }, // Trier par nom de classe
+      },
+    ]);
+
+    res.status(200).json({
+      message: "Statistiques par classe récupérées avec succès",
+      statistics: stats,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des statistiques:", error);
+    res.status(500).json({
+      message: "Erreur interne du serveur",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
 
 module.exports = router;
