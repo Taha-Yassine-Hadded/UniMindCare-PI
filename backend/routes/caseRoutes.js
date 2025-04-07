@@ -110,37 +110,50 @@ router.post('/:id/add-appointment', async (req, res) => {
     }
   });
   // 1) Create or fetch a case when booking an appointment
-router.post('/book-appointment', async (req, res) => {
+  router.post('/book-appointment', async (req, res) => {
     try {
       const { studentId, psychologistId, date, priority } = req.body;
-  
-      // Create the appointment first
-      const newAppointment = new Appointment({
+      
+      // 1. Create new appointment in the Appointment collection with 'pending' status.
+      const appointment = await Appointment.create({
         studentId,
         psychologistId,
         date,
-        priority
+        priority,
+        status: 'pending'
       });
-      await newAppointment.save();
-  
-      // Find existing case or create a new one
+      
+      // 2. Check if a case already exists for this student with this psychologist.
       let existingCase = await Case.findOne({ studentId, psychologistId });
-      if (!existingCase) {
-        existingCase = new Case({
-          studentId,
-          psychologistId,
-          status: 'pending',     // Starts as pending
-          priority: priority || 'regular',
-          appointments: [newAppointment._id],
-        });
+      
+      if (existingCase) {
+        // If the case was resolved or archived, "re-open" it.
+        if (existingCase.archived === true || existingCase.status === 'resolved') {
+          existingCase.archived = false;
+          existingCase.status = 'pending';
+        }
+        // Add the new appointment if it is not already included.
+        if (!existingCase.appointments.includes(appointment._id)) {
+          existingCase.appointments.push(appointment._id);
+        }
         await existingCase.save();
       } else {
-        // If case exists, add the new appointment
-        existingCase.appointments.push(newAppointment._id);
-        await existingCase.save();
+        // Otherwise, create a new case.
+        existingCase = await Case.create({
+          studentId,
+          psychologistId,
+          status: 'pending',
+          priority,
+          appointments: [appointment._id],
+          archived: false
+        });
       }
-  
-      res.status(201).json({ message: 'Appointment booked', appointment: newAppointment, case: existingCase });
+      
+      res.status(201).json({
+        message: 'Appointment booked and case updated',
+        appointment,
+        case: existingCase
+      });
     } catch (error) {
       res.status(500).json({ message: 'Error booking appointment', error });
     }

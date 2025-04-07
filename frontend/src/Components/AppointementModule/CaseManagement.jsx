@@ -95,43 +95,43 @@ const CaseManagement = ({ psychologistId }) => {
       <Tabs defaultActiveKey="pending" className="mb-3">
         {/* Pending Cases */}
         <Tab eventKey="pending" title="Pending">
-          <Table bordered hover>
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Appointments</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingCases.map(c => (
-                <tr key={c._id}>
-                  <td>{c.studentId?.Name}</td>
-                  <td>{c.status}</td>
-                  <td>{c.priority}</td>
-                  <td>
-                    {c.pendingAppointments.map(app => (
-                      <div key={app._id}>
-                        {new Date(app.date).toLocaleString()} - {app.priority}
-                        {" "}
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={() => handleConfirmAppointment(app._id)}
-                        >
-                          Confirm
-                        </Button>
-                      </div>
-                    ))}
-                  </td>
-                  <td>—</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Tab>
+  <Table bordered hover>
+    <thead>
+      <tr>
+        <th>Student</th>
+        <th>Status</th>
+        <th>Priority</th>
+        <th>Appointments</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {pendingCases.map(c => (
+        <tr key={c._id}>
+          <td>{c.studentId?.Name}</td>
+          <td>{c.status}</td>
+          <td>{c.priority}</td>
+          <td>
+            {c.pendingAppointments.map(app => (
+              <div key={app._id}>
+                {new Date(app.date).toLocaleString()} - {app.priority}
+                {" "}
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={() => handleConfirmAppointment(app._id)}
+                >
+                  Confirm
+                </Button>
+              </div>
+            ))}
+          </td>
+          <td>—</td>
+        </tr>
+      ))}
+    </tbody>
+  </Table>
+</Tab>
   
         {/* In-Progress Cases */}
         <Tab eventKey="inProgress" title="In-Progress">
