@@ -35,57 +35,64 @@ const Statistics = () => {
     return (
       <div style={styles.loaderContainer}>
         <div style={styles.loader}></div>
-        <p style={{ marginTop: "10px", fontSize: "18px", color: "#555" }}>Chargement des statistiques...</p>
+        <p style={styles.loaderText}>Chargement...</p>
       </div>
     );
 
   const chartData = {
-    labels: stats.map(stat => stat._id),
+    labels: stats.map((stat) => stat._id),
     datasets: [
       {
         label: "Évaluations totales",
-        data: stats.map(stat => stat.totalEvaluations),
+        data: stats.map((stat) => stat.totalEvaluations),
         backgroundColor: "#FFD700",
-        borderRadius: 5,
+        borderRadius: 4,
       },
       {
         label: "Concentration moyenne",
-        data: stats.map(stat => stat.avgConcentration),
-        backgroundColor: "#4B9CD3",
-        borderRadius: 5,
+        data: stats.map((stat) => stat.avgConcentration),
+        backgroundColor: "#1E90FF",
+        borderRadius: 4,
       },
     ],
   };
 
   const options = {
+    animation: {
+      duration: 1500,
+      easing: "easeInOutQuart",
+    },
     responsive: true,
     plugins: {
       legend: {
         position: "bottom",
         labels: {
-          color: "#333",
-          font: { size: 14, weight: "bold" },
+          font: { size: 12 },
         },
       },
       title: {
         display: true,
         text: "Statistiques des Évaluations par Classe",
+        font: { size: 18, weight: "600" },
         color: "#333",
-        font: { size: 20 },
-        padding: { top: 10, bottom: 20 },
       },
     },
     scales: {
-      x: {
-        ticks: { color: "#444" },
-        grid: { display: false },
-      },
       y: {
         beginAtZero: true,
-        ticks: { color: "#444" },
+        ticks: {
+          font: { size: 10 },
+          color: "#555",
+        },
         grid: {
-          color: "#e0e0e0",
-          borderDash: [4, 4],
+          color: "rgba(200,200,200,0.2)",
+          borderDash: [5, 5],
+        },
+      },
+      x: {
+        ticks: {
+          font: { size: 10 },
+          color: "#555",
         },
       },
     },
@@ -93,50 +100,80 @@ const Statistics = () => {
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>📊 Statistiques  par Classe</h2>
-      <div style={styles.chartCard}>
+      <h2 style={styles.title}>📊 Statistiques Modernes par Classe</h2>
+      <div style={styles.chartContainer}>
         <Bar data={chartData} options={options} />
       </div>
     </div>
   );
 };
 
-// 🎨 Style intelligent et épuré
 const styles = {
   container: {
-    padding: "30px 20px",
-    maxWidth: "900px",
-    margin: "0 auto",
-    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    maxWidth: "600px",
+    margin: "20px auto",
+    padding: "20px",
+    borderRadius: "12px",
+    background: "rgba(255,255,255,0.9)",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
+    animation: "fadeIn 1.5s ease-in-out",
+    fontFamily: "'Helvetica Neue', Arial, sans-serif",
   },
   title: {
-    color: "#1E90FF",
     textAlign: "center",
-    marginBottom: "30px",
-    fontSize: "26px",
-    fontWeight: "600",
+    color: "#1E90FF",
+    marginBottom: "15px",
+    fontSize: "22px",
+    fontWeight: "700",
   },
-  chartCard: {
-    backgroundColor: "#ffffff",
-    padding: "20px",
-    borderRadius: "16px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-    transition: "transform 0.3s ease",
+  chartContainer: {
+    padding: "10px",
+    animation: "slideUp 1s ease-out",
   },
   loaderContainer: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    paddingTop: "100px",
+    justifyContent: "center",
+    height: "300px",
   },
   loader: {
     width: "50px",
     height: "50px",
-    border: "6px solid #f3f3f3",
-    borderTop: "6px solid #1E90FF",
+    border: "5px solid #f3f3f3",
+    borderTop: "5px solid #1E90FF",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
   },
+  loaderText: {
+    marginTop: "10px",
+    fontSize: "16px",
+    color: "#333",
+  },
 };
+
+// Injection des animations CSS dans le document
+const styleSheet = document.styleSheets[0];
+const keyframesSpin = `
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}`;
+const keyframesFadeIn = `
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}`;
+const keyframesSlideUp = `
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}`;
+
+if (styleSheet) {
+  styleSheet.insertRule(keyframesSpin, styleSheet.cssRules.length);
+  styleSheet.insertRule(keyframesFadeIn, styleSheet.cssRules.length);
+  styleSheet.insertRule(keyframesSlideUp, styleSheet.cssRules.length);
+}
 
 export default Statistics;

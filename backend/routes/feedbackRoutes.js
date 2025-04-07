@@ -31,6 +31,15 @@ const authenticateToken = async (req, res, next) => {
     return res.status(401).json({ message: "Token invalide" });
   }
 };
+router.get("/teachers", async (req, res) => {
+  try {
+    const teachers = await Feedback.distinct("nomEnseignant");
+    res.status(200).json({ teachers });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des enseignants :", error);
+    res.status(500).json({ message: "Erreur interne du serveur" });
+  }
+});
 
 router.post(
   "/feedback",
