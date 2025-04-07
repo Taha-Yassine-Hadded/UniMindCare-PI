@@ -1,15 +1,41 @@
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Form, FormGroup, Label, Input, Button } from "reactstrap";
+
+// Injecter les styles globaux pour les animations
+const injectGlobalStyles = () => {
+  const styleSheet = document.createElement("style");
+  styleSheet.type = "text/css";
+  styleSheet.innerText = `
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes dropdownFadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+  `;
+  document.head.appendChild(styleSheet);
+};
 
 const AddEvaluation = () => {
   const navigate = useNavigate();
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [serverErrors, setServerErrors] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
-  const { control, handleSubmit, formState: { errors } } = useForm({
+  const { control, handleSubmit, formState: { errors }, setValue } = useForm({
     defaultValues: {
       nomEtudiant: "",
       classe: "",
@@ -28,7 +54,8 @@ const AddEvaluation = () => {
   });
 
   useEffect(() => {
-    const fetchUserRole = async () => {
+    injectGlobalStyles();
+    const fetchUserRoleAndStudents = async () => {
       try {
         const token = localStorage.getItem("token") || sessionStorage.getItem("token");
         if (!token) {
@@ -36,7 +63,7 @@ const AddEvaluation = () => {
           return;
         }
 
-        const response = await fetch("http://localhost:5000/api/users/me", {
+        const userResponse = await fetch("http://localhost:5000/api/users/me", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -44,33 +71,75 @@ const AddEvaluation = () => {
           },
         });
 
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP ${response.status}`);
+        if (!userResponse.ok) {
+          throw new Error(`Erreur HTTP ${userResponse.status}`);
         }
 
-        const userData = await response.json();
-        console.log("Données utilisateur :", userData);
-
+        const userData = await userResponse.json();
         if (userData.Role && userData.Role.includes("teacher")) {
           setUserRole("teacher");
         } else {
           setUserRole(null);
         }
+
+        const studentsResponse = await fetch("http://localhost:5000/api/students", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!studentsResponse.ok) {
+          throw new Error("Erreur lors de la récupération des étudiants");
+        }
+
+        const studentsData = await studentsResponse.json();
+        setStudents(studentsData.students || []);
+        setFilteredStudents(studentsData.students || []);
       } catch (err) {
-        console.error("Erreur lors de la récupération du rôle :", err);
+        console.error("Erreur lors de la récupération des données :", err);
         setUserRole(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUserRole();
+    fetchUserRoleAndStudents();
   }, [navigate]);
+
+  const filterStudents = (value) => {
+    if (value.trim()) {
+      const filtered = students.filter((student) =>
+        student.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredStudents(filtered);
+      setShowDropdown(true);
+    } else {
+      setFilteredStudents(students);
+      setShowDropdown(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleSelectStudent = (student) => {
+    setValue("nomEtudiant", student);
+    setShowDropdown(false);
+  };
 
   const handleSaveChange = async (data) => {
     setServerErrors([]);
-    console.log("Données avant envoi :", data);
-
     try {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
@@ -87,10 +156,7 @@ const AddEvaluation = () => {
         body: JSON.stringify(data),
       });
 
-      console.log("Statut de la réponse :", response.status); // Log pour débogage
       const responseData = await response.json();
-      console.log("Réponse du serveur :", responseData);
-
       if (!response.ok) {
         const errors = responseData.errors || [{ msg: responseData.message || "Erreur serveur" }];
         setServerErrors(errors);
@@ -128,15 +194,15 @@ const AddEvaluation = () => {
   };
 
   if (loading) {
-    return <div>Chargement des données utilisateur...</div>;
+    return <div style={styles.loading}>Chargement des données utilisateur...</div>;
   }
 
   if (!userRole) {
     return (
-      <Container fluid={true} className="text-center mt-5">
-        <h2>Accès refusé</h2>
-        <p>Seuls les enseignants peuvent ajouter des évaluations.</p>
-        <Button color="secondary" onClick={handleLogout}>
+      <Container fluid={true} style={styles.accessDeniedContainer}>
+        <h2 style={styles.accessDeniedTitle}>Accès refusé</h2>
+        <p style={styles.accessDeniedText}>Seuls les enseignants peuvent ajouter des évaluations.</p>
+        <Button style={styles.logoutButton} onClick={handleLogout}>
           Se déconnecter
         </Button>
       </Container>
@@ -145,36 +211,58 @@ const AddEvaluation = () => {
 
   return (
     <Fragment>
-      <Container fluid={true} className="add-evaluation">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h2>Ajouter une évaluation</h2>
-          <Button color="secondary" onClick={handleLogout}>
+      <Container fluid={true} style={styles.container}>
+        <div style={styles.header}>
+          <h2 style={styles.title}>📝 Ajouter une évaluation</h2>
+          <Button style={styles.logoutButton} onClick={handleLogout}>
             Se déconnecter
           </Button>
         </div>
-        <Form onSubmit={handleSubmit(handleSaveChange)}>
+        <Form onSubmit={handleSubmit(handleSaveChange)} style={styles.form}>
           <Row>
             <Col md={6}>
-              <FormGroup>
-                <Label for="nomEtudiant">Nom de l'étudiant</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="nomEtudiant" style={styles.label}>Nom de l'étudiant</Label>
                 <Controller
                   name="nomEtudiant"
                   control={control}
                   rules={{ required: "Le nom de l'étudiant est requis" }}
                   render={({ field }) => (
-                    <Input
-                      id="nomEtudiant"
-                      type="text"
-                      {...field}
-                      invalid={!!errors.nomEtudiant}
-                    />
+                    <div style={styles.inputWrapper}>
+                      <Input
+                        id="nomEtudiant"
+                        type="text"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          filterStudents(e.target.value);
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        invalid={!!errors.nomEtudiant}
+                        placeholder="Entrez le nom de l'étudiant"
+                        style={styles.input}
+                      />
+                      {showDropdown && filteredStudents.length > 0 && (
+                        <div ref={dropdownRef} style={styles.dropdown}>
+                          {filteredStudents.map((student, index) => (
+                            <div
+                              key={index}
+                              onClick={() => handleSelectStudent(student)}
+                              style={styles.dropdownItem}
+                            >
+                              {student}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 />
-                {errors.nomEtudiant && <span className="text-danger">{errors.nomEtudiant.message}</span>}
+                {errors.nomEtudiant && <span style={styles.errorText}>{errors.nomEtudiant.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="classe">Classe</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="classe" style={styles.label}>Classe</Label>
                 <Controller
                   name="classe"
                   control={control}
@@ -185,14 +273,15 @@ const AddEvaluation = () => {
                       type="text"
                       {...field}
                       invalid={!!errors.classe}
+                      style={styles.input}
                     />
                   )}
                 />
-                {errors.classe && <span className="text-danger">{errors.classe.message}</span>}
+                {errors.classe && <span style={styles.errorText}>{errors.classe.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="matiere">Matière</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="matiere" style={styles.label}>Matière</Label>
                 <Controller
                   name="matiere"
                   control={control}
@@ -203,14 +292,15 @@ const AddEvaluation = () => {
                       type="text"
                       {...field}
                       invalid={!!errors.matiere}
+                      style={styles.input}
                     />
                   )}
                 />
-                {errors.matiere && <span className="text-danger">{errors.matiere.message}</span>}
+                {errors.matiere && <span style={styles.errorText}>{errors.matiere.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="dateEvaluation">Date d'évaluation</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="dateEvaluation" style={styles.label}>Date d'évaluation</Label>
                 <Controller
                   name="dateEvaluation"
                   control={control}
@@ -224,14 +314,15 @@ const AddEvaluation = () => {
                       type="date"
                       {...field}
                       invalid={!!errors.dateEvaluation}
+                      style={styles.input}
                     />
                   )}
                 />
-                {errors.dateEvaluation && <span className="text-danger">{errors.dateEvaluation.message}</span>}
+                {errors.dateEvaluation && <span style={styles.errorText}>{errors.dateEvaluation.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="reactionCorrection">Réaction à la correction</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="reactionCorrection" style={styles.label}>Réaction à la correction</Label>
                 <Controller
                   name="reactionCorrection"
                   control={control}
@@ -245,6 +336,7 @@ const AddEvaluation = () => {
                       type="select"
                       {...field}
                       invalid={!!errors.reactionCorrection}
+                      style={styles.select}
                     >
                       <option value="">Choisir...</option>
                       <option value="Accepte bien">Accepte bien</option>
@@ -253,11 +345,11 @@ const AddEvaluation = () => {
                     </Input>
                   )}
                 />
-                {errors.reactionCorrection && <span className="text-danger">{errors.reactionCorrection.message}</span>}
+                {errors.reactionCorrection && <span style={styles.errorText}>{errors.reactionCorrection.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="gestionStress">Gestion du stress</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="gestionStress" style={styles.label}>Gestion du stress</Label>
                 <Controller
                   name="gestionStress"
                   control={control}
@@ -271,6 +363,7 @@ const AddEvaluation = () => {
                       type="select"
                       {...field}
                       invalid={!!errors.gestionStress}
+                      style={styles.select}
                     >
                       <option value="">Choisir...</option>
                       <option value="Calme">Calme</option>
@@ -279,13 +372,13 @@ const AddEvaluation = () => {
                     </Input>
                   )}
                 />
-                {errors.gestionStress && <span className="text-danger">{errors.gestionStress.message}</span>}
+                {errors.gestionStress && <span style={styles.errorText}>{errors.gestionStress.message}</span>}
               </FormGroup>
             </Col>
 
             <Col md={6}>
-              <FormGroup>
-                <Label for="presence">Présence</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="presence" style={styles.label}>Présence</Label>
                 <Controller
                   name="presence"
                   control={control}
@@ -299,6 +392,7 @@ const AddEvaluation = () => {
                       type="select"
                       {...field}
                       invalid={!!errors.presence}
+                      style={styles.select}
                     >
                       <option value="">Choisir...</option>
                       <option value="Toujours à l’heure">Toujours à l’heure</option>
@@ -307,11 +401,11 @@ const AddEvaluation = () => {
                     </Input>
                   )}
                 />
-                {errors.presence && <span className="text-danger">{errors.presence.message}</span>}
+                {errors.presence && <span style={styles.errorText}>{errors.presence.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="expressionEmotionnelle">Expression émotionnelle</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="expressionEmotionnelle" style={styles.label}>Expression émotionnelle</Label>
                 <Controller
                   name="expressionEmotionnelle"
                   control={control}
@@ -325,6 +419,7 @@ const AddEvaluation = () => {
                       type="select"
                       {...field}
                       invalid={!!errors.expressionEmotionnelle}
+                      style={styles.select}
                     >
                       <option value="">Choisir...</option>
                       <option value="Enthousiaste">Enthousiaste</option>
@@ -334,11 +429,11 @@ const AddEvaluation = () => {
                     </Input>
                   )}
                 />
-                {errors.expressionEmotionnelle && <span className="text-danger">{errors.expressionEmotionnelle.message}</span>}
+                {errors.expressionEmotionnelle && <span style={styles.errorText}>{errors.expressionEmotionnelle.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="participationOrale">Participation orale</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="participationOrale" style={styles.label}>Participation orale</Label>
                 <Controller
                   name="participationOrale"
                   control={control}
@@ -352,6 +447,7 @@ const AddEvaluation = () => {
                       type="select"
                       {...field}
                       invalid={!!errors.participationOrale}
+                      style={styles.select}
                     >
                       <option value="">Choisir...</option>
                       <option value="Très active">Très active</option>
@@ -361,11 +457,11 @@ const AddEvaluation = () => {
                     </Input>
                   )}
                 />
-                {errors.participationOrale && <span className="text-danger">{errors.participationOrale.message}</span>}
+                {errors.participationOrale && <span style={styles.errorText}>{errors.participationOrale.message}</span>}
               </FormGroup>
 
-              <FormGroup>
-                <Label for="difficultes">Difficultés</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="difficultes" style={styles.label}>Difficultés</Label>
                 <Controller
                   name="difficultes"
                   control={control}
@@ -375,13 +471,14 @@ const AddEvaluation = () => {
                       type="textarea"
                       {...field}
                       invalid={!!errors.difficultes}
+                      style={styles.textarea}
                     />
                   )}
                 />
               </FormGroup>
 
-              <FormGroup>
-                <Label for="pointsPositifs">Points positifs</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="pointsPositifs" style={styles.label}>Points positifs</Label>
                 <Controller
                   name="pointsPositifs"
                   control={control}
@@ -391,13 +488,14 @@ const AddEvaluation = () => {
                       type="textarea"
                       {...field}
                       invalid={!!errors.pointsPositifs}
+                      style={styles.textarea}
                     />
                   )}
                 />
               </FormGroup>
 
-              <FormGroup>
-                <Label for="axesAmelioration">Axes d'amélioration</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="axesAmelioration" style={styles.label}>Axes d'amélioration</Label>
                 <Controller
                   name="axesAmelioration"
                   control={control}
@@ -407,13 +505,14 @@ const AddEvaluation = () => {
                       type="textarea"
                       {...field}
                       invalid={!!errors.axesAmelioration}
+                      style={styles.textarea}
                     />
                   )}
                 />
               </FormGroup>
 
-              <FormGroup>
-                <Label for="suiviRecommande">Suivi recommandé</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="suiviRecommande" style={styles.label}>Suivi recommandé</Label>
                 <Controller
                   name="suiviRecommande"
                   control={control}
@@ -424,6 +523,7 @@ const AddEvaluation = () => {
                       {...field}
                       checked={field.value}
                       onChange={(e) => field.onChange(e.target.checked)}
+                      style={styles.checkbox}
                     />
                   )}
                 />
@@ -431,16 +531,16 @@ const AddEvaluation = () => {
             </Col>
           </Row>
 
-          <Button type="submit" color="primary" className="mt-3">
+          <Button type="submit" style={styles.submitButton}>
             Enregistrer
           </Button>
 
           {serverErrors.length > 0 && (
-            <div className="mt-3">
-              <h5>Erreurs du serveur :</h5>
-              <ul>
+            <div style={styles.errorContainer}>
+              <h5 style={styles.errorTitle}>Erreurs du serveur :</h5>
+              <ul style={styles.errorList}>
                 {serverErrors.map((error, index) => (
-                  <li key={index} className="text-danger">{error.msg}</li>
+                  <li key={index} style={styles.errorItem}>{error.msg}</li>
                 ))}
               </ul>
             </div>
@@ -449,6 +549,198 @@ const AddEvaluation = () => {
       </Container>
     </Fragment>
   );
+};
+
+const styles = {
+  container: {
+    minHeight: "100vh",
+    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+    padding: "40px 20px",
+    fontFamily: "'Poppins', sans-serif",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "30px",
+  },
+  title: {
+    fontSize: "28px",
+    fontWeight: "600",
+    color: "#2c3e50",
+    margin: 0,
+    animation: "fadeIn 0.5s ease-in-out",
+  },
+  logoutButton: {
+    background: "linear-gradient(45deg, #e74c3c, #c0392b)",
+    border: "none",
+    padding: "10px 20px",
+    fontSize: "14px",
+    fontWeight: "500",
+    borderRadius: "25px",
+    color: "#fff",
+    transition: "transform 0.3s ease, box-shadow 0.3s ease",
+    boxShadow: "0 4px 15px rgba(231, 76, 60, 0.3)",
+    ":hover": {
+      transform: "scale(1.05)",
+      boxShadow: "0 6px 20px rgba(231, 76, 60, 0.4)",
+    },
+  },
+  form: {
+    background: "rgba(255, 255, 255, 0.95)",
+    padding: "30px",
+    borderRadius: "15px",
+    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
+    animation: "fadeIn 0.5s ease-in-out",
+  },
+  formGroup: {
+    marginBottom: "20px",
+    position: "relative",
+  },
+  label: {
+    fontSize: "16px",
+    fontWeight: "500",
+    color: "#34495e",
+    marginBottom: "8px",
+  },
+  inputWrapper: {
+    position: "relative",
+  },
+  input: {
+    borderRadius: "10px",
+    border: "1px solid #dfe6e9",
+    padding: "12px",
+    fontSize: "14px",
+    boxShadow: "0 2px 5px rgba(0, 0, 0, 0.05)",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+    ":focus": {
+      borderColor: "#1E90FF",
+      boxShadow: "0 0 8px rgba(30, 144, 255, 0.3)",
+    },
+  },
+  select: {
+    borderRadius: "10px",
+    border: "1px solid #dfe6e9",
+    padding: "12px",
+    fontSize: "14px",
+    boxShadow: "0 2px 5px rgba(0, 0, 0, 0.05)",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+    ":focus": {
+      borderColor: "#1E90FF",
+      boxShadow: "0 0 8px rgba(30, 144, 255, 0.3)",
+    },
+  },
+  textarea: {
+    borderRadius: "10px",
+    border: "1px solid #dfe6e9",
+    padding: "12px",
+    fontSize: "14px",
+    boxShadow: "0 2px 5px rgba(0, 0, 0, 0.05)",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+    minHeight: "80px",
+    ":focus": {
+      borderColor: "#1E90FF",
+      boxShadow: "0 0 8px rgba(30, 144, 255, 0.3)",
+    },
+  },
+  checkbox: {
+    marginLeft: "10px",
+    transform: "scale(1.2)",
+  },
+  dropdown: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    background: "rgba(255, 255, 255, 0.98)",
+    borderRadius: "10px",
+    boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)",
+    maxHeight: "200px",
+    overflowY: "auto",
+    zIndex: 1000,
+    animation: "dropdownFadeIn 0.3s ease-in-out",
+    marginTop: "5px",
+  },
+  dropdownItem: {
+    padding: "10px 15px",
+    fontSize: "14px",
+    color: "#34495e",
+    cursor: "pointer",
+    transition: "background 0.2s ease, color 0.2s ease",
+    ":hover": {
+      background: "linear-gradient(45deg, #1E90FF, #00c4ff)",
+      color: "#fff",
+    },
+  },
+  submitButton: {
+    background: "linear-gradient(45deg, #1E90FF, #00c4ff)",
+    border: "none",
+    padding: "12px 30px",
+    fontSize: "16px",
+    fontWeight: "500",
+    borderRadius: "25px",
+    color: "#fff",
+    transition: "transform 0.3s ease, box-shadow 0.3s ease",
+    boxShadow: "0 4px 15px rgba(30, 144, 255, 0.3)",
+    display: "block",
+    margin: "20px auto 0",
+    animation: "pulse 2s infinite",
+    ":hover": {
+      transform: "scale(1.05)",
+      boxShadow: "0 6px 20px rgba(30, 144, 255, 0.4)",
+    },
+  },
+  errorText: {
+    color: "#e74c3c",
+    fontSize: "12px",
+    marginTop: "5px",
+    animation: "fadeIn 0.3s ease-in-out",
+  },
+  errorContainer: {
+    marginTop: "20px",
+    textAlign: "center",
+    animation: "fadeIn 0.5s ease-in-out",
+  },
+  errorTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#e74c3c",
+  },
+  errorList: {
+    listStyle: "none",
+    padding: 0,
+  },
+  errorItem: {
+    color: "#e74c3c",
+    fontSize: "14px",
+    margin: "5px 0",
+  },
+  loading: {
+    textAlign: "center",
+    fontSize: "18px",
+    color: "#34495e",
+    padding: "50px",
+  },
+  accessDeniedContainer: {
+    minHeight: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+  },
+  accessDeniedTitle: {
+    fontSize: "32px",
+    fontWeight: "600",
+    color: "#e74c3c",
+    animation: "fadeIn 0.5s ease-in-out",
+  },
+  accessDeniedText: {
+    fontSize: "18px",
+    color: "#34495e",
+    marginBottom: "20px",
+    animation: "fadeIn 0.5s ease-in-out",
+  },
 };
 
 export default AddEvaluation;

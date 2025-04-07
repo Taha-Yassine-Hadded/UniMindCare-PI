@@ -1,16 +1,19 @@
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Form, FormGroup, Label, Input, Button } from "reactstrap";
-import React from "react";
 
 const AddFeedback = () => {
   const navigate = useNavigate();
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [serverErrors, setServerErrors] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [filteredTeachers, setFilteredTeachers] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
-  const { control, handleSubmit, formState: { errors } } = useForm({
+  const { control, handleSubmit, formState: { errors }, setValue } = useForm({
     defaultValues: {
       nomEnseignant: "",
       matiere: "",
@@ -20,63 +23,87 @@ const AddFeedback = () => {
       disponibilite: "",
       gestionCours: "",
       commentaire: "",
-      satisfactionGlobale: 3, // Valeur par défaut (échelle de 1 à 5)
+      satisfactionGlobale: 3,
     },
   });
 
-  // Vérification du rôle de l'utilisateur au montage
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchUserRoleAndTeachers = async () => {
       try {
         const token = localStorage.getItem("token") || sessionStorage.getItem("token");
         if (!token) {
           navigate("/login");
           return;
         }
-
-        const response = await fetch("http://localhost:5000/api/users/me", {
+        const userResponse = await fetch("http://localhost:5000/api/users/me", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
         });
+        if (!userResponse.ok) throw new Error(`Erreur HTTP ${userResponse.status}`);
+        const userData = await userResponse.json();
+        setUserRole(userData.Role && userData.Role.includes("student") ? "student" : null);
 
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP ${response.status}`);
-        }
-
-        const userData = await response.json();
-        console.log("Données utilisateur :", userData);
-
-        if (userData.Role && userData.Role.includes("student")) {
-          setUserRole("student");
-        } else {
-          setUserRole(null);
-        }
+        const teachersResponse = await fetch("http://localhost:5000/api/teachers", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!teachersResponse.ok) throw new Error("Erreur lors de la récupération des enseignants");
+        const teachersData = await teachersResponse.json();
+        setTeachers(teachersData.teachers || []);
+        setFilteredTeachers(teachersData.teachers || []);
       } catch (err) {
-        console.error("Erreur lors de la récupération du rôle :", err);
+        console.error("Erreur lors de la récupération des données :", err);
         setUserRole(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUserRole();
+    fetchUserRoleAndTeachers();
   }, [navigate]);
 
-  // Gestion de la soumission du formulaire
+  const filterTeachers = (value) => {
+    if (value.trim()) {
+      const filtered = teachers.filter((teacher) =>
+        teacher.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredTeachers(filtered);
+      setShowDropdown(true);
+    } else {
+      setFilteredTeachers(teachers);
+      setShowDropdown(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectTeacher = (teacher) => {
+    setValue("nomEnseignant", teacher);
+    setShowDropdown(false);
+  };
+
   const handleSaveChange = async (data) => {
     setServerErrors([]);
-    console.log("Données avant envoi :", data);
-
     try {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         navigate("/login");
         return;
       }
-
       const response = await fetch("http://localhost:5000/api/feedback", {
         method: "POST",
         headers: {
@@ -85,35 +112,27 @@ const AddFeedback = () => {
         },
         body: JSON.stringify(data),
       });
-
-      console.log("Statut de la réponse :", response.status);
       const responseData = await response.json();
-      console.log("Réponse du serveur :", responseData);
-
       if (!response.ok) {
         const errors = responseData.errors || [{ msg: responseData.message || "Erreur serveur" }];
         setServerErrors(errors);
         return;
       }
-
       alert("Feedback envoyé avec succès");
-      navigate("/feedback/list"); // Redirection vers une liste de feedback ou autre page
+      navigate("/feedback/list");
     } catch (error) {
       console.error("Erreur lors de l'enregistrement :", error);
       setServerErrors([{ msg: "Erreur réseau ou réponse inattendue du serveur : " + error.message }]);
     }
   };
 
-  // Gestion de la déconnexion
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       if (token) {
         await fetch("http://localhost:5000/users/logout", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
       }
       localStorage.removeItem("token");
@@ -127,75 +146,82 @@ const AddFeedback = () => {
     }
   };
 
-  // Chargement initial
-  if (loading) {
-    return <div>Chargement des données utilisateur...</div>;
-  }
+  if (loading) return <div style={styles.loading}>Chargement...</div>;
 
-  // Accès refusé pour les non-étudiants
   if (!userRole) {
     return (
-      <Container fluid={true} className="text-center mt-5">
+      <Container fluid style={styles.denied}>
         <h2>Accès refusé</h2>
         <p>Seuls les étudiants peuvent soumettre un feedback.</p>
-        <Button color="secondary" onClick={handleLogout}>
-          Se déconnecter
-        </Button>
+        <Button color="secondary" onClick={handleLogout} style={styles.smallButton}>Se déconnecter</Button>
       </Container>
     );
   }
 
-  // Afficher le formulaire pour les étudiants
   return (
     <Fragment>
-      <Container fluid={true} className="add-feedback">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h2>Ajouter un feedback sur un enseignant</h2>
-          <Button color="secondary" onClick={handleLogout}>
-            Se déconnecter
-          </Button>
+      <Container fluid className="add-feedback" style={styles.container}>
+        <div style={styles.header}>
+          <h2 style={styles.headerTitle}>Ajouter votre feedback</h2>
+          <Button color="secondary" onClick={handleLogout} style={styles.smallButton}>Déconnexion</Button>
         </div>
-        <Form onSubmit={handleSubmit(handleSaveChange)}>
-          <Row>
+        <Form onSubmit={handleSubmit(handleSaveChange)} style={styles.form}>
+          <Row style={styles.row}>
             <Col md={6}>
-              <FormGroup>
-                <Label for="nomEnseignant">Nom de l'enseignant</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="nomEnseignant" style={styles.label}>Nom de l'enseignant</Label>
                 <Controller
                   name="nomEnseignant"
                   control={control}
                   rules={{ required: "Le nom de l'enseignant est requis" }}
                   render={({ field }) => (
-                    <Input
-                      id="nomEnseignant"
-                      type="text"
-                      {...field}
-                      invalid={!!errors.nomEnseignant}
-                    />
+                    <div style={styles.inputWrapper}>
+                      <Input
+                        id="nomEnseignant"
+                        type="text"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          filterTeachers(e.target.value);
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        placeholder="Entrez le nom de l'enseignant"
+                        style={styles.input}
+                      />
+                      {showDropdown && filteredTeachers.length > 0 && (
+                        <div ref={dropdownRef} style={styles.dropdown}>
+                          {filteredTeachers.map((teacher, index) => (
+                            <div
+                              key={index}
+                              onClick={() => handleSelectTeacher(teacher)}
+                              style={styles.dropdownItem}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0f2f5")}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                            >
+                              {teacher}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 />
-                {errors.nomEnseignant && <span className="text-danger">{errors.nomEnseignant.message}</span>}
+                {errors.nomEnseignant && <span style={styles.errorText}>{errors.nomEnseignant.message}</span>}
               </FormGroup>
-
-              <FormGroup>
-                <Label for="matiere">Matière</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="matiere" style={styles.label}>Matière</Label>
                 <Controller
                   name="matiere"
                   control={control}
                   rules={{ required: "La matière est requise" }}
                   render={({ field }) => (
-                    <Input
-                      id="matiere"
-                      type="text"
-                      {...field}
-                      invalid={!!errors.matiere}
-                    />
+                    <Input id="matiere" type="text" {...field} style={styles.input} placeholder="Entrez la matière" />
                   )}
                 />
-                {errors.matiere && <span className="text-danger">{errors.matiere.message}</span>}
+                {errors.matiere && <span style={styles.errorText}>{errors.matiere.message}</span>}
               </FormGroup>
-
-              <FormGroup>
-                <Label for="dateSession">Date de la session</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="dateSession" style={styles.label}>Date de la session</Label>
                 <Controller
                   name="dateSession"
                   control={control}
@@ -204,19 +230,13 @@ const AddFeedback = () => {
                     validate: (value) => !isNaN(new Date(value).getTime()) || "La date est invalide",
                   }}
                   render={({ field }) => (
-                    <Input
-                      id="dateSession"
-                      type="date"
-                      {...field}
-                      invalid={!!errors.dateSession}
-                    />
+                    <Input id="dateSession" type="date" {...field} style={styles.input} />
                   )}
                 />
-                {errors.dateSession && <span className="text-danger">{errors.dateSession.message}</span>}
+                {errors.dateSession && <span style={styles.errorText}>{errors.dateSession.message}</span>}
               </FormGroup>
-
-              <FormGroup>
-                <Label for="clarteExplications">Clarté des explications</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="clarteExplications" style={styles.label}>Clarté des explications</Label>
                 <Controller
                   name="clarteExplications"
                   control={control}
@@ -225,12 +245,7 @@ const AddFeedback = () => {
                     validate: (value) => value !== "" || "Veuillez sélectionner une option valide",
                   }}
                   render={({ field }) => (
-                    <Input
-                      id="clarteExplications"
-                      type="select"
-                      {...field}
-                      invalid={!!errors.clarteExplications}
-                    >
+                    <Input id="clarteExplications" type="select" {...field} style={styles.inputSelect}>
                       <option value="">Choisir...</option>
                       <option value="Très claire">Très claire</option>
                       <option value="Clair">Clair</option>
@@ -239,13 +254,12 @@ const AddFeedback = () => {
                     </Input>
                   )}
                 />
-                {errors.clarteExplications && <span className="text-danger">{errors.clarteExplications.message}</span>}
+                {errors.clarteExplications && <span style={styles.errorText}>{errors.clarteExplications.message}</span>}
               </FormGroup>
             </Col>
-
             <Col md={6}>
-              <FormGroup>
-                <Label for="interactionEtudiant">Interaction avec les étudiants</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="interactionEtudiant" style={styles.label}>Interaction avec les étudiants</Label>
                 <Controller
                   name="interactionEtudiant"
                   control={control}
@@ -254,12 +268,7 @@ const AddFeedback = () => {
                     validate: (value) => value !== "" || "Veuillez sélectionner une option valide",
                   }}
                   render={({ field }) => (
-                    <Input
-                      id="interactionEtudiant"
-                      type="select"
-                      {...field}
-                      invalid={!!errors.interactionEtudiant}
-                    >
+                    <Input id="interactionEtudiant" type="select" {...field} style={styles.inputSelect}>
                       <option value="">Choisir...</option>
                       <option value="Très positive">Très positive</option>
                       <option value="Positive">Positive</option>
@@ -268,11 +277,10 @@ const AddFeedback = () => {
                     </Input>
                   )}
                 />
-                {errors.interactionEtudiant && <span className="text-danger">{errors.interactionEtudiant.message}</span>}
+                {errors.interactionEtudiant && <span style={styles.errorText}>{errors.interactionEtudiant.message}</span>}
               </FormGroup>
-
-              <FormGroup>
-                <Label for="disponibilite">Disponibilité</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="disponibilite" style={styles.label}>Disponibilité</Label>
                 <Controller
                   name="disponibilite"
                   control={control}
@@ -281,12 +289,7 @@ const AddFeedback = () => {
                     validate: (value) => value !== "" || "Veuillez sélectionner une option valide",
                   }}
                   render={({ field }) => (
-                    <Input
-                      id="disponibilite"
-                      type="select"
-                      {...field}
-                      invalid={!!errors.disponibilite}
-                    >
+                    <Input id="disponibilite" type="select" {...field} style={styles.inputSelect}>
                       <option value="">Choisir...</option>
                       <option value="Toujours disponible">Toujours disponible</option>
                       <option value="Souvent disponible">Souvent disponible</option>
@@ -295,11 +298,10 @@ const AddFeedback = () => {
                     </Input>
                   )}
                 />
-                {errors.disponibilite && <span className="text-danger">{errors.disponibilite.message}</span>}
+                {errors.disponibilite && <span style={styles.errorText}>{errors.disponibilite.message}</span>}
               </FormGroup>
-
-              <FormGroup>
-                <Label for="gestionCours">Gestion du cours</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="gestionCours" style={styles.label}>Gestion du cours</Label>
                 <Controller
                   name="gestionCours"
                   control={control}
@@ -308,12 +310,7 @@ const AddFeedback = () => {
                     validate: (value) => value !== "" || "Veuillez sélectionner une option valide",
                   }}
                   render={({ field }) => (
-                    <Input
-                      id="gestionCours"
-                      type="select"
-                      {...field}
-                      invalid={!!errors.gestionCours}
-                    >
+                    <Input id="gestionCours" type="select" {...field} style={styles.inputSelect}>
                       <option value="">Choisir...</option>
                       <option value="Excellente">Excellente</option>
                       <option value="Bonne">Bonne</option>
@@ -322,11 +319,10 @@ const AddFeedback = () => {
                     </Input>
                   )}
                 />
-                {errors.gestionCours && <span className="text-danger">{errors.gestionCours.message}</span>}
+                {errors.gestionCours && <span style={styles.errorText}>{errors.gestionCours.message}</span>}
               </FormGroup>
-
-              <FormGroup>
-                <Label for="satisfactionGlobale">Satisfaction globale (1-5)</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="satisfactionGlobale" style={styles.label}>Satisfaction globale (1-5)</Label>
                 <Controller
                   name="satisfactionGlobale"
                   control={control}
@@ -342,15 +338,15 @@ const AddFeedback = () => {
                       min="1"
                       max="5"
                       {...field}
-                      invalid={!!errors.satisfactionGlobale}
+                      style={styles.input}
+                      placeholder="1 à 5"
                     />
                   )}
                 />
-                {errors.satisfactionGlobale && <span className="text-danger">{errors.satisfactionGlobale.message}</span>}
+                {errors.satisfactionGlobale && <span style={styles.errorText}>{errors.satisfactionGlobale.message}</span>}
               </FormGroup>
-
-              <FormGroup>
-                <Label for="commentaire">Commentaire (optionnel)</Label>
+              <FormGroup style={styles.formGroup}>
+                <Label for="commentaire" style={styles.label}>Commentaire (optionnel)</Label>
                 <Controller
                   name="commentaire"
                   control={control}
@@ -359,24 +355,23 @@ const AddFeedback = () => {
                       id="commentaire"
                       type="textarea"
                       {...field}
-                      invalid={!!errors.commentaire}
+                      style={styles.textarea}
+                      placeholder="Ajoutez un commentaire..."
                     />
                   )}
                 />
               </FormGroup>
             </Col>
           </Row>
-
-          <Button type="submit" color="primary" className="mt-3">
-            Envoyer le feedback
+          <Button type="submit" color="primary" style={styles.submitButton}>
+            Envoyer votre feedback
           </Button>
-
           {serverErrors.length > 0 && (
-            <div className="mt-3">
+            <div style={styles.serverErrors}>
               <h5>Erreurs du serveur :</h5>
               <ul>
                 {serverErrors.map((error, index) => (
-                  <li key={index} className="text-danger">{error.msg}</li>
+                  <li key={index} style={styles.errorText}>{error.msg}</li>
                 ))}
               </ul>
             </div>
@@ -386,5 +381,208 @@ const AddFeedback = () => {
     </Fragment>
   );
 };
+
+const styles = {
+  container: {
+    maxWidth: "960px",
+    margin: "60px auto",
+    padding: "40px",
+    background: "linear-gradient(145deg, #ffffff, #f5f7fa)",
+    borderRadius: "20px",
+    boxShadow: "0 15px 35px rgba(0, 0, 0, 0.08)",
+    fontFamily: "'Inter', 'Poppins', sans-serif",
+    animation: "fadeIn 0.8s ease-in-out",
+    border: "1px solid rgba(230, 230, 230, 0.5)",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "35px",
+    paddingBottom: "15px",
+    borderBottom: "1px solid rgba(200, 200, 200, 0.3)",
+  },
+  headerTitle: {
+    color: "#2a2d3e",
+    fontSize: "28px",
+    fontWeight: "600",
+    letterSpacing: "-0.5px",
+    margin: 0,
+  },
+  form: {
+    fontFamily: "'Inter', 'Poppins', sans-serif",
+  },
+  row: {
+    marginBottom: "30px",
+  },
+  formGroup: {
+    marginBottom: "25px",
+    position: "relative",
+  },
+  label: {
+    fontWeight: "500",
+    marginBottom: "10px",
+    color: "#4a4a4a",
+    fontSize: "14px",
+    letterSpacing: "0.2px",
+  },
+  inputWrapper: {
+    position: "relative",
+  },
+  input: {
+    border: "1px solid #e0e4e8",
+    borderRadius: "12px",
+    padding: "14px 16px",
+    width: "100%",
+    outline: "none",
+    backgroundColor: "#fff",
+    fontSize: "15px",
+    color: "#333",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.03)",
+    "&:focus": {
+      borderColor: "#6a82fb",
+      boxShadow: "0 0 0 3px rgba(106, 130, 251, 0.2)",
+    },
+    "&:hover": {
+      borderColor: "#c0c7d1",
+    },
+  },
+  inputSelect: {
+    border: "1px solid #e0e4e8",
+    borderRadius: "12px",
+    padding: "14px 16px",
+    width: "100%",
+    backgroundColor: "#fff",
+    fontSize: "15px",
+    color: "#333",
+    outline: "none",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.03)",
+    "&:focus": {
+      borderColor: "#6a82fb",
+      boxShadow: "0 0 0 3px rgba(106, 130, 251, 0.2)",
+    },
+    "&:hover": {
+      borderColor: "#c0c7d1",
+    },
+  },
+  textarea: {
+    border: "1px solid #e0e4e8",
+    borderRadius: "12px",
+    padding: "14px 16px",
+    minHeight: "120px",
+    width: "100%",
+    resize: "vertical",
+    outline: "none",
+    backgroundColor: "#fff",
+    fontSize: "15px",
+    color: "#333",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.03)",
+    "&:focus": {
+      borderColor: "#6a82fb",
+      boxShadow: "0 0 0 3px rgba(106, 130, 251, 0.2)",
+    },
+    "&:hover": {
+      borderColor: "#c0c7d1",
+    },
+  },
+  dropdown: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    background: "#fff",
+    border: "1px solid #e0e4e8",
+    borderRadius: "12px",
+    maxHeight: "200px",
+    overflowY: "auto",
+    zIndex: 1000,
+    boxShadow: "0 8px 16px rgba(0, 0, 0, 0.1)",
+    marginTop: "5px",
+  },
+  dropdownItem: {
+    padding: "10px 16px",
+    fontSize: "14px",
+    color: "#333",
+    cursor: "pointer",
+    transition: "background-color 0.2s ease",
+    "&:hover": {
+      backgroundColor: "#f0f2f5",
+    },
+  },
+  submitButton: {
+    width: "100%",
+    padding: "14px",
+    fontSize: "16px",
+    fontWeight: "500",
+    borderRadius: "12px",
+    marginTop: "30px",
+    background: "linear-gradient(45deg, #6a82fb,rgb(242, 243, 182))",
+    border: "none",
+    color: "#fff",
+    cursor: "pointer",
+    transition: "transform 0.2s ease, box-shadow 0.3s ease",
+    boxShadow: "0 4px 15px rgba(106, 130, 251, 0.4)",
+    "&:hover": {
+      transform: "translateY(-2px)",
+      boxShadow: "0 6px 20px rgba(106, 130, 251, 0.5)",
+    },
+  },
+  smallButton: {
+    padding: "8px 16px",
+    fontSize: "13px",
+    fontWeight: "500",
+    borderRadius: "8px",
+    backgroundColor: "#a0aec0",
+    border: "none",
+    color: "#fff",
+    cursor: "pointer",
+    transition: "background-color 0.3s ease, transform 0.2s ease",
+    "&:hover": {
+      backgroundColor: "#718096",
+      transform: "translateY(-1px)",
+    },
+  },
+  errorText: {
+    color: "#f56565",
+    fontSize: "13px",
+    marginTop: "6px",
+    fontWeight: "400",
+  },
+  serverErrors: {
+    marginTop: "25px",
+    background: "#fef2f2",
+    padding: "15px",
+    borderRadius: "12px",
+    border: "1px solid #fed7d7",
+  },
+  loading: {
+    textAlign: "center",
+    marginTop: "100px",
+    fontSize: "20px",
+    color: "#718096",
+    fontFamily: "'Inter', 'Poppins', sans-serif",
+  },
+  denied: {
+    marginTop: "100px",
+    padding: "50px",
+    background: "#fff5f5",
+    borderRadius: "20px",
+    textAlign: "center",
+    boxShadow: "0 15px 35px rgba(0, 0, 0, 0.08)",
+    maxWidth: "500px",
+    margin: "100px auto",
+  },
+};
+
+// Add this to your CSS file or a <style> tag in your app for the animations
+const globalStyles = `
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+`;
 
 export default AddFeedback;
