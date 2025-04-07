@@ -1,0 +1,60 @@
+services:
+  backend:
+    image: backend-dev
+    build: ./backend  # Build the backend Docker image
+    ports:
+      - "5000:5000"    # Expose backend port
+    volumes:
+      - ./backend:/app  # Mount code for hot-reload
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - MONGO_URI=mongodb://mongo:27017/Pi-2025  # Use MongoDB service
+      - SESSION_SECRET=17d6b5674a49997fb296f9d1f8dfcfaf80b42c2714416d758b487f16168d70cf
+      - KEYCLOAK_REALM=unimindcare
+      - KEYCLOAK_URL=http://keycloak:8080/auth
+      - KEYCLOAK_CLIENT_ID=unimindcare-client
+      - FRONTEND_URI=http://frontend:3000
+    depends_on:
+      - mongo
+      - keycloak
+  
+  frontend:
+    image: frontend-dev
+    build: ./frontend  # Build the frontend Docker image
+    ports:
+      - "3000:3000"    # Map to Vite dev server port
+    volumes:
+      - ./frontend:/app  # Mount code for hot-reload
+      - /app/node_modules  # Isolate dependencies
+    environment:
+      - NODE_ENV=development
+      - BACKEND_URI=http://backend:5000
+    depends_on:
+      - backend
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db  # Persist MongoDB data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.1.1
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak/import:/opt/keycloak/import
+    command:
+      - start-dev
+      - --import-realm
+
+volumes:
+  mongo-data:
+  keycloak-data:

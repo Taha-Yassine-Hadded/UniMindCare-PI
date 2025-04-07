@@ -7,12 +7,14 @@ import 'react-quill/dist/quill.snow.css';
 import Swal from 'sweetalert2';
 import Dropzone from 'react-dropzone-uploader';
 import 'react-dropzone-uploader/dist/styles.css'; // Importer les styles de Dropzone
+import { useNavigate } from 'react-router-dom'; // Importer useNavigate
 
 const FormPost = ({ onPostSuccess }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [image, setImage] = useState(null); // État pour stocker le fichier image
+  const navigate = useNavigate();
 
   // Fonction appelée lorsque les fichiers changent dans Dropzone
   const handleChangeStatus = ({ meta, file }, status) => {
@@ -84,6 +86,8 @@ const FormPost = ({ onPostSuccess }) => {
         text: 'Votre post a été publié avec succès.',
       });
       if (onPostSuccess) onPostSuccess();
+      navigate(`${process.env.PUBLIC_URL}/blog/blogDetail`);
+
     } catch (error) {
       Swal.fire({
         icon: 'error',

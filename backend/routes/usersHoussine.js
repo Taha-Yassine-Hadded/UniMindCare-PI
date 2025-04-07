@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const router = express.Router();
-const User = require('../models/Users');
+const User = require('../Models/Users');
 const jwt = require('jsonwebtoken'); // Ajoutez ceci si vous utilisez JWT
 const speakeasy = require('speakeasy'); // Pour générer le secret 2FA
 const qrcode = require('qrcode');     // Pour générer le QR code

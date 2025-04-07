@@ -25,6 +25,7 @@
     "chart.js": "^3.9.1",
     "chartjs-plugin-zoom": "^2.2.0",
     "core-js": "^3.40.0",
+    "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "deni-react-treeview": "^1.1.11",
     "emoji-picker-react": "^3.5.1",
@@ -71,7 +72,7 @@
     "react-ratings-declarative": "^3.4.1",
     "react-redux": "^7.2.9",
     "react-router": "^6.3.0",
-    "react-router-dom": "^6.3.0",
+    "react-router-dom": "^6.30.0",
     "react-scripts": "^5.0.1",
     "react-select": "^5.6.1",
     "react-simplemde-editor": "^5.0.2",
@@ -124,6 +125,10 @@
   },
   "devDependencies": {
     "@types/react-slick": "^0.23.10",
+    "babel-eslint": "^10.1.0",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "react-app-rewired": "^2.2.1",
     "source-map-loader": "^3.0.0"
   },
   "resolutions": {

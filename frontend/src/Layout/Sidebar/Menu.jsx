@@ -138,6 +138,23 @@ export const MENU = [
             bookmark: true,
 
           },
+
+
+          {
+            url: `${process.env.PUBLIC_URL}/dashboard/statistics`,
+            title: "Statistics Dashboard",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`,
+            title: "Statistics Students",
+            type: "link",
+            bookmark: true,
+
+          }
+         
         ],
       },
     

@@ -119,13 +119,34 @@ import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
 import EmergencyClaim from "../Components/EmergencyClaim/EmergencyClaimButton"; // Importation du nouveau composant
 import EmergencyDashboard from "../Components/EmergencyClaim/EmergencyDashboard";
-
+import Feedback from "../Components/FormFARAH/FeedbackEtudiant";
+import StudentDashboard from "../Components/StudentDashboard";
+import TeacherDashboard from "../Components/TeacherDashboard";
+import Statistics from "../Components/Statistics";
+import StatisticsEtudiant from "../Components/StudentStats";
 
 
 export const routes = [
   //dashboard
   //<Route path="/notifications" element={<NotificationsPage />} />,
   { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
+
+    //Weather
+    { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
+    
+    //statistics
+    { path: `${process.env.PUBLIC_URL}/dashboard/statistics`, Component: <Statistics /> },
+
+    { path: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`, Component: <StatisticsEtudiant /> },
+
+  //Feedback
+  { path: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`, Component: <Feedback /> },
+
+  { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard /> },
+  { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
+
+
+  // dashboard
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/default`, Component: <Default /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/ecommerce`, Component: <Ecommerce /> },
