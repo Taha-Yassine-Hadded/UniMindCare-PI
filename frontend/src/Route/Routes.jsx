@@ -117,6 +117,7 @@ import AddProductName from "../Components/Eccommerce/AddProduct";
 import FileManagerContain from "../Components/FileManager/index"
 import MapJsContain from "../Components/Maps/pigeon-maps";
 import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
+import BlogStats from "../Components/Blog/BlogStats";
 
 export const routes = [
   //dashboard
@@ -126,6 +127,9 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/dashboard/default`, Component: <Default /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/ecommerce`, Component: <Ecommerce /> },
 
+  //blog
+  { path: `${process.env.PUBLIC_URL}/blog/statBlog`, Component: <BlogStats /> },
+  
   //widgets
   { path: `${process.env.PUBLIC_URL}/widgets/general`, Component: <General /> },
   { path: `${process.env.PUBLIC_URL}/widgets/chart`, Component: <Chart /> },

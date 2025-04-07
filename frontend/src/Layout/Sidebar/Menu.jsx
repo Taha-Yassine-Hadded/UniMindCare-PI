@@ -828,6 +828,11 @@ export const MENU = [
             type: "link",
             title: "Add Post",
           },
+          {
+            url: `${process.env.PUBLIC_URL}/blog/statBlog`,
+            type: "link",
+            title: "Stat Blog",
+          },
         ],
       },
       {
@@ -1716,6 +1721,11 @@ export const SEARCHMENU = [
             url: `${process.env.PUBLIC_URL}/blog/blogPost`,
             type: "link",
             title: "Add Post",
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/blog/statBlog`,
+            type: "link",
+            title: "Stat Blog",
           },
         ],
       },
