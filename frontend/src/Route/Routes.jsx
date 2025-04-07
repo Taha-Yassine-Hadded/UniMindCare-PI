@@ -115,6 +115,7 @@ import CheckOutContain from "../Components/Eccommerce/CheckOut/index";
 import AddProductName from "../Components/Eccommerce/AddProduct";
 import FileManagerContain from "../Components/FileManager/index";
 import MapJsContain from "../Components/Maps/pigeon-maps";
+import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
 import EmergencyClaim from "../Components/EmergencyClaim/EmergencyClaimButton"; // Importation du nouveau composant
 import EmergencyDashboard from "../Components/EmergencyClaim/EmergencyDashboard";
@@ -122,19 +123,25 @@ import EmergencyDashboard from "../Components/EmergencyClaim/EmergencyDashboard"
 
 
 export const routes = [
-  // Emergency Claim
-    {path: `${process.env.PUBLIC_URL}/emergency-claim`, Component: <EmergencyClaim />}, // Ajout de la route pour EmergencyClaim
-
-    { path: `${process.env.PUBLIC_URL}/emergency-dashboard`, Component: <EmergencyDashboard /> }, // Add this line
-
-    //Weather
-    { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
-    
-  // dashboard
+  //dashboard
+  //<Route path="/notifications" element={<NotificationsPage />} />,
+  { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/default`, Component: <Default /> },
   { path: `${process.env.PUBLIC_URL}/dashboard/ecommerce`, Component: <Ecommerce /> },
 
+
+
+   // Emergency Claim
+   {path: `${process.env.PUBLIC_URL}/emergency-claim`, Component: <EmergencyClaim />}, // Ajout de la route pour EmergencyClaim
+
+   { path: `${process.env.PUBLIC_URL}/emergency-dashboard`, Component: <EmergencyDashboard /> }, // Add this line
+
+   //Weather
+   { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
+
+
+   
   // widgets
   { path: `${process.env.PUBLIC_URL}/widgets/general`, Component: <General /> },
   { path: `${process.env.PUBLIC_URL}/widgets/chart`, Component: <Chart /> },

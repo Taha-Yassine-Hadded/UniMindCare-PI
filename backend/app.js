@@ -22,7 +22,7 @@ const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
 const transporter = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
-const { initScheduler } = require('./utils/scheduler');
+const notificationsRoutes = require('./routes/notifications');const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
 
 
@@ -34,8 +34,21 @@ var usersRoutes = require('./routes/users');
 const passport = require('./routes/passportConfig'); // Import the configured passport instance
 const usersRouter = require('./routes/usersRouter');
 
+const http = require('http'); // Ajout pour WebSocket
+const { Server } = require('socket.io'); // Ajout de Socket.IO
 // Initialize Express app
 var app = express();
+
+// Créer un serveur HTTP avec Express
+const server = http.createServer(app);
+
+// Initialiser Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:3000', // Remplacez par l'URL de votre frontend
+    methods: ['GET', 'POST'],
+  },
+});
 
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
@@ -52,11 +65,35 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Middleware pour passer io à toutes les routes
+app.use((req, res, next) => {
+  req.io = io; // Ajouter io à l'objet req pour qu'il soit accessible dans les routes
+  next();
+});
+
+// Gestion des connexions WebSocket
+io.on('connection', (socket) => {
+  console.log('Un utilisateur s\'est connecté via WebSocket:', socket.id);
+
+  // Associer l'utilisateur à une salle basée sur son ID
+  socket.on('join', (userId) => {
+    socket.join(userId);
+    console.log(`Utilisateur ${userId} a rejoint sa salle`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Un utilisateur s\'est déconnecté:', socket.id);
+  });
+});
+
 app.use('/', indexRouter);
 app.use("/api/users", usersRoutes);
 
 app.use('/api/posts', postsRouter);
 
+// Dans ton fichier principal (ex: app.js ou server.js)
+app.use('/uploads', express.static('uploads'));
+app.use('/api/notifications', notificationsRoutes);
 
 // MongoDB connection
 /*mongoose
@@ -754,4 +791,11 @@ app.use(function (err, req, res, next) {
   res.render('error');
 });
 
-module.exports = app;
+// Démarrer le serveur avec server.listen
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Serveur démarré sur le port ${PORT}`);
+});
+
+// Exporter l'app et le serveur
+module.exports = { app, server };

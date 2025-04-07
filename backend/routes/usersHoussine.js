@@ -18,6 +18,7 @@ router.get('/me', async (req, res) => {
         if (!user) return res.status(404).json({ message: 'User not found' });
 
         res.json({
+            _id: user._id, // Add the _id field (zedha baha bech supprimer al comment walet temchi kenn star hetha zedt)
             Name: user.Name,
             Identifiant: user.Identifiant,
             Email: user.Email,

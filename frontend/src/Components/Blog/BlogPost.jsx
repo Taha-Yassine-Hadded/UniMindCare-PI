@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, CardBody } from 'reactstrap';
 import { PostEdit, Post, Discard } from '../../Constant';
 import { Breadcrumbs, Btn } from '../../AbstractElements';
 import FormPost from './BlogPost/FormPost';
-import DropzoneClass from './BlogPost/DropzoneClass';
+
 import HeadingCommon from '../../Common/Component/HeadingCommon';
 
 const BlogPostContain = () => {
@@ -21,7 +21,7 @@ const BlogPostContain = () => {
               <HeadingCommon CardHeaderClassName="pb-0" Heading={PostEdit} />
               <CardBody className="add-post">
                 <FormPost onPostSuccess={handlePostSuccess} />
-                <DropzoneClass />
+                
                 <div className="btn-showcase">
                   <Btn attrBtn={{ color: 'primary', type: 'submit', form: 'form-post' }}>
                     {Post}
