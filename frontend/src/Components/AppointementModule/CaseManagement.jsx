@@ -1,6 +1,6 @@
 //// filepath: c:\Users\salma\UniMindCare-PI\frontend\src\Components\AppointementModule\CaseManagement.jsx
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Tabs, Tab, Table, Button, Dropdown } from 'react-bootstrap';
+import { Container, Row, Col, Tabs, Tab, Table, Button, Dropdown, Form, InputGroup } from 'react-bootstrap';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import './CaseManagement.css';
@@ -10,6 +10,8 @@ const CaseManagement = ({ psychologistId }) => {
   const [inProgressCases, setInProgressCases] = useState([]);
   const [archivedCases, setArchivedCases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortDesc, setSortDesc] = useState(true); // if true, "emergency" sorted to top
 
   // Fetch all cases, then separate appointments within each case
   const fetchCases = async () => {
@@ -18,7 +20,7 @@ const CaseManagement = ({ psychologistId }) => {
       const resAll = await axios.get('http://localhost:5000/api/cases', {
         params: { psychologistId }
       });
-      
+
       // Process each case: split appointments based on status
       const processedCases = resAll.data.map(c => {
         const pendingAppointments = c.appointments
@@ -27,26 +29,25 @@ const CaseManagement = ({ psychologistId }) => {
         const confirmedAppointments = c.appointments
           ? c.appointments.filter(app => app.status === 'confirmed')
           : [];
-          
         return { ...c, pendingAppointments, confirmedAppointments };
       });
-      
+
       // For Pending tab: show cases that have at least one pending appointment
       const pending = processedCases.filter(c => c.pendingAppointments.length > 0);
-      
+
       // For In-Progress tab: show cases that have no pending appointments and at least one confirmed appointment,
       // and a case overall is marked as in_progress
-      const inProgress = processedCases.filter(c => 
+      const inProgress = processedCases.filter(c =>
         c.pendingAppointments.length === 0 &&
         c.confirmedAppointments.length > 0 &&
         c.status === 'in_progress'
       );
-      
+
       // Get archived/resolved cases as before
       const resArchived = await axios.get('http://localhost:5000/api/cases/archived', {
         params: { psychologistId }
       });
-      
+
       setPendingCases(pending);
       setInProgressCases(inProgress);
       setArchivedCases(resArchived.data);
@@ -60,7 +61,24 @@ const CaseManagement = ({ psychologistId }) => {
   useEffect(() => {
     fetchCases();
   }, [psychologistId]);
-  
+
+  // Helper function to sort based on priority (assumes values "emergency" or "regular")
+  const sortByPriority = (array) => {
+    return [...array].sort((a, b) => {
+      const aVal = a.priority === 'emergency' ? 1 : 0;
+      const bVal = b.priority === 'emergency' ? 1 : 0;
+      return sortDesc ? bVal - aVal : aVal - bVal;
+    });
+  };
+
+  // Apply search filter on student name and then sort by priority
+  const filterAndSort = (cases) => {
+    const filtered = cases.filter(c =>
+      c.studentId?.Name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    return sortByPriority(filtered);
+  };
+
   // Confirm appointment: call backend to update status and then refresh
   const handleConfirmAppointment = async (appointmentId) => {
     try {
@@ -91,48 +109,72 @@ const CaseManagement = ({ psychologistId }) => {
       <Row className="my-3">
         <Col><h2>Case Management</h2></Col>
       </Row>
-  
+
+      {/* Search bar and separate sort toggle (optional) */}
+      <Row className="mb-3">
+        <Col md={6}>
+          <InputGroup>
+            <InputGroup.Text>Search Student</InputGroup.Text>
+            <Form.Control 
+              type="text" 
+              placeholder="Enter student name" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </InputGroup>
+        </Col>
+        <Col md={6} className="d-flex align-items-center">
+          {/* You can choose to keep a separate sort button or just rely on header click.
+              Here both are provided */}
+         
+        </Col>
+      </Row>
+
       <Tabs defaultActiveKey="pending" className="mb-3">
         {/* Pending Cases */}
         <Tab eventKey="pending" title="Pending">
-  <Table bordered hover>
-    <thead>
-      <tr>
-        <th>Student</th>
-        <th>Status</th>
-        <th>Priority</th>
-        <th>Appointments</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {pendingCases.map(c => (
-        <tr key={c._id}>
-          <td>{c.studentId?.Name}</td>
-          <td>{c.status}</td>
-          <td>{c.priority}</td>
-          <td>
-            {c.pendingAppointments.map(app => (
-              <div key={app._id}>
-                {new Date(app.date).toLocaleString()} - {app.priority}
-                {" "}
-                <Button
-                  variant="success"
-                  size="sm"
-                  onClick={() => handleConfirmAppointment(app._id)}
+          <Table bordered hover>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Status</th>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSortDesc(!sortDesc)}
                 >
-                  Confirm
-                </Button>
-              </div>
-            ))}
-          </td>
-          <td>—</td>
-        </tr>
-      ))}
-    </tbody>
-  </Table>
-</Tab>
-  
+                  Priority {sortDesc ? '⇩' : '⇧'}
+                </th>
+                <th>Appointments</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filterAndSort(pendingCases).map(c => (
+                <tr key={c._id}>
+                  <td>{c.studentId?.Name}</td>
+                  <td>{c.status}</td>
+                  <td>{c.priority}</td>
+                  <td>
+                    {c.pendingAppointments.map(app => (
+                      <div key={app._id}>
+                        {new Date(app.date).toLocaleString()} - {app.priority}{" "}
+                        <Button
+                          variant="success"
+                          size="sm"
+                          onClick={() => handleConfirmAppointment(app._id)}
+                        >
+                          Confirm
+                        </Button>
+                      </div>
+                    ))}
+                  </td>
+                  <td>—</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Tab>
+
         {/* In-Progress Cases */}
         <Tab eventKey="inProgress" title="In-Progress">
           <Table bordered hover>
@@ -140,13 +182,18 @@ const CaseManagement = ({ psychologistId }) => {
               <tr>
                 <th>Student</th>
                 <th>Status</th>
-                <th>Priority</th>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSortDesc(!sortDesc)}
+                >
+                  Priority {sortDesc ? '⇩' : '⇧'}
+                </th>
                 <th>Appointments</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {inProgressCases.map(c => (
+              {filterAndSort(inProgressCases).map(c => (
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
@@ -175,7 +222,7 @@ const CaseManagement = ({ psychologistId }) => {
             </tbody>
           </Table>
         </Tab>
-  
+
         {/* Archived / Resolved Cases */}
         <Tab eventKey="archived" title="Archived">
           <Table bordered hover>
@@ -183,12 +230,17 @@ const CaseManagement = ({ psychologistId }) => {
               <tr>
                 <th>Student</th>
                 <th>Status</th>
-                <th>Priority</th>
+                <th
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSortDesc(!sortDesc)}
+                >
+                  Priority {sortDesc ? '⇩' : '⇧'}
+                </th>
                 <th>Appointments</th>
               </tr>
             </thead>
             <tbody>
-              {archivedCases.map(c => (
+              {filterAndSort(archivedCases).map(c => (
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
