@@ -228,6 +228,17 @@ router.get("/statistics", async (req, res) => {
   }
 });
 
+// Route pour récupérer la liste des étudiants
+router.get("/students", async (req, res) => {
+  try {
+    const students = await Evaluation.distinct("nomEtudiant");
+    res.status(200).json({ students });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des étudiants :", error);
+    res.status(500).json({ message: "Erreur interne du serveur" });
+  }
+});
+
 // Route pour les statistiques par étudiant
 router.get("/student-stats/:nomEtudiant", async (req, res) => {
   try {
