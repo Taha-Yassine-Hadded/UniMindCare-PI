@@ -120,6 +120,7 @@ import DoctorsList from "../Components/AppointementModule/DoctorsList";
 // Add these imports at the top with other imports
 import StudentDashboard from "../Components/AppointementModule/StudentDashboard";
 import PsychologistDashboard from "../Components/AppointementModule/PsychologistDashboard";
+import CaseManagement from "../Components/AppointementModule/CaseManagement";
 export const routes = [
   //dashboard
 
@@ -265,6 +266,6 @@ export const routes = [
   {path : `${process.env.PUBLIC_URL}/appointment/doctor-list`, Component: <DoctorsList />},
   { path: `${process.env.PUBLIC_URL}/appointment/student-dashboard`, Component: <StudentDashboard /> },
   { path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
-  
+  {path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagement />},
 
 ];

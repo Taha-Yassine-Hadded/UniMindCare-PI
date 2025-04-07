@@ -278,13 +278,13 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             switch (modalType) {
                 case 'book':
                     // Student books an appointment
-                    const bookResponse = await axios.post('http://localhost:5000/api/appointments/book', {
+                    const bookResponse = await axios.post('http://localhost:5000/api/cases/book-appointment', {
                         studentId: userId,
                         psychologistId: selectedPsychologist,
                         date: formData.date,
                         priority: formData.priority
                     });
-
+                    console.log('Book response:', bookResponse.data);
                     setEvents([...events, {
                         id: bookResponse.data._id,
                         title: `Appointment with Dr. ${psychologists.find(psy => psy._id === selectedPsychologist)?.Name || 'Unknown'}`,

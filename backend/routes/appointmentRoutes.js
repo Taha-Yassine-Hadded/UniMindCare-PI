@@ -4,7 +4,7 @@ const Appointment = require('../Models/Appointment');
 const Availability = require('../Models/Availability');
 const mongoose = require('mongoose'); // Add this line
 const User = require('../Models/Users');
-
+const Case = require('../Models/Case'); // Import the Case model
 // Student/Psychologist: Get all appointments
 router.get('/', async (req, res) => {
     const { studentId, psychologistId } = req.query;
@@ -70,17 +70,53 @@ router.delete('/:id', async (req, res) => {
 // Psychologist: Confirm appointment
 router.put('/confirm/:id', async (req, res) => {
     try {
-        const appointment = await Appointment.findByIdAndUpdate(
-            req.params.id,
-            { status: 'confirmed' },
-            { new: true }
-        );
-        if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
-        res.json(appointment);
+      // 1) Update the appointment’s status to "confirmed"
+      const appointment = await Appointment.findByIdAndUpdate(
+        req.params.id,
+        { status: 'confirmed' },
+        { new: true }
+      );
+      if (!appointment) {
+        return res.status(404).json({ message: 'Appointment not found' });
+      }
+  
+      // 2) Find or create the matching Case
+      let foundCase = await Case.findOne({
+        studentId: appointment.studentId,
+        psychologistId: appointment.psychologistId,
+        archived: false
+      });
+  
+      if (!foundCase) {
+        foundCase = new Case({
+          studentId: appointment.studentId,
+          psychologistId: appointment.psychologistId,
+          status: 'pending',
+          priority: appointment.priority
+        });
+      }
+  
+      // 3) Update the case status if still "pending"
+      if (foundCase.status === 'pending') {
+        foundCase.status = 'in_progress';
+      }
+  
+      // 4) Ensure the appointment is linked in the Case
+      if (!foundCase.appointments.includes(appointment._id)) {
+        foundCase.appointments.push(appointment._id);
+      }
+  
+      await foundCase.save();
+  
+      return res.json({
+        message: 'Appointment confirmed',
+        appointment,
+        case: foundCase
+      });
     } catch (error) {
-        res.status(500).json({ message: 'Error confirming appointment', error });
+      res.status(500).json({ message: 'Error confirming appointment', error });
     }
-});
+  });
 
 // Get available time slots for a psychologist
 router.get('/available', async (req, res) => {

@@ -1,0 +1,14 @@
+.custom-table {
+    background-color: #fdfdfd; 
+    border-color: #ccc;
+  }
+  
+  .custom-table th {
+    text-align: center;
+    background-color: #e9ecef;
+    color: #333;
+  }
+  
+  .emergency-row {
+    border-left: 4px solid red;
+  }
