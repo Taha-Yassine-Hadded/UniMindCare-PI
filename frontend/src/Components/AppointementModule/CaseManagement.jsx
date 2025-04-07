@@ -1,4 +1,3 @@
-//// filepath: c:\Users\salma\UniMindCare-PI\frontend\src\Components\AppointementModule\CaseManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Tabs, Tab, Table, Button, Dropdown, Form, InputGroup } from 'react-bootstrap';
 import axios from 'axios';
@@ -13,7 +12,7 @@ const CaseManagement = ({ psychologistId }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortDesc, setSortDesc] = useState(true); // if true, "emergency" sorted to top
 
-  // Fetch all cases, then separate appointments within each case
+  // Fetch all cases, then separate appointments within each case.
   const fetchCases = async () => {
     try {
       // Get non-archived cases from the backend
@@ -21,22 +20,30 @@ const CaseManagement = ({ psychologistId }) => {
         params: { psychologistId }
       });
 
-      // Process each case: split appointments based on status
-      const processedCases = resAll.data.map(c => {
+      // Process each case: split appointments based on status and set casePriority
+      const processedCases = resAll.data.map((c) => {
         const pendingAppointments = c.appointments
           ? c.appointments.filter(app => app.status === 'pending')
           : [];
         const confirmedAppointments = c.appointments
           ? c.appointments.filter(app => app.status === 'confirmed')
           : [];
-        return { ...c, pendingAppointments, confirmedAppointments };
+        // Determine the case priority by using the latest appointment's priority.
+        let casePriority = c.priority; // fallback value
+        if (c.appointments && c.appointments.length > 0) {
+          const sortedApps = [...c.appointments].sort(
+            (a, b) => new Date(b.date) - new Date(a.date)
+          );
+          casePriority = sortedApps[0].priority;
+        }
+        return { ...c, pendingAppointments, confirmedAppointments, casePriority };
       });
 
       // For Pending tab: show cases that have at least one pending appointment
       const pending = processedCases.filter(c => c.pendingAppointments.length > 0);
 
-      // For In-Progress tab: show cases that have no pending appointments and at least one confirmed appointment,
-      // and a case overall is marked as in_progress
+      // For In-Progress tab: show cases that have no pending appointments,
+      // at least one confirmed appointment, and status is in_progress
       const inProgress = processedCases.filter(c =>
         c.pendingAppointments.length === 0 &&
         c.confirmedAppointments.length > 0 &&
@@ -62,16 +69,16 @@ const CaseManagement = ({ psychologistId }) => {
     fetchCases();
   }, [psychologistId]);
 
-  // Helper function to sort based on priority (assumes values "emergency" or "regular")
+  // Helper function to sort based on casePriority (assumes values "emergency" or "regular")
   const sortByPriority = (array) => {
     return [...array].sort((a, b) => {
-      const aVal = a.priority === 'emergency' ? 1 : 0;
-      const bVal = b.priority === 'emergency' ? 1 : 0;
+      const aVal = a.casePriority === 'emergency' ? 1 : 0;
+      const bVal = b.casePriority === 'emergency' ? 1 : 0;
       return sortDesc ? bVal - aVal : aVal - bVal;
     });
   };
 
-  // Apply search filter on student name and then sort by priority
+  // Apply search filter on student name and then sort by casePriority
   const filterAndSort = (cases) => {
     const filtered = cases.filter(c =>
       c.studentId?.Name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -110,7 +117,7 @@ const CaseManagement = ({ psychologistId }) => {
         <Col><h2>Case Management</h2></Col>
       </Row>
 
-      {/* Search bar and separate sort toggle (optional) */}
+      {/* Search bar */}
       <Row className="mb-3">
         <Col md={6}>
           <InputGroup>
@@ -124,9 +131,7 @@ const CaseManagement = ({ psychologistId }) => {
           </InputGroup>
         </Col>
         <Col md={6} className="d-flex align-items-center">
-          {/* You can choose to keep a separate sort button or just rely on header click.
-              Here both are provided */}
-         
+          {/* Optionally, you can use a separate sort button here */}
         </Col>
       </Row>
 
@@ -153,7 +158,7 @@ const CaseManagement = ({ psychologistId }) => {
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
-                  <td>{c.priority}</td>
+                  <td>{c.casePriority}</td>
                   <td>
                     {c.pendingAppointments.map(app => (
                       <div key={app._id}>
@@ -197,7 +202,7 @@ const CaseManagement = ({ psychologistId }) => {
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
-                  <td>{c.priority}</td>
+                  <td>{c.casePriority}</td>
                   <td>
                     {c.confirmedAppointments.map(app => (
                       <div key={app._id}>
@@ -244,7 +249,7 @@ const CaseManagement = ({ psychologistId }) => {
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
-                  <td>{c.priority}</td>
+                  <td>{c.casePriority}</td>
                   <td>
                     {c.appointments?.map(app => (
                       <div key={app._id}>
