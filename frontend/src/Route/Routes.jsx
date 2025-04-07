@@ -120,7 +120,7 @@ import Feedback from "../Components/FormFARAH/FeedbackEtudiant";
 import StudentDashboard from "../Components/StudentDashboard";
 import TeacherDashboard from "../Components/TeacherDashboard";
 import Statistics from "../Components/Statistics";
-
+import StatisticsEtudiant from "../Components/StudentStats";
 export const routes = [
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
@@ -128,6 +128,7 @@ export const routes = [
     //statistics
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics`, Component: <Statistics /> },
 
+    { path: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`, Component: <StatisticsEtudiant /> },
 
   //Feedback
   { path: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`, Component: <Feedback /> },

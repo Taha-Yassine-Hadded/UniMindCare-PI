@@ -228,4 +228,128 @@ router.get("/statistics", async (req, res) => {
   }
 });
 
+// Route pour les statistiques par étudiant
+router.get("/student-stats/:nomEtudiant", async (req, res) => {
+  try {
+    const { nomEtudiant } = req.params;
+
+    const stats = await Evaluation.aggregate([
+      {
+        $match: { nomEtudiant: nomEtudiant } // Filtrer par nom de l'étudiant
+      },
+      {
+        $group: {
+          _id: "$nomEtudiant",
+          totalEvaluations: { $sum: 1 },
+          avgConcentration: { $avg: "$concentration" },
+          presenceStats: { $push: "$presence" },
+          participationStats: { $push: "$participationOrale" },
+          stressStats: { $push: "$gestionStress" },
+          engagementStats: { $push: "$engagement" },
+          latestEvaluations: { 
+            $push: { 
+              date: "$dateEvaluation", 
+              matiere: "$matiere",
+              reactionCorrection: "$reactionCorrection"
+            } 
+          }
+        }
+      },
+      {
+        $project: {
+          totalEvaluations: 1,
+          avgConcentration: { $round: ["$avgConcentration", 2] },
+          presenceDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: ["Toujours à l’heure", "Souvent en retard", "Absences fréquentes"],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$presenceStats", cond: { $eq: ["$$this", "$$key"] } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          participationDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: ["Très active", "Moyenne", "Faible", "Nulle"],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$participationStats", cond: { $eq: ["$$this", "$$key"] } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          stressDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: ["Calme", "Anxieux", "Très stressé"],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$stressStats", cond: { $eq: ["$$this", "$$key"] } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          engagementDistribution: {
+            $arrayToObject: {
+              $map: {
+                input: [
+                  "Très impliqué",
+                  "Moyennement impliqué",
+                  "Peu impliqué",
+                  "Pas du tout impliqué"
+                ],
+                as: "key",
+                in: {
+                  k: "$$key",
+                  v: {
+                    $size: {
+                      $filter: { input: "$engagementStats", cond: { $eq: ["$$this", "$$key"] } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          latestEvaluations: { $slice: ["$latestEvaluations", 5] } // 5 dernières évaluations
+        }
+      }
+    ]);
+
+    if (!stats.length) {
+      return res.status(404).json({
+        message: "Aucune évaluation trouvée pour cet étudiant"
+      });
+    }
+
+    res.status(200).json({
+      message: "Statistiques récupérées avec succès",
+      statistics: stats[0]
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des statistiques:", error);
+    res.status(500).json({
+      message: "Erreur interne du serveur",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
+  }
+});
+
 module.exports = router;
