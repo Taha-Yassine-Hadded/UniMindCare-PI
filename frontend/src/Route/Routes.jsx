@@ -121,6 +121,8 @@ import DoctorsList from "../Components/AppointementModule/DoctorsList";
 import StudentDashboard from "../Components/AppointementModule/StudentDashboard";
 import PsychologistDashboard from "../Components/AppointementModule/PsychologistDashboard";
 import CaseManagement from "../Components/AppointementModule/CaseManagement";
+import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
+
 export const routes = [
   //dashboard
 
@@ -267,5 +269,6 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/appointment/student-dashboard`, Component: <StudentDashboard /> },
   { path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
   {path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagement />},
+  { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
 
 ];

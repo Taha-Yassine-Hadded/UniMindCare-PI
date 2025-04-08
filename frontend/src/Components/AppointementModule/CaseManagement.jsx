@@ -2,7 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Tabs, Tab, Table, Button, Dropdown, Form, InputGroup } from 'react-bootstrap';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
+import io from 'socket.io-client';
 import './CaseManagement.css';
+
+// Initialize Socket.IO client
+const socket = io('http://localhost:5000', {
+  transports: ['websocket'],
+  reconnection: true,
+});
+
+socket.on('connect', () => {
+  console.log('Connected to WebSocket server with ID:', socket.id);
+});
+
+socket.on('connect_error', (error) => {
+  console.error('WebSocket connection error:', error);
+});
 
 const CaseManagement = ({ psychologistId }) => {
   const [pendingCases, setPendingCases] = useState([]);
@@ -12,21 +27,250 @@ const CaseManagement = ({ psychologistId }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortDesc, setSortDesc] = useState(true); // if true, "emergency" sorted to top
 
+  // Join Socket.IO room when psychologistId is available
+  useEffect(() => {
+    if (psychologistId) {
+      socket.emit('join', psychologistId);
+      return () => {
+        socket.off('new_notification');
+      };
+    }
+  }, [psychologistId]);
+
+  // Handle real-time notifications
+  useEffect(() => {
+    socket.on('new_notification', (notification) => {
+      console.log('New notification received:', notification);
+
+      // Ensure the notification is for the current psychologist
+      if (notification.recipient._id !== psychologistId) return;
+
+      const appointment = notification.appointment;
+      const studentId = appointment.studentId._id;
+      const sender = notification.sender;
+
+      if (notification.type === 'appointment_booked') {
+        // Add or update a case with a new pending appointment
+        setPendingCases((prevCases) => {
+          const existingCaseIndex = prevCases.findIndex((c) => c.studentId._id === studentId);
+          const newAppointment = {
+            _id: appointment._id,
+            date: appointment.date,
+            priority: appointment.priority,
+            status: appointment.status,
+          };
+
+          if (existingCaseIndex !== -1) {
+            // Update existing case
+            const updatedCases = [...prevCases];
+            updatedCases[existingCaseIndex] = {
+              ...updatedCases[existingCaseIndex],
+              pendingAppointments: [
+                ...updatedCases[existingCaseIndex].pendingAppointments,
+                newAppointment,
+              ],
+              casePriority: appointment.priority, // Update priority based on latest appointment
+            };
+            return updatedCases;
+          } else {
+            // Create new case
+            return [
+              ...prevCases,
+              {
+                _id: appointment._id, // Use appointment ID as a temporary case ID (backend will provide actual case ID)
+                studentId: appointment.studentId,
+                status: 'pending',
+                priority: appointment.priority,
+                casePriority: appointment.priority,
+                pendingAppointments: [newAppointment],
+                confirmedAppointments: [],
+                appointments: [newAppointment],
+              },
+            ];
+          }
+        });
+        toast.success(`New appointment booked by ${sender.Name} on ${new Date(appointment.date).toLocaleString()}`);
+      } else if (notification.type === 'appointment_confirmed') {
+        // Move appointment from pending to confirmed
+        setPendingCases((prevCases) => {
+          const caseIndex = prevCases.findIndex((c) => c.studentId._id === studentId);
+          if (caseIndex === -1) return prevCases;
+
+          const updatedCases = [...prevCases];
+          const targetCase = updatedCases[caseIndex];
+          const updatedPending = targetCase.pendingAppointments.filter(
+            (app) => app._id !== appointment._id
+          );
+          const updatedConfirmed = [
+            ...targetCase.confirmedAppointments,
+            {
+              _id: appointment._id,
+              date: appointment.date,
+              priority: appointment.priority,
+              status: 'confirmed',
+            },
+          ];
+
+          updatedCases[caseIndex] = {
+            ...targetCase,
+            pendingAppointments: updatedPending,
+            confirmedAppointments: updatedConfirmed,
+            appointments: [...updatedPending, ...updatedConfirmed],
+            status: updatedPending.length === 0 ? 'in_progress' : targetCase.status,
+          };
+
+          return updatedCases;
+        });
+
+        // Add to inProgressCases if no pending appointments remain
+        setInProgressCases((prevCases) => {
+          const caseIndex = pendingCases.findIndex((c) => c.studentId._id === studentId);
+          if (caseIndex === -1 || pendingCases[caseIndex].pendingAppointments.length > 1) {
+            return prevCases; // Case still has pending appointments or doesn't exist
+          }
+
+          const targetCase = pendingCases[caseIndex];
+          const existingCaseIndex = prevCases.findIndex((c) => c.studentId._id === studentId);
+
+          if (existingCaseIndex !== -1) {
+            // Update existing in-progress case
+            const updatedCases = [...prevCases];
+            updatedCases[existingCaseIndex] = {
+              ...updatedCases[existingCaseIndex],
+              confirmedAppointments: [
+                ...updatedCases[existingCaseIndex].confirmedAppointments,
+                {
+                  _id: appointment._id,
+                  date: appointment.date,
+                  priority: appointment.priority,
+                  status: 'confirmed',
+                },
+              ],
+              appointments: [
+                ...updatedCases[existingCaseIndex].confirmedAppointments,
+                {
+                  _id: appointment._id,
+                  date: appointment.date,
+                  priority: appointment.priority,
+                  status: 'confirmed',
+                },
+              ],
+            };
+            return updatedCases;
+          } else {
+            // Move case to in-progress
+            return [
+              ...prevCases,
+              {
+                ...targetCase,
+                status: 'in_progress',
+                pendingAppointments: [],
+                confirmedAppointments: [
+                  {
+                    _id: appointment._id,
+                    date: appointment.date,
+                    priority: appointment.priority,
+                    status: 'confirmed',
+                  },
+                ],
+                appointments: [
+                  {
+                    _id: appointment._id,
+                    date: appointment.date,
+                    priority: appointment.priority,
+                    status: 'confirmed',
+                  },
+                ],
+              },
+            ];
+          }
+        });
+
+        // Remove from pendingCases if no pending appointments remain
+        setPendingCases((prevCases) =>
+          prevCases.filter((c) => c.studentId._id !== studentId || c.pendingAppointments.length > 0)
+        );
+
+        toast.success(`Appointment with ${sender.Name} confirmed`);
+      } else if (notification.type === 'appointment_modified') {
+        // Update the appointment in the pending case
+        setPendingCases((prevCases) => {
+          const caseIndex = prevCases.findIndex((c) => c.studentId._id === studentId);
+          if (caseIndex === -1) return prevCases;
+
+          const updatedCases = [...prevCases];
+          const targetCase = updatedCases[caseIndex];
+          const updatedPending = targetCase.pendingAppointments.map((app) =>
+            app._id === appointment._id
+              ? {
+                  ...app,
+                  date: appointment.date,
+                  status: 'pending',
+                  priority: appointment.priority,
+                }
+              : app
+          );
+
+          updatedCases[caseIndex] = {
+            ...targetCase,
+            pendingAppointments: updatedPending,
+            appointments: [...updatedPending, ...targetCase.confirmedAppointments],
+            casePriority: appointment.priority,
+          };
+
+          return updatedCases;
+        });
+        toast.info(`Appointment with ${sender.Name} modified to ${new Date(appointment.date).toLocaleString()}`);
+      } else if (notification.type === 'appointment_cancelled') {
+        // Remove the appointment from the case
+        setPendingCases((prevCases) => {
+          const caseIndex = prevCases.findIndex((c) => c.studentId._id === studentId);
+          if (caseIndex === -1) return prevCases;
+
+          const updatedCases = [...prevCases];
+          const targetCase = updatedCases[caseIndex];
+          const updatedPending = targetCase.pendingAppointments.filter(
+            (app) => app._id !== appointment._id
+          );
+
+          updatedCases[caseIndex] = {
+            ...targetCase,
+            pendingAppointments: updatedPending,
+            appointments: [...updatedPending, ...targetCase.confirmedAppointments],
+          };
+
+          return updatedCases;
+        });
+
+        // Remove the case from pendingCases if no pending appointments remain
+        setPendingCases((prevCases) =>
+          prevCases.filter((c) => c.studentId._id !== studentId || c.pendingAppointments.length > 0)
+        );
+
+        toast.warn(`Appointment with ${sender.Name} cancelled`);
+      }
+    });
+
+    return () => {
+      socket.off('new_notification');
+    };
+  }, [psychologistId]);
+
   // Fetch all cases, then separate appointments within each case.
   const fetchCases = async () => {
     try {
       // Get non-archived cases from the backend
       const resAll = await axios.get('http://localhost:5000/api/cases', {
-        params: { psychologistId }
+        params: { psychologistId },
       });
 
       // Process each case: split appointments based on status and set casePriority
       const processedCases = resAll.data.map((c) => {
         const pendingAppointments = c.appointments
-          ? c.appointments.filter(app => app.status === 'pending')
+          ? c.appointments.filter((app) => app.status === 'pending')
           : [];
         const confirmedAppointments = c.appointments
-          ? c.appointments.filter(app => app.status === 'confirmed')
+          ? c.appointments.filter((app) => app.status === 'confirmed')
           : [];
         // Determine the case priority by using the latest appointment's priority.
         let casePriority = c.priority; // fallback value
@@ -40,19 +284,20 @@ const CaseManagement = ({ psychologistId }) => {
       });
 
       // For Pending tab: show cases that have at least one pending appointment
-      const pending = processedCases.filter(c => c.pendingAppointments.length > 0);
+      const pending = processedCases.filter((c) => c.pendingAppointments.length > 0);
 
       // For In-Progress tab: show cases that have no pending appointments,
       // at least one confirmed appointment, and status is in_progress
-      const inProgress = processedCases.filter(c =>
-        c.pendingAppointments.length === 0 &&
-        c.confirmedAppointments.length > 0 &&
-        c.status === 'in_progress'
+      const inProgress = processedCases.filter(
+        (c) =>
+          c.pendingAppointments.length === 0 &&
+          c.confirmedAppointments.length > 0 &&
+          c.status === 'in_progress'
       );
 
       // Get archived/resolved cases as before
       const resArchived = await axios.get('http://localhost:5000/api/cases/archived', {
-        params: { psychologistId }
+        params: { psychologistId },
       });
 
       setPendingCases(pending);
@@ -80,7 +325,7 @@ const CaseManagement = ({ psychologistId }) => {
 
   // Apply search filter on student name and then sort by casePriority
   const filterAndSort = (cases) => {
-    const filtered = cases.filter(c =>
+    const filtered = cases.filter((c) =>
       c.studentId?.Name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return sortByPriority(filtered);
@@ -89,11 +334,11 @@ const CaseManagement = ({ psychologistId }) => {
   // Confirm appointment: call backend to update status and then refresh
   const handleConfirmAppointment = async (appointmentId) => {
     try {
-      await axios.put(`http://localhost:5000/api/cases/confirm-appointment/${appointmentId}`);
+      await axios.put(`http://localhost:5000/api/appointments/confirm/${appointmentId}`); // Updated endpoint to match your backend
       toast.success('Appointment confirmed');
       fetchCases();
     } catch (err) {
-      toast.error('Error confirming appointment');
+      toast.error(err.response?.data?.message || 'Error confirming appointment');
     }
   };
 
@@ -104,7 +349,7 @@ const CaseManagement = ({ psychologistId }) => {
       toast.success('Case resolved and archived');
       fetchCases();
     } catch (err) {
-      toast.error('Error resolving case');
+      toast.error(err.response?.data?.message || 'Error resolving case');
     }
   };
 
@@ -114,7 +359,9 @@ const CaseManagement = ({ psychologistId }) => {
     <Container fluid className="case-management">
       <ToastContainer position="top-right" autoClose={4000} />
       <Row className="my-3">
-        <Col><h2>Case Management</h2></Col>
+        <Col>
+          <h2>Case Management</h2>
+        </Col>
       </Row>
 
       {/* Search bar */}
@@ -122,9 +369,9 @@ const CaseManagement = ({ psychologistId }) => {
         <Col md={6}>
           <InputGroup>
             <InputGroup.Text>Search Student</InputGroup.Text>
-            <Form.Control 
-              type="text" 
-              placeholder="Enter student name" 
+            <Form.Control
+              type="text"
+              placeholder="Enter student name"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -144,7 +391,7 @@ const CaseManagement = ({ psychologistId }) => {
                 <th>Student</th>
                 <th>Status</th>
                 <th
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: 'pointer' }}
                   onClick={() => setSortDesc(!sortDesc)}
                 >
                   Priority {sortDesc ? '⇩' : '⇧'}
@@ -154,15 +401,15 @@ const CaseManagement = ({ psychologistId }) => {
               </tr>
             </thead>
             <tbody>
-              {filterAndSort(pendingCases).map(c => (
+              {filterAndSort(pendingCases).map((c) => (
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
                   <td>{c.casePriority}</td>
                   <td>
-                    {c.pendingAppointments.map(app => (
+                    {c.pendingAppointments.map((app) => (
                       <div key={app._id}>
-                        {new Date(app.date).toLocaleString()} - {app.priority}{" "}
+                        {new Date(app.date).toLocaleString()} - {app.priority}{' '}
                         <Button
                           variant="success"
                           size="sm"
@@ -188,7 +435,7 @@ const CaseManagement = ({ psychologistId }) => {
                 <th>Student</th>
                 <th>Status</th>
                 <th
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: 'pointer' }}
                   onClick={() => setSortDesc(!sortDesc)}
                 >
                   Priority {sortDesc ? '⇩' : '⇧'}
@@ -198,13 +445,13 @@ const CaseManagement = ({ psychologistId }) => {
               </tr>
             </thead>
             <tbody>
-              {filterAndSort(inProgressCases).map(c => (
+              {filterAndSort(inProgressCases).map((c) => (
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
                   <td>{c.casePriority}</td>
                   <td>
-                    {c.confirmedAppointments.map(app => (
+                    {c.confirmedAppointments.map((app) => (
                       <div key={app._id}>
                         {new Date(app.date).toLocaleString()} - {app.priority}
                       </div>
@@ -236,7 +483,7 @@ const CaseManagement = ({ psychologistId }) => {
                 <th>Student</th>
                 <th>Status</th>
                 <th
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: 'pointer' }}
                   onClick={() => setSortDesc(!sortDesc)}
                 >
                   Priority {sortDesc ? '⇩' : '⇧'}
@@ -245,13 +492,13 @@ const CaseManagement = ({ psychologistId }) => {
               </tr>
             </thead>
             <tbody>
-              {filterAndSort(archivedCases).map(c => (
+              {filterAndSort(archivedCases).map((c) => (
                 <tr key={c._id}>
                   <td>{c.studentId?.Name}</td>
                   <td>{c.status}</td>
                   <td>{c.casePriority}</td>
                   <td>
-                    {c.appointments?.map(app => (
+                    {c.appointments?.map((app) => (
                       <div key={app._id}>
                         {new Date(app.date).toLocaleString()} - {app.priority}
                       </div>
