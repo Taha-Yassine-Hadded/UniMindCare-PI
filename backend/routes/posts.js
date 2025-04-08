@@ -31,7 +31,7 @@ router.post(
   passport.authenticate('jwt', { session: false }),
   upload.single('image'),
   async (req, res) => {
-    const { title, content, isAnonymous } = req.body;
+    const { title, content, isAnonymous, tags } = req.body;
 
     try {
       const post = new Post({
@@ -41,6 +41,7 @@ router.post(
         isAnonymous: isAnonymous || false,
         anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
         imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
+        tags: tags ? JSON.parse(tags) : [], // Les tags sont envoyés sous forme de tableau JSON
       });
       await post.save();
       res.status(201).json(post);
@@ -63,12 +64,93 @@ router.get('/', async (req, res) => {
   }
 });
 
+
+router.get('/stats', async (req, res) => {
+  try {
+    console.log('Début de la récupération des stats');
+    const posts = await Post.find();
+    console.log('Posts récupérés:', posts.length);
+    const totalPosts = posts.length;
+    console.log('Total posts:', totalPosts);
+    const totalComments = posts.reduce((acc, post) => acc + (post.comments?.length || 0), 0);
+    console.log('Total comments:', totalComments);
+    const totalLikes = posts.reduce((acc, post) => acc + (post.likes?.length || 0), 0);
+    console.log('Total likes:', totalLikes);
+    const avgCommentsPerPost = totalPosts > 0 ? Number((totalComments / totalPosts).toFixed(2)) : 0;
+    console.log('Moyenne commentaires par post:', avgCommentsPerPost);
+
+    // Publications les plus visitées (Top 3)
+    const mostVisitedPosts = posts
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 3)
+      .map(post => ({
+        id: post._id,
+        title: post.title,
+        views: post.views,
+      }));
+
+    // Publications les plus engageantes (Top 3 par likes + commentaires)
+    const mostEngagingPosts = posts
+      .map(post => ({
+        id: post._id,
+        title: post.title,
+        engagement: (post.likes?.length || 0) + (post.comments?.length || 0),
+        tags: post.tags || [],
+      }))
+      .sort((a, b) => b.engagement - a.engagement)
+      .slice(0, 3);
+
+    // Publications les plus commentées (Top 3)
+    const mostCommentedPosts = posts
+      .sort((a, b) => (b.comments?.length || 0) - (a.comments?.length || 0))
+      .slice(0, 3)
+      .map(post => ({
+        id: post._id,
+        title: post.title,
+        commentCount: post.comments?.length || 0,
+      }));
+
+    // Sujets les plus populaires (basé sur les tags de toutes les publications)
+    const tagCounts = {};
+    posts.forEach(post => {
+      const engagement = (post.likes?.length || 0) + (post.comments?.length || 0);
+      (post.tags || []).forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + (engagement > 0 ? engagement : 1); // Ajouter 1 si engagement est 0
+      });
+    });
+    const popularTags = Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([tag, engagement]) => ({ tag, engagement }));
+
+    res.json({
+      totalPosts,
+      totalComments,
+      totalLikes,
+      avgCommentsPerPost,
+      mostVisitedPosts,
+      mostEngagingPosts,
+      mostCommentedPosts,
+      popularTags,
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération des stats:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+});
+
+
+
 router.get('/:id', async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
       .populate('author', 'Name')
       .populate('comments.author');
     if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
+    // Incrémenter le compteur de vues
+    post.views += 1;
+    await post.save();
+
     res.status(200).json(post);
   } catch (error) {
     console.error('Erreur lors de la récupération:', error);

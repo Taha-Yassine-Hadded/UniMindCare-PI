@@ -23,7 +23,8 @@ const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
 const transporter = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
-const notificationsRoutes = require('./routes/notifications');const { initScheduler } = require('./utils/scheduler');
+const notificationsRoutes = require('./routes/notifications');
+const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
 const evaluationRoutes = require("./routes/evalution");
 const crisisRoutes = require("./routes/crisisData"); // Nouvelle route

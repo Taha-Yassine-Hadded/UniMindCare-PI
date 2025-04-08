@@ -93,7 +93,7 @@ const questions = [
 ];
 
 // Récupérer les questions
-
+/*
 router.get('/questions', (req, res) => {
   // Vérifier si aujourd'hui est un samedi (jour 6 de la semaine en JavaScript)
   const today = new Date();
@@ -122,6 +122,41 @@ function getNextSaturday() {
   nextSaturday.setDate(today.getDate() + daysUntilSaturday);
   
   return nextSaturday.toISOString().split('T')[0]; // Format YYYY-MM-DD
+}
+
+
+*/
+
+
+// Modifier la vérification du jour (remplacer samedi (6) par mardi (2))
+router.get('/questions', (req, res) => {
+  // Vérifier si aujourd'hui est un mardi (jour 2 de la semaine en JavaScript)
+  const today = new Date();
+  if (today.getDay() !== 2) {
+    return res.status(403).json({ 
+      message: "Le questionnaire est uniquement disponible le mardi",
+      isAvailable: false,
+      nextAvailableDate: getNextTuesday(),
+      reminderMessage: "N'oubliez pas de revenir mardi prochain pour compléter le questionnaire et gagner des points!",
+    });
+  }
+  
+  res.json({ 
+    questions,
+    isAvailable: true
+  });
+});
+
+// Remplacer la fonction getNextSaturday par getNextTuesday
+function getNextTuesday() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 (dimanche) à 6 (samedi)
+  const daysUntilTuesday = dayOfWeek === 2 ? 7 : (2 + 7 - dayOfWeek) % 7; // Si on est déjà mardi, on prend le mardi suivant
+  
+  const nextTuesday = new Date(today);
+  nextTuesday.setDate(today.getDate() + daysUntilTuesday);
+  
+  return nextTuesday.toISOString().split('T')[0]; // Format YYYY-MM-DD
 }
 
 
@@ -483,7 +518,7 @@ router.get('/points/:userId', async (req, res) => {
   }
 });
 
-
+/*
 router.post('/send-reminders', async (req, res) => {
   try {
     // Vérifier si c'est samedi (jour 6 de la semaine en JavaScript)
@@ -505,7 +540,30 @@ router.post('/send-reminders', async (req, res) => {
   }
 });
 
+*/
 
+
+// Modifier également la vérification pour l'envoi des rappels
+router.post('/send-reminders', async (req, res) => {
+  try {
+    // Vérifier si c'est mardi (jour 2 de la semaine en JavaScript)
+    const today = new Date();
+    if (today.getDay() !== 2) {
+      return res.status(400).json({ 
+        message: "Les rappels ne peuvent être envoyés que le mardi" 
+      });
+    }
+    
+    const result = await sendRemindersToAllUsers();
+    res.status(200).json({ 
+      message: "Rappels envoyés avec succès", 
+      stats: result 
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'envoi des rappels:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
 
 /*
 router.post('/send-reminders', async (req, res) => {

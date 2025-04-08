@@ -1,0 +1,161 @@
+/* General Card Styling */
+.stat-card {
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Circular Progress Chart for Total Posts */
+  .circular-card {
+    background: #f8f9fa;
+    position: relative;
+  }
+  
+  .chart-container {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+  }
+  
+  .chart-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  
+  .chart-center span {
+    font-size: 24px;
+    font-weight: bold;
+    color: #2575fc;
+  }
+  
+  .chart-center p {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+  }
+  
+  /* Bar Chart for Total Comments */
+  .bar-card {
+    background: #fff;
+  }
+  
+  /* Gradient Card for Total Likes */
+  .gradient-card {
+    background: linear-gradient(135deg, #ff6b6b, #feca57);
+    color: #fff;
+  }
+  
+  .gradient-card h6 {
+    color: #fff;
+  }
+  
+  .gradient-card h3 {
+    font-size: 36px;
+    font-weight: bold;
+  }
+  
+  /* Gauge for Average Comments Per Post */
+  .gauge-card {
+    background: #fff;
+  }
+  
+  .gauge {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    background: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  
+  .gauge-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6a11cb, #2575fc);
+    transition: width 1s ease;
+  }
+  
+  .gauge-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  /* Horizontal Bar Chart for Most Visited Posts */
+  .bar-chart-card {
+    background: #f8f9fa;
+  }
+  
+  /* List with Icons for Most Engaging Posts */
+  .list-card {
+    background: #fff;
+  }
+  
+  .engaging-posts-list {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .engaging-post-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+    transition: background 0.3s ease;
+  }
+  
+  .engaging-post-item:hover {
+    background: #f0f4f8;
+  }
+  
+  .post-icon {
+    margin-right: 10px;
+    font-size: 20px;
+  }
+  
+  /* 3D Card for Most Commented Posts */
+  .three-d-card {
+    background: #fff;
+    transform: perspective(1000px) rotateX(5deg);
+    transform-style: preserve-3d;
+  }
+  
+  .three-d-card:hover {
+    transform: perspective(1000px) rotateX(0deg);
+  }
+  
+  /* Tag Cloud for Popular Tags */
+  .tag-cloud-card {
+    background: #f8f9fa;
+  }
+  
+  .tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .tag {
+    background: #2575fc;
+    color: #fff;
+    border-radius: 20px;
+    padding: 5px 10px;
+    display: inline-block;
+    transition: transform 0.3s ease;
+  }
+  
+  .tag:hover {
+    transform: scale(1.1);
+  }

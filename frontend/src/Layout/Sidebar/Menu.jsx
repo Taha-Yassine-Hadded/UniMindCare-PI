@@ -153,7 +153,36 @@ export const MENU = [
             type: "link",
             bookmark: true,
 
-          }
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`,
+            title: "Feedback etudiant",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/student`,
+            title: "demande de sortir",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/teacher`,
+            title: "autorisation de tri",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/yoga`,
+            title: "Seance Yoga",
+            type: "link",
+            bookmark: true,
+
+          },
+          
          
         ],
       },
@@ -854,6 +883,11 @@ export const MENU = [
             type: "link",
             title: "Add Post",
           },
+          {
+            url: `${process.env.PUBLIC_URL}/blog/statBlog`,
+            type: "link",
+            title: "Stat Blog",
+          },
         ],
       },
       {
@@ -1005,7 +1039,7 @@ export const SEARCHMENU = [
           },
           {
             url: `${process.env.PUBLIC_URL}/ecommerce/Add-product`,
-            title: "Add Product",
+            title: "Ajouter evaluation",
             type: "link",
           },
           {
@@ -1742,6 +1776,11 @@ export const SEARCHMENU = [
             url: `${process.env.PUBLIC_URL}/blog/blogPost`,
             type: "link",
             title: "Add Post",
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/blog/statBlog`,
+            type: "link",
+            title: "Stat Blog",
           },
         ],
       },

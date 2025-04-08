@@ -124,7 +124,8 @@ import StudentDashboard from "../Components/StudentDashboard";
 import TeacherDashboard from "../Components/TeacherDashboard";
 import Statistics from "../Components/Statistics";
 import StatisticsEtudiant from "../Components/StudentStats";
-
+import Yoga from "../Components/EmergencyClaim/YogaSeance";
+import BlogStats from "../Components/Blog/BlogStats";
 
 export const routes = [
   //dashboard
@@ -133,7 +134,11 @@ export const routes = [
 
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
-    
+      
+    //Yoga
+    { path: `${process.env.PUBLIC_URL}/yoga`, Component: <Yoga /> },
+
+
     //statistics
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics`, Component: <Statistics /> },
 
@@ -145,6 +150,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard /> },
   { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
 
+  { path: `${process.env.PUBLIC_URL}/blog/statBlog`, Component: <BlogStats /> },
 
   // dashboard
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
