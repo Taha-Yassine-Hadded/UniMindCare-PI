@@ -1,22 +1,69 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardHeader, CardBody, Form, FormGroup, Input, Label, Row } from 'reactstrap';
-import { Link, useLocation } from 'react-router-dom';
 import { Image, H3, P } from '../../../AbstractElements';
-import userImg from '../../../assets/images/user/7.jpg';
+import swal from 'sweetalert';
 
 const MyProfileEdit = () => {
   const storedUser = JSON.parse(localStorage.getItem('user'));
-  const location = useLocation();
+  const [profileImage, setProfileImage] = useState('/defaultProfile.png');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const identifiant = storedUser?.Identifiant || storedUser?.identifiant;
 
-  // Determine which button is active based on the current path
-  const isTwoFactorActive = location.pathname === `${process.env.PUBLIC_URL}/users/useredit`;
-  const isManageContactActive = location.pathname === `${process.env.PUBLIC_URL}/users/useredit/manage-contact-info`;
-  const isChangePasswordActive = location.pathname === `${process.env.PUBLIC_URL}/users/useredit/change-password`;
+  useEffect(() => {
+    if (storedUser?.imageUrl) {
+      setProfileImage(storedUser.imageUrl);
+    }
+  }, [storedUser]);
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !identifiant) return;
+
+    setUploading(true);
+    try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) {
+        swal("Erreur", "Votre session semble avoir expirée. Veuillez vous reconnecter.", "error");
+        return;
+      }
+
+      // Create a FormData object to send the file
+      const formData = new FormData();
+      formData.append('profilePicture', file);
+
+      const response = await fetch(`http://localhost:5000/api/users/${identifiant}/upload-profile-picture`, {
+        method: 'PUT',
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          'X-Auth-FaceID': 'true',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Backend error response:", errorText);
+        throw new Error(`Erreur lors de la mise à jour (${response.status})`);
+      }
+
+      const updatedUser = await response.json();
+      console.log("Updated user from backend:", updatedUser);
+      setProfileImage(updatedUser.imageUrl);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      swal("Succès", "Image de profil mise à jour avec succès", "success");
+    } catch (err) {
+      console.error("Erreur d'upload :", err);
+      swal("Erreur", "Échec de l'upload de l'image", "error");
+    }
+    setUploading(false);
+  };
 
   return (
     <Card>
       <CardHeader>
-        <H3 attrH3={{ className: 'card-title mb-0' }}>User Informations</H3>
+        <H3 attrH3={{ className: 'card-title mb-0' }}>My Profile</H3>
       </CardHeader>
       <CardBody>
         <Form>
@@ -25,55 +72,38 @@ const MyProfileEdit = () => {
               <Image
                 attrImage={{
                   className: 'img-70 rounded-circle',
-                  alt: '',
-                  src: storedUser && storedUser.imageUrl ? storedUser.imageUrl : userImg,
+                  alt: 'Profile',
+                  src: profileImage,
+                  style: { cursor: 'pointer' },
+                  onClick: () => fileInputRef.current.click(),
                 }}
               />
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+              {uploading && <p>Téléchargement de l'image...</p>}
               <div>
                 <H3 attrH3={{ className: 'mb-1 f-20 txt-primary' }}>
                   {storedUser ? storedUser.Name : 'Nom'}
                 </H3>
                 <P attrPara={{ className: 'mb-0' }}>
-                  Role: {storedUser?.Role?.[0]?.toUpperCase() || 'Role'}
-                </P>
-                <P attrPara={{ className: 'mb-0' }}>
-                  Identifier: {storedUser ? storedUser.Identifiant : 'Identifiant'}
+                  Role: {storedUser ? storedUser.Role : 'Rôle'}
                 </P>
               </div>
             </div>
           </Row>
           <FormGroup className="mb-3">
             <Label>Email Address</Label>
-            <Input type="email" defaultValue={storedUser ? storedUser.Email : ''} disabled />
+            <Input
+              type="email"
+              defaultValue={storedUser ? storedUser.Email : ''}
+              disabled
+            />
           </FormGroup>
-
-          {/* Navigation Buttons */}
-          <div className="text-center">
-            <Link to={`${process.env.PUBLIC_URL}/users/useredit`}>
-              <button
-                type="button"
-                className={`btn btn-primary mb-2 d-block ${isTwoFactorActive ? 'active' : ''}`}
-              >
-                Two Factor Auth
-              </button>
-            </Link>
-            <Link to={`${process.env.PUBLIC_URL}/users/useredit/manage-contact-info`}>
-              <button
-                type="button"
-                className={`btn btn-primary mb-2 d-block ${isManageContactActive ? 'active' : ''}`}
-              >
-                Manage Contact Info
-              </button>
-            </Link>
-            <Link to={`${process.env.PUBLIC_URL}/users/useredit/change-password`}>
-              <button
-                type="button"
-                className={`btn btn-primary mb-2 d-block ${isChangePasswordActive ? 'active' : ''}`}
-              >
-                Change Password
-              </button>
-            </Link>
-          </div>
         </Form>
       </CardBody>
     </Card>

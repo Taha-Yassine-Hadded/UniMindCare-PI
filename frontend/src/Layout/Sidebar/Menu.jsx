@@ -786,6 +786,13 @@ export const MENU = [
     className: "menu-box",
     menu: [
       {
+        url: `${process.env.PUBLIC_URL}/teacher-training/my-programs`,
+        icon: <Monitor />,
+        title: "Psychologist Dashboard",
+        type: "link",
+        bookmark: true,
+      },
+      {
         icon: <Image />,
         title: "Gallery",
         type: "sub",
@@ -882,14 +889,6 @@ export const MENU = [
             title: "Detail Course",
           },
         ],
-      },
-
-      {
-        url: `${process.env.PUBLIC_URL}/teacher-training/my-programs`,
-        icon: <FileText />,
-        title: "Psychologist Dashboard",
-        type: "link",
-        bookmark: true,
       },
       {
         url: `${process.env.PUBLIC_URL}/teacher-training/all-programs`,
