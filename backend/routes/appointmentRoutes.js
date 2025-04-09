@@ -72,106 +72,138 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Student: Modify an appointment
+// Student/Psychologist: Modify an appointment
 router.put('/:id', async (req, res) => {
-    const io = req.io; // Access Socket.IO instance
-    const { date, senderId } = req.body; // SenderId indicates who is modifying (student or psychologist)
-
+    const io = req.io;
+    const { date, senderId } = req.body;
+  
     try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: 'Invalid appointment ID format' });
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid appointment ID format' });
+      }
+  
+      const appointment = await Appointment.findById(req.params.id)
+        .populate('studentId', 'Name')
+        .populate('psychologistId', 'Name');
+      if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  
+      if (date) {
+        const newStart = new Date(date);
+        const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
+        if (newStart < new Date()) {
+          return res.status(400).json({ message: 'Cannot modify appointment to a past date' });
         }
-
-        const appointment = await Appointment.findById(req.params.id)
-            .populate('studentId', 'Name')
-            .populate('psychologistId', 'Name');
-        if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
-
-        if (date) {
-            if (new Date(date) < new Date()) {
-                return res.status(400).json({ message: 'Cannot modify appointment to a past date' });
-            }
-            appointment.date = date;
+  
+        // Check availability if student is modifying - KEEP EXISTING LOGIC
+        if (senderId.toString() === appointment.studentId._id.toString()) {
+          const availableSlots = await Availability.find({
+            psychologistId: appointment.psychologistId._id,
+            status: 'available',
+            startTime: { $lte: newStart },
+            endTime: { $gte: newEnd },
+          });
+          const bookedSlots = await Appointment.find({
+            psychologistId: appointment.psychologistId._id,
+            status: { $ne: 'cancelled' },
+            _id: { $ne: appointment._id }, // Exclude the current appointment
+            date: { $gte: newStart, $lt: newEnd },
+          });
+  
+          if (availableSlots.length === 0 || bookedSlots.length > 0) {
+            return res.status(400).json({ message: "Selected time is not within the psychologist's available slots or is already booked" });
+          }
         }
-        appointment.status = 'pending'; // Reset to pending after modification
-        await appointment.save();
-
-        // Notify the other party (student or psychologist) about the modification
-        const recipientId = senderId.toString() === appointment.studentId.toString() ? appointment.psychologistId : appointment.studentId;
-        const message = `Appointment on ${new Date(appointment.date).toLocaleString()} has been modified by ${senderId.toString() === appointment.studentId.toString() ? appointment.studentId.Name : appointment.psychologistId.Name}`;
-        await createAndEmitNotification(
-            io,
-            recipientId,
-            senderId,
-            'appointment_modified',
-            appointment._id,
-            message
-        );
-
-        res.json(appointment);
+  
+        appointment.date = date;
+      }
+      appointment.status = 'pending';
+      await appointment.save();
+  
+      // FIXED: Correctly determine recipient based on who sent the modification
+      const isStudentModifying = senderId.toString() === appointment.studentId._id.toString();
+      const recipientId = isStudentModifying ? 
+        appointment.psychologistId._id : 
+        appointment.studentId._id;
+      
+      const senderName = isStudentModifying ? 
+        appointment.studentId.Name : 
+        appointment.psychologistId.Name;
+      
+      const message = `Appointment on ${new Date(appointment.date).toLocaleString()} has been modified by ${senderName}`;
+      
+      console.log(`Modification notification to: ${recipientId}`);
+      await createAndEmitNotification(io, recipientId, senderId, 'appointment_modified', appointment._id, message);
+  
+      res.json(appointment);
     } catch (error) {
-        res.status(500).json({ message: 'Error modifying appointment', error: error.message });
+      console.error('Error modifying appointment:', error.stack);
+      res.status(500).json({ message: 'Error modifying appointment', error: error.message });
     }
-});
-
-// Student/Psychologist: Cancel an appointment
-router.delete('/:id', async (req, res) => {
-    const io = req.io; // Access Socket.IO instance
-    const { reasonForCancellation, senderId } = req.body; // SenderId indicates who is canceling
-
+  });
+  
+  // Student/Psychologist: Cancel an appointment
+  router.delete('/:id', async (req, res) => {
+    const io = req.io;
+    const { reasonForCancellation, senderId } = req.body;
+  
     try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: 'Invalid appointment ID format' });
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid appointment ID format' });
+      }
+  
+      const appointment = await Appointment.findById(req.params.id)
+        .populate('studentId', 'Name')
+        .populate('psychologistId', 'Name');
+      if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+  
+      appointment.status = 'cancelled';
+      appointment.reasonForCancellation = reasonForCancellation;
+      await appointment.save();
+  
+      // Update the linked case
+      const linkedCase = await Case.findOne({
+        studentId: appointment.studentId._id,
+        psychologistId: appointment.psychologistId._id,
+        archived: false
+      }).populate('appointments');
+  
+      if (linkedCase) {
+        // Rest of case update logic remains unchanged
+        linkedCase.appointments = linkedCase.appointments.filter(app => app._id.toString() !== appointment._id.toString());
+        const hasPendingAppointments = linkedCase.appointments.some(app => app.status === 'pending');
+        const hasConfirmedAppointments = linkedCase.appointments.some(app => app.status === 'confirmed');
+  
+        if (hasPendingAppointments) {
+          linkedCase.status = 'pending';
+        } else if (hasConfirmedAppointments && linkedCase.status !== 'resolved') {
+          linkedCase.status = 'in_progress';
+        } else if (!hasPendingAppointments && !hasConfirmedAppointments && linkedCase.status !== 'resolved') {
+          linkedCase.status = 'pending';
         }
-
-        const appointment = await Appointment.findById(req.params.id)
-            .populate('studentId', 'Name')
-            .populate('psychologistId', 'Name');
-        if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
-
-        appointment.status = 'cancelled';
-        appointment.reasonForCancellation = reasonForCancellation;
-        await appointment.save();
-
-        // Update the linked case
-        const linkedCase = await Case.findOne({
-            studentId: appointment.studentId,
-            psychologistId: appointment.psychologistId,
-            archived: false
-        }).populate('appointments');
-
-        if (linkedCase) {
-            linkedCase.appointments = linkedCase.appointments.filter(app => app._id.toString() !== appointment._id.toString());
-            const hasPendingAppointments = linkedCase.appointments.some(app => app.status === 'pending');
-            const hasConfirmedAppointments = linkedCase.appointments.some(app => app.status === 'confirmed');
-
-            if (hasPendingAppointments) {
-                linkedCase.status = 'pending';
-            } else if (hasConfirmedAppointments && linkedCase.status !== 'resolved') {
-                linkedCase.status = 'in_progress';
-            } else if (!hasPendingAppointments && !hasConfirmedAppointments && linkedCase.status !== 'resolved') {
-                linkedCase.status = 'pending';
-            }
-            await linkedCase.save();
-        }
-
-        // Notify the other party about the cancellation
-        const recipientId = senderId.toString() === appointment.studentId.toString() ? appointment.psychologistId : appointment.studentId;
-        const message = `Appointment on ${new Date(appointment.date).toLocaleString()} was cancelled by ${senderId.toString() === appointment.studentId.toString() ? appointment.studentId.Name : appointment.psychologistId.Name}${reasonForCancellation ? ` (Reason: ${reasonForCancellation})` : ''}`;
-        await createAndEmitNotification(
-            io,
-            recipientId,
-            senderId,
-            'appointment_cancelled',
-            appointment._id,
-            message
-        );
-
-        res.json({ message: 'Appointment cancelled', appointment, case: linkedCase });
+        await linkedCase.save();
+      }
+  
+      // FIXED: Correctly determine recipient based on who sent the cancellation
+      const isStudentCancelling = senderId.toString() === appointment.studentId._id.toString();
+      const recipientId = isStudentCancelling ? 
+        appointment.psychologistId._id : 
+        appointment.studentId._id;
+      
+      const senderName = isStudentCancelling ? 
+        appointment.studentId.Name : 
+        appointment.psychologistId.Name;
+      
+      const message = `Appointment on ${new Date(appointment.date).toLocaleString()} was cancelled by ${senderName}${reasonForCancellation ? ` (Reason: ${reasonForCancellation})` : ''}`;
+      
+      console.log(`Cancellation notification to: ${recipientId}`);
+      await createAndEmitNotification(io, recipientId, senderId, 'appointment_cancelled', appointment._id, message);
+  
+      res.json({ message: 'Appointment cancelled', appointment, case: linkedCase });
     } catch (error) {
-        res.status(500).json({ message: 'Error cancelling appointment', error: error.message });
+      console.error('Error cancelling appointment:', error.stack);
+      res.status(500).json({ message: 'Error cancelling appointment', error: error.message });
     }
-});
+  });
 
 // Psychologist: Confirm appointment
 router.put('/confirm/:id', async (req, res) => {
