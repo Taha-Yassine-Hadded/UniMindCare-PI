@@ -27,6 +27,7 @@
     "express-validator": "^7.2.1",
     "firebase-admin": "^13.1.0",
     "fs": "^0.0.1-security",
+    "googleapis": "^148.0.0",
     "gridfs-stream": "^1.1.1",
     "http-errors": "~1.6.3",
     "jest": "^29.7.0",
@@ -48,8 +49,10 @@
     "react-quill": "^2.0.0",
     "sanitize-html": "^2.14.0",
     "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "speakeasy": "^2.0.0",
     "supertest": "^7.0.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "wrtc": "^0.4.7"
   }
 }

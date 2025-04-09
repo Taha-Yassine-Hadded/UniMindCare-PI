@@ -14,6 +14,7 @@ const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
 const UserVerification = require('./Models/UserVerification'); 
 const User = require('./Models/Users');
+const http = require('http');
 
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
@@ -35,20 +36,69 @@ var usersRoutes = require('./routes/users');
 const passport = require('./routes/passportConfig'); // Import the configured passport instance
 const usersRouter = require('./routes/usersRouter');
 const exitRequestRoutes = require('./routes/exitRequests'); // Chemin correct vers tes routes
+const Message = require('./Models/message'); // Assurez-vous que le chemin est correct
+const socketIo = require('socket.io');
 
-// Initialize Express app
+
 var app = express();
 
+
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+
+// Endpoints pour récupérer l'historique
+app.get('/messages/:userId1/:userId2', async (req, res) => {
+  const { userId1, userId2 } = req.params;
+  const messages = await Message.find({
+    $or: [
+      { sender: userId1, receiver: userId2 },
+      { sender: userId2, receiver: userId1 }
+    ]
+  }).sort({ timestamp: 1 });
+  res.json(messages);
+});
+
+
+// Socket.IO
+io.on('connection', (socket) => {
+  console.log(`User connecté : ${socket.id}`);
+
+  socket.on('join', (userId) => {
+    socket.join(userId);
+  });
+
+  socket.on('sendMessage', async ({ sender, receiver, message }) => {
+    const newMessage = new Message({ sender, receiver, message });
+    await newMessage.save();
+
+    io.to(receiver).emit('receiveMessage', newMessage);
+    io.to(sender).emit('receiveMessage', newMessage);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User déconnecté');
+  });
+});
+
+ 
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000', // Your frontend URL
+  credentials: true
+}));
 app.use(bodyParser.json());
 
 // view engine setup
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 app.use("/api", exitRequestRoutes);
-
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -63,7 +113,6 @@ app.use("/api/users", usersRoutes);
 app.use('/api/posts', postsRouter);
 app.use('/api/crisis', crisisRoutes); // Nouvelle route pour la crise
 app.use("/api", feedbackRoutes); // Monter les routes de feedback sous /api
-// MongoDB connection
 /*mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
@@ -731,9 +780,6 @@ app.closeAll = async () => {
 };
 
 
-
-
-
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
   next(createError(404));
@@ -749,8 +795,6 @@ app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
-// Démarrage du serveur
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-module.exports = app;
+server.listen(PORT, () => console.log(`Server running on port ${PORT} with Socket.IO`));

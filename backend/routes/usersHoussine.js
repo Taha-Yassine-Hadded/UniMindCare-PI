@@ -136,5 +136,14 @@ router.put('/:identifiant', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+router.get("/all", async (req, res) => {
+    try {
+      const users = await User.find({}, "Name Email _id"); // Récupérer uniquement les champs nécessaires
+      res.json(users);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des utilisateurs:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
 
 module.exports = router;

@@ -121,20 +121,28 @@ import StudentDashboard from "../Components/StudentDashboard";
 import TeacherDashboard from "../Components/TeacherDashboard";
 import Statistics from "../Components/Statistics";
 import StatisticsEtudiant from "../Components/StudentStats";
+import Chat from "../Components/chat";
+import UserList from "../Components/userList"; 
 export const routes = [
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
     
-    //statistics
+    { 
+      path: `${process.env.PUBLIC_URL}/users/list`, 
+      Component: <UserList /> 
+    },    //statistics
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics`, Component: <Statistics /> },
 
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`, Component: <StatisticsEtudiant /> },
 
+    { path: `${process.env.PUBLIC_URL}/dashboard/chat`, Component: <Chat /> },
+
+
   //Feedback
   { path: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`, Component: <Feedback /> },
 
-  { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard /> },
-  { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
+  { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard  /> }, 
+   { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
 
 
   // dashboard
