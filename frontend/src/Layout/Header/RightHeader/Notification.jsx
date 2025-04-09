@@ -5,19 +5,27 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
 
-// Initialize Socket.IO connection
+// Get token once for consistent socket connection
+const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+// Create a unique instance ID to track this component instance
+const instanceId = Math.random().toString(36).substring(2, 9);
+
+// Initialize Socket.IO connection - outside component to prevent multiple connections
 const socket = io('http://localhost:5000', {
   transports: ['websocket'],
   reconnection: true,
-  auth: { token: localStorage.getItem('token') || sessionStorage.getItem('token') },
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+  auth: { token }
 });
 
 socket.on('connect', () => {
-  console.log('Connected to WebSocket server with ID:', socket.id);
+  console.log(`[${instanceId}] Connected to WebSocket server with ID:`, socket.id);
 });
 
 socket.on('connect_error', (error) => {
-  console.error('WebSocket connection error:', error.message);
+  console.error(`[${instanceId}] WebSocket connection error:`, error.message);
 });
 
 const Notification = ({ active, setActive }) => {
@@ -29,9 +37,8 @@ const Notification = ({ active, setActive }) => {
 
   // Fetch current user's ID and role from /api/users/me
   const fetchCurrentUser = async () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
-      console.log('No token found, user not logged in');
+      console.log(`[${instanceId}] No token found, user not logged in`);
       return null;
     }
 
@@ -39,173 +46,199 @@ const Notification = ({ active, setActive }) => {
       const response = await axios.get('http://localhost:5000/api/users/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Logged-in user:', response.data);
+      console.log(`[${instanceId}] Logged-in user:`, response.data);
       const userId = response.data.userId || response.data._id;
       setCurrentUserId(userId);
       setUserRole(response.data.Role?.[0]); // Access first role since it's an array
       return userId;
     } catch (error) {
-      console.error('Error fetching user:', error.response?.data || error.message);
+      console.error(`[${instanceId}] Error fetching user:`, error.response?.data || error.message);
       return null;
     }
   };
 
   // Fetch notifications from /api/notifications
   const fetchNotifications = async () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return;
 
     try {
       const response = await axios.get('http://localhost:5000/api/notifications', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Notifications fetched:', response.data);
+      console.log(`[${instanceId}] Notifications fetched:`, response.data);
       setNotifications(response.data);
       setUnreadCount(response.data.filter((notif) => !notif.read).length);
     } catch (error) {
-      console.error('Error fetching notifications:', error.response?.data || error.message);
+      console.error(`[${instanceId}] Error fetching notifications:`, error.response?.data || error.message);
     }
   };
 
   // Initialize component
   useEffect(() => {
     const initialize = async () => {
-      const userId = await fetchCurrentUser();
-      if (userId) {
-        await fetchNotifications();
-      } else {
-        console.log('Failed to fetch userId, Socket.IO not initialized');
+      try {
+        const userId = await fetchCurrentUser();
+        if (userId) {
+          await fetchNotifications();
+          // Join the socket room on initialization
+          console.log(`[${instanceId}] Joining room for userId:`, userId);
+          socket.emit('join', userId);
+        } else {
+          console.log(`[${instanceId}] Failed to fetch userId, Socket.IO not initialized`);
+        }
+      } catch (error) {
+        console.error(`[${instanceId}] Initialization error:`, error);
       }
     };
     initialize();
+
+    // Cleanup function to ensure proper disconnection
+    return () => {
+      console.log(`[${instanceId}] Component unmounting - cleaning up listeners`);
+    };
   }, []);
 
-  // Set up Socket.IO listener with improved handling
+  // Handle socket.io notifications with dedicated event handler
   useEffect(() => {
     if (!currentUserId) return;
 
-    console.log('Joining room for userId:', currentUserId);
-    socket.emit('join', currentUserId);
+    console.log(`[${instanceId}] Setting up notification listener for userId:`, currentUserId);
 
-    socket.on('new_notification', (notification) => {
-      console.log('New notification received in dropdown:', notification);
+    // Define the notification handler function
+    const handleNewNotification = (notification) => {
+      console.log(`[${instanceId}] New notification received:`, notification);
       
-      // Debug the notification type specifically for appointment confirmations
+      // Special logging for confirmation notifications to debug
       if (notification.type === 'appointment_confirmed') {
-        console.log('CONFIRMATION NOTIFICATION RECEIVED:', notification);
+        console.log(`[${instanceId}] 🔔 CONFIRMATION NOTIFICATION RECEIVED:`, {
+          id: notification._id,
+          type: notification.type,
+          recipient: notification.recipient?._id || notification.recipient,
+          sender: notification.sender?.Name,
+          appointmentId: notification.appointment?._id
+        });
       }
       
       try {
-        // Handle all possible recipient structures
-        const recipientId = (notification.recipient?._id || notification.recipient || '').toString();
-        const currentId = (currentUserId || '').toString();
+        // Handle all possible recipient structures with consistent string conversion
+        const recipientId = String(notification.recipient?._id || notification.recipient || '');
+        const currentId = String(currentUserId || '');
         
-        console.log('ID comparison:', {
+        console.log(`[${instanceId}] ID comparison:`, {
           recipientId,
           currentId,
           match: recipientId === currentId
         });
         
         if (recipientId === currentId) {
-          // Add to notifications and ensure UI update
+          // Add notification to state with duplication check
           setNotifications(prev => {
-            // Check by _id to prevent duplicates
+            // Check if notification already exists
             if (prev.some(n => n._id === notification._id)) {
-              console.log('Duplicate notification prevented');
+              console.log(`[${instanceId}] Duplicate notification prevented:`, notification._id);
               return prev;
             }
-            console.log('Adding new notification to dropdown');
+            console.log(`[${instanceId}] Adding notification to dropdown:`, notification._id);
             return [notification, ...prev];
           });
           
-          // Update unread count
+          // Update unread count for new notifications
           if (!notification.read) {
-            console.log('Incrementing unread count');
+            console.log(`[${instanceId}] Incrementing unread count`);
             setUnreadCount(prev => prev + 1);
           }
         } else {
-          console.log('Notification not for current user, ignoring');
+          console.log(`[${instanceId}] Notification not for current user, ignoring`);
         }
       } catch (error) {
-        console.error('Error processing notification:', error);
+        console.error(`[${instanceId}] Error processing notification:`, error);
       }
-    });
+    };
 
+    // Remove any existing listeners to prevent duplicates
+    socket.off('new_notification');
+    
+    // Add the new listener
+    socket.on('new_notification', handleNewNotification);
+
+    // Cleanup function
     return () => {
-      console.log('Cleaning up new_notification listener for userId:', currentUserId);
-      socket.off('new_notification');
+      console.log(`[${instanceId}] Removing notification listener for userId:`, currentUserId);
+      socket.off('new_notification', handleNewNotification);
     };
   }, [currentUserId]);
 
   // Mark a notification as read and navigate to appropriate dashboard
   const markAsReadAndNavigate = async (notificationId, appointmentId) => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return;
 
     try {
-      // Debug the notification click
-      console.log('Marking notification as read:', notificationId);
-      console.log('Appointment ID for navigation:', appointmentId);
+      console.log(`[${instanceId}] Marking notification as read:`, notificationId);
+      console.log(`[${instanceId}] Will navigate to appointment:`, appointmentId);
       
-      // Update UI optimistically first - ensure this happens regardless of API call
-      setNotifications((prev) => 
+      // Update UI optimistically
+      setNotifications(prev => 
         prev.map(notif => notif._id === notificationId ? {...notif, read: true} : notif)
       );
-      setUnreadCount((prev) => Math.max(prev - 1, 0));
+      setUnreadCount(prev => Math.max(prev - 1, 0));
       
-      // Set a flag to prevent multiple navigation attempts
+      // Flag to prevent multiple navigation attempts
       let navigationAttempted = false;
 
-      // Mark as read on the server with proper error handling
+      // Mark as read on the server
       try {
         await axios.put(
           `http://localhost:5000/api/notifications/${notificationId}/read`,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log('Successfully marked notification as read on server');
+        console.log(`[${instanceId}] Successfully marked notification as read on server`);
       } catch (error) {
-        console.error('Error marking notification as read on server:', error);
-        // Don't revert optimistic UI updates - they should still work locally
+        console.error(`[${instanceId}] Server error marking notification as read:`, error);
+        // Don't revert UI state - keep the optimistic update
       }
 
-      // Navigate based on user role
+      // Navigate to the appropriate dashboard
       if (appointmentId && userRole && !navigationAttempted) {
         navigationAttempted = true;
-        // Get user role and force lowercase for comparison
-        const role = (userRole || '').toLowerCase();
-        let dashboardPath = role === 'student' 
+        
+        // Determine target dashboard based on user role
+        const role = String(userRole || '').toLowerCase();
+        const dashboardPath = role === 'student' 
           ? "/appointment/student-dashboard" 
           : (role === 'psychiatre' || role === 'psychologist')
           ? "/appointment/psychologist-dashboard"
           : "/appointment/student-dashboard"; // Fallback
         
-        // Ensure we have a valid URL with the highlight parameter
-        const navigationUrl = `${process.env.PUBLIC_URL}${dashboardPath}?highlight=${appointmentId}`;
-        console.log(`Navigating to: ${navigationUrl}`);
+        // Create navigation URL with highlight parameter
+        const baseUrl = process.env.PUBLIC_URL || '';
+        const navigationUrl = `${baseUrl}${dashboardPath}?highlight=${appointmentId}`;
+        console.log(`[${instanceId}] Navigating to:`, navigationUrl);
         
-        // Force window navigation to ensure it works in all cases
+        // Use window.location for most reliable navigation
         window.location.href = navigationUrl;
       } else {
-        console.warn('Navigation skipped - missing data:', { 
+        console.warn(`[${instanceId}] Navigation skipped - missing data:`, { 
           hasAppointmentId: !!appointmentId,
           userRole,
           navigationAttempted
         });
       }
     } catch (error) {
-      console.error('Unexpected error in markAsReadAndNavigate:', error);
+      console.error(`[${instanceId}] Unexpected error in markAsReadAndNavigate:`, error);
     }
   };
 
   // Handle notification click
   const handleNotificationClick = (notification) => {
-    console.log('Notification clicked:', notification);
-    // Make sure we extract the appointment ID correctly for all notification types
+    console.log(`[${instanceId}] Notification clicked:`, notification);
+    
+    // Extract appointment ID, handling both object and string IDs
     const appointmentId = notification.appointment?._id || notification.appointment;
     
     if (!appointmentId) {
-      console.error('No appointment ID found in notification:', notification);
+      console.error(`[${instanceId}] No appointment ID found in notification:`, notification);
+      return;
     }
     
     markAsReadAndNavigate(notification._id, appointmentId);
