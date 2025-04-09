@@ -5,6 +5,7 @@ import axios from 'axios';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { toast, ToastContainer } from 'react-toastify';
 import io from 'socket.io-client';
+import { useLocation } from 'react-router-dom'; // Added for URL query params
 import 'react-toastify/dist/ReactToastify.css';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import './AppointmentCalendar.css';
@@ -43,6 +44,11 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     startTime: '',
     endTime: '',
   });
+  const location = useLocation(); // Added to access URL query params
+
+  // Extract highlight parameter from URL
+  const queryParams = new URLSearchParams(location.search);
+  const highlightAppointmentId = queryParams.get('highlight');
 
   // Join Socket.IO room when userId is available
   useEffect(() => {
@@ -66,7 +72,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
       const sender = notification.sender;
 
       if (role === 'student') {
-        // Handle student-specific notifications
         if (notification.type === 'appointment_confirmed') {
           setEvents((prevEvents) =>
             prevEvents.map((event) =>
@@ -88,7 +93,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                     ...event,
                     start: new Date(appointment.date),
                     end: new Date(new Date(appointment.date).getTime() + 60 * 60 * 1000),
-                    status: 'pending', // Reset to pending when modified by psychologist
+                    status: 'pending',
                     title: `Appointment with Dr. ${appointment.psychologistId?.Name || 'Unknown'}`,
                   }
                 : event
@@ -100,7 +105,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
           toast.warn(`Appointment on ${new Date(appointment.date).toLocaleString()} cancelled`);
         }
       } else if (role === 'psychiatre') {
-        // Handle psychologist-specific notifications
         if (notification.type === 'appointment_booked') {
           setEvents((prevEvents) => [
             ...prevEvents,
@@ -124,7 +128,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                     ...event,
                     start: new Date(appointment.date),
                     end: new Date(new Date(appointment.date).getTime() + 60 * 60 * 1000),
-                    status: 'pending', // Reset to pending when modified by student
+                    status: 'pending',
                     title: `Appointment with ${appointment.studentId?.Name || 'Student'}`,
                   }
                 : event
@@ -151,11 +155,9 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
           const response = await axios.get('http://localhost:5000/api/appointments/psychiatres');
           setPsychologists(response.data);
 
-          // Ensure the pre-selected psychologist (from URL) is set
           if (selectedPsychologistId && response.data.some((psy) => psy._id === selectedPsychologistId)) {
             setSelectedPsychologist(selectedPsychologistId);
           } else if (response.data.length > 0 && !selectedPsychologist) {
-            // Fallback to the first psychologist if no pre-selection
             setSelectedPsychologist(response.data[0]._id);
           }
         } catch (err) {
@@ -176,10 +178,9 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         if (role === 'student') {
           if (!selectedPsychologist) {
             setLoading(false);
-            return; // Wait until a psychologist is selected
+            return;
           }
 
-          // For students: fetch the selected psychologist's availability and the student's appointments
           const availabilityResponse = await axios.get(
             `http://localhost:5000/api/availability?psychologistId=${selectedPsychologist}`
           );
@@ -188,11 +189,10 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             `http://localhost:5000/api/appointments?studentId=${userId}&psychologistId=${selectedPsychologist}`
           );
 
-          // Format availability data for the calendar - Using empty title to show only borders
           setAvailability(
             availabilityResponse.data.map((slot) => ({
               id: slot._id,
-              title: '', // Empty title to show only the border
+              title: '',
               start: new Date(slot.startTime),
               end: new Date(slot.endTime),
               status: slot.status,
@@ -201,7 +201,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             }))
           );
 
-          // Format appointments data for the calendar
           setEvents(
             appointmentsResponse.data.map((appointment) => ({
               id: appointment._id,
@@ -215,7 +214,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             }))
           );
         } else if (role === 'psychiatre') {
-          // For psychologists: fetch their availability and all appointments
           const availabilityResponse = await axios.get(
             `http://localhost:5000/api/availability?psychologistId=${userId}`
           );
@@ -224,11 +222,10 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             `http://localhost:5000/api/appointments?psychologistId=${userId}`
           );
 
-          // Format availability data for the calendar - Using empty title to show only borders
           setAvailability(
             availabilityResponse.data.map((slot) => ({
               id: slot._id,
-              title: '', // Empty title to show only the border
+              title: '',
               start: new Date(slot.startTime),
               end: new Date(slot.endTime),
               status: slot.status,
@@ -262,21 +259,29 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     fetchData();
   }, [role, userId, selectedPsychologist]);
 
+  // Highlight the event when the component mounts or highlight ID changes
+  useEffect(() => {
+    if (highlightAppointmentId && events.length > 0) {
+      const eventToHighlight = events.find((event) => event.id === highlightAppointmentId);
+      if (eventToHighlight) {
+        handleSelectEvent(eventToHighlight); // Open the modal for the highlighted event
+        toast.info(`Viewing appointment on ${new Date(eventToHighlight.start).toLocaleString()}`);
+      }
+    }
+  }, [highlightAppointmentId, events]);
+
   // Handle slot selection (for booking or adding availability)
   const handleSelectSlot = ({ start, end }) => {
-    // Don't allow selecting slots in the past
     if (start < new Date()) {
       toast.error('Cannot select time slots in the past');
       return;
     }
 
-    // Check if this slot has existing availability
     const existingAvailability = availability.find(
       (slot) => slot.start <= end && slot.end >= start
     );
 
     if (existingAvailability) {
-      // If this slot already has availability, select that event instead
       setSelectedEvent(existingAvailability);
 
       if (role === 'psychiatre') {
@@ -296,7 +301,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         }
         setShowModal(true);
       } else if (role === 'student') {
-        // For students, check if the slot is available for booking
         if (existingAvailability.status === 'available') {
           setModalType('book');
           setFormData({
@@ -310,7 +314,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         }
       }
     } else {
-      // No existing availability - proceed as before
       setSelectedSlot({ start, end });
 
       if (role === 'student') {
@@ -333,7 +336,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     setSelectedEvent(event);
 
     if (event.resource === 'availability') {
-      // Handling availability slots
       if (role === 'psychiatre') {
         if (event.status === 'available') {
           setModalType('modifyAvailability');
@@ -352,9 +354,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         setShowModal(true);
       }
     } else {
-      // Handling appointment events
       if (role === 'student') {
-        // Students can modify or cancel their appointments
         setModalType('modifyAppointment');
         setFormData({
           date: event.start.toISOString(),
@@ -362,7 +362,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         });
         setShowModal(true);
       } else if (role === 'psychiatre') {
-        // Psychologists can review (accept/decline) pending appointments or modify/cancel confirmed ones
         if (event.status === 'pending') {
           setModalType('reviewAppointment');
           setFormData({
@@ -387,9 +386,8 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
 
   // Helper function to check if a time slot is available
   const isSlotAvailable = (start, end) => {
-    // Check if the slot overlaps with any available slot
     return availability.some((slot) => {
-      if (slot.status !== 'available') return false; // Skip blocked slots
+      if (slot.status !== 'available') return false;
       return slot.start <= end && slot.end >= start;
     });
   };
@@ -400,7 +398,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       switch (modalType) {
         case 'book':
-          // Student books an appointment
           const bookResponse = await axios.post(
             'http://localhost:5000/api/cases/book-appointment',
             {
@@ -425,28 +422,21 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
               priority: formData.priority,
             },
           ]);
-
           toast.success('Appointment request submitted!');
           break;
 
         case 'modifyAppointment':
-          // Modify an appointment (for students or psychologists)
           const newStart = new Date(formData.date);
-          const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000); // Assume 1-hour appointments
+          const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
 
-          // Don't allow modifications to past dates
           if (newStart < new Date()) {
             toast.error('Cannot modify appointment to a past date');
             return;
           }
 
-          // For students, always check availability
-          if (role === 'student') {
-            const slotAvailable = isSlotAvailable(newStart, newEnd);
-            if (!slotAvailable) {
-              toast.error("Please select a time within the psychologist's available slots.");
-              return;
-            }
+          if (role === 'student' && !isSlotAvailable(newStart, newEnd)) {
+            toast.error("Please select a time within the psychologist's available slots.");
+            return;
           }
 
           await axios.put(
@@ -465,17 +455,15 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                     ...event,
                     start: newStart,
                     end: newEnd,
-                    status: role === 'student' ? 'pending' : 'confirmed', // Reset to pending for students, keep confirmed for psychologists
+                    status: role === 'student' ? 'pending' : 'confirmed',
                   }
                 : event
             )
           );
-
           toast.success('Appointment modified! ' + (role === 'student' ? 'Awaiting confirmation.' : ''));
           break;
 
         case 'cancelAppointment':
-          // Student or Psychologist cancels an appointment
           await axios.delete(
             `http://localhost:5000/api/appointments/${selectedEvent.id}`,
             {
@@ -483,14 +471,11 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
               data: { reasonForCancellation: formData.reason, senderId: userId },
             }
           );
-
           setEvents(events.filter((event) => event.id !== selectedEvent.id));
-
           toast.success('Appointment cancelled successfully');
           break;
 
         case 'addAvailability':
-          // Psychologist adds availability
           const availabilityResponse = await axios.post(
             'http://localhost:5000/api/availability',
             {
@@ -501,7 +486,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
-
           setAvailability([
             ...availability,
             {
@@ -513,12 +497,10 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
               resource: 'availability',
             },
           ]);
-
           toast.success('Availability added to your calendar');
           break;
 
         case 'modifyAvailability':
-          // Psychologist modifies availability
           await axios.put(
             `http://localhost:5000/api/availability/${selectedEvent.id}`,
             {
@@ -530,41 +512,24 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
-
-          if (formData.status === 'block') {
-            setAvailability(
-              availability.map((slot) =>
-                slot.id === selectedEvent.id
-                  ? {
-                      ...slot,
-                      title: '',
-                      status: 'blocked',
-                      reason: formData.reason,
-                      start: new Date(formData.startTime),
-                      end: new Date(formData.endTime),
-                    }
-                  : slot
-              )
-            );
-            toast.success('Time slot blocked');
-          } else {
-            setAvailability(
-              availability.map((slot) =>
-                slot.id === selectedEvent.id
-                  ? {
-                      ...slot,
-                      start: new Date(formData.startTime),
-                      end: new Date(formData.endTime),
-                    }
-                  : slot
-              )
-            );
-            toast.success('Availability updated');
-          }
+          setAvailability(
+            availability.map((slot) =>
+              slot.id === selectedEvent.id
+                ? {
+                    ...slot,
+                    title: '',
+                    status: formData.status === 'block' ? 'blocked' : 'available',
+                    reason: formData.status === 'block' ? formData.reason : null,
+                    start: new Date(formData.startTime),
+                    end: new Date(formData.endTime),
+                  }
+                : slot
+            )
+          );
+          toast.success(formData.status === 'block' ? 'Time slot blocked' : 'Availability updated');
           break;
 
         case 'unblockAvailability':
-          // Psychologist unblocks a time slot
           await axios.put(
             `http://localhost:5000/api/availability/${selectedEvent.id}`,
             {
@@ -573,7 +538,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
-
           setAvailability(
             availability.map((slot) =>
               slot.id === selectedEvent.id
@@ -586,39 +550,31 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                 : slot
             )
           );
-
           toast.success('Time slot is now available');
           break;
 
         case 'deleteAvailability':
-          // Remove a time slot
           await axios.delete(`http://localhost:5000/api/availability/${selectedEvent.id}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-
           setAvailability(availability.filter((slot) => slot.id !== selectedEvent.id));
-
           toast.success('Time slot removed successfully');
           break;
 
         case 'reviewAppointment':
-          // Psychologist accepts an appointment
           await axios.put(
             `http://localhost:5000/api/appointments/confirm/${selectedEvent.id}`,
             {},
             { headers: { Authorization: `Bearer ${token}` } }
           );
-
           setEvents(
             events.map((event) =>
               event.id === selectedEvent.id ? { ...event, status: 'confirmed' } : event
             )
           );
-
           toast.success('Appointment confirmed');
           break;
       }
-
       setShowModal(false);
     } catch (err) {
       console.error('Error submitting form:', err);
@@ -626,57 +582,60 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     }
   };
 
-  // Custom event styling based on status and priority
+  // Custom event styling based on status, priority, and highlight
   const eventPropGetter = (event) => {
     let style = {
       borderRadius: '4px',
-      border: '2px solid', // Solid border for all events
+      border: '2px solid',
       display: 'block',
       boxShadow: '0 2px 3px rgba(0,0,0,0.1)',
-      zIndex: 5, // Ensure events are above other elements
+      zIndex: 5,
     };
 
     if (event.resource === 'availability') {
-      // Keep availability events invisible
       style = {
         ...style,
         backgroundColor: 'transparent',
         borderColor: 'transparent',
         color: 'transparent',
-        display: 'none', // Hide them completely
-        pointerEvents: 'none', // Make them non-interactive
+        display: 'none',
+        pointerEvents: 'none',
       };
     } else {
-      // Appointment styling based on status
       switch (event.status) {
         case 'confirmed':
-          style.backgroundColor = '#28a745'; // Green for confirmed
-          style.borderColor = '#1e7e34'; // Darker green border
+          style.backgroundColor = '#28a745';
+          style.borderColor = '#1e7e34';
           style.color = '#212529';
-          style.opacity = 1; // Fully opaque
+          style.opacity = 1;
           break;
         case 'pending':
-          style.backgroundColor = '#fdfd96'; // Yellow for pending
-          style.borderColor = '#fdfd96'; // Darker yellow border
+          style.backgroundColor = '#fdfd96';
+          style.borderColor = '#fdfd96';
           style.color = '#212529';
-          style.opacity = 1; // Fully opaque
+          style.opacity = 1;
           break;
         case 'cancelled':
-          style.backgroundColor = '#f8d7da'; // Pink for cancelled
-          style.borderColor = '#dc3545'; // Red border
-          style.color = '#721c24'; // Darker text color for contrast
-          style.opacity = 0.8; // Slightly transparent for cancelled
+          style.backgroundColor = '#f8d7da';
+          style.borderColor = '#dc3545';
+          style.color = '#721c24';
+          style.opacity = 0.8;
           break;
         default:
-          style.backgroundColor = '#007bff'; // Fallback blue (shouldn't be used)
+          style.backgroundColor = '#007bff';
           style.borderColor = '#0056b3';
           style.color = '#212529';
           style.opacity = 1;
       }
 
-      // Add priority styling
       if (event.priority === 'emergency') {
-        style.borderBottom = '4px solid #dc3545'; // Red bottom border for urgent
+        style.borderBottom = '4px solid #dc3545';
+      }
+
+      // Highlight the event if it matches the query param
+      if (event.id === highlightAppointmentId) {
+        style.boxShadow = '0 0 10px 5px rgba(255, 215, 0, 0.7)'; // Gold glow effect
+        style.zIndex = 10; // Ensure highlighted event is on top
       }
     }
 
@@ -685,14 +644,12 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
 
   // Custom component for time slot cells
   const TimeSlotWrapper = ({ value, children }) => {
-    // Check if this time slot overlaps with any availability
     const slotStart = new Date(value);
-    const slotEnd = new Date(new Date(value).setMinutes(value.getMinutes() + 30)); // Assume 30-min slots
+    const slotEnd = new Date(new Date(value).setMinutes(value.getMinutes() + 30));
 
     let availableSlot = null;
     let blockedSlot = null;
 
-    // Find if this time slot is within any availability period
     for (const slot of availability) {
       if (slot.start <= slotEnd && slot.end >= slotStart) {
         if (slot.status === 'available') {
@@ -703,7 +660,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
       }
     }
 
-    // Determine the class to apply
     let cellClass = '';
     if (blockedSlot) {
       cellClass = 'blocked-time-slot';
@@ -723,7 +679,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     let hasAvailable = false;
     let hasBlocked = false;
 
-    // Find if this day has any availability or blocked periods
     for (const slot of availability) {
       if (slot.start <= dayEnd && slot.end >= dayStart) {
         if (slot.status === 'available') {
@@ -734,7 +689,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
       }
     }
 
-    // Determine the class to apply
     let cellClass = '';
     if (hasBlocked) {
       cellClass = 'blocked-date-cell';
@@ -757,7 +711,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     <div className="appointment-calendar">
       <ToastContainer position="top-right" autoClose={5000} />
 
-      {/* Psychologist selector for students */}
       {role === 'student' && (
         <div className="psychologist-selector mb-4">
           <Form.Group>
@@ -782,7 +735,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         </div>
       )}
 
-      {/* Calendar legend */}
       <div className="calendar-legend mb-3">
         <div className="d-flex flex-wrap">
           <div className="legend-section me-4">
@@ -807,7 +759,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                   className="legend-color"
                   style={{
                     backgroundColor: '#fdfd96',
-                    border: '2px solid #fef86c',
+                    border: '2px solid #fdfd96',
                     borderRadius: '4px',
                   }}
                 ></div>
@@ -817,8 +769,8 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                 <div
                   className="legend-color"
                   style={{
-                    backgroundColor: '#b0f2b6',
-                    border: '2px solid #75da7e',
+                    backgroundColor: '#28a745',
+                    border: '2px solid #1e7e34',
                     borderRadius: '4px',
                   }}
                 ></div>
@@ -828,8 +780,8 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                 <div
                   className="legend-color"
                   style={{
-                    backgroundColor: '#ff9e93',
-                    border: '2px solid #ff847a',
+                    backgroundColor: '#f8d7da',
+                    border: '2px solid #dc3545',
                     borderRadius: '4px',
                     opacity: 0.8,
                   }}
@@ -851,7 +803,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                   className="legend-color"
                   style={{
                     backgroundColor: '#fdfd96',
-                    border: '2px solid #fef86c',
+                    border: '2px solid #fdfd96',
                     borderRadius: '4px',
                   }}
                 ></div>
@@ -862,7 +814,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         </div>
       </div>
 
-      {/* Calendar view */}
       <div className="my-calendar">
         <Calendar
           localizer={localizer}
@@ -889,8 +840,7 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                   ? '#28a745'
                   : props.event.status === 'cancelled'
                   ? '#f8d7da'
-                  : '#007bff'; // Fallback (shouldn't be used)
-
+                  : '#007bff';
               const borderColor =
                 props.event.status === 'pending'
                   ? '#fdfd96'
@@ -899,7 +849,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                   : props.event.status === 'cancelled'
                   ? '#dc3545'
                   : '#0056b3';
-
               const textColor =
                 props.event.status === 'pending'
                   ? '#212529'
@@ -908,9 +857,12 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                   : props.event.status === 'cancelled'
                   ? '#721c24'
                   : '#212529';
-
               const priorityBorder =
                 props.event.priority === 'emergency' ? '4px solid #dc3545' : 'none';
+              const highlightStyle =
+                props.event.id === highlightAppointmentId
+                  ? { boxShadow: '0 0 10px 5px rgba(255, 215, 0, 0.7)', zIndex: 10 }
+                  : {};
 
               const inlineStyle = {
                 backgroundColor: statusColor,
@@ -919,8 +871,8 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
                 color: textColor,
                 boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                 borderRadius: '4px',
-                zIndex: 5,
-                opacity: props.event.status === 'cancelled' ? 0.8 : 1, // Slightly transparent for cancelled
+                opacity: props.event.status === 'cancelled' ? 0.8 : 1,
+                ...highlightStyle,
               };
 
               return (
@@ -946,7 +898,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         />
       </div>
 
-      {/* Dynamic Modal for various actions */}
       <Modal show={showModal} onHide={() => setShowModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>
@@ -962,7 +913,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
         </Modal.Header>
         <Modal.Body>
           <Form>
-            {/* Book or Modify Appointment Form */}
             {(modalType === 'book' || modalType === 'modifyAppointment') && (
               <>
                 <Form.Group className="mb-3">
@@ -1006,7 +956,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
               </>
             )}
 
-            {/* Add/Modify Availability Form */}
             {(modalType === 'addAvailability' || modalType === 'modifyAvailability') && (
               <>
                 <Form.Group className="mb-3">
@@ -1076,12 +1025,10 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
               </>
             )}
 
-            {/* Delete Availability Confirmation */}
             {modalType === 'deleteAvailability' && (
               <p>Are you sure you want to remove this time slot from your schedule?</p>
             )}
 
-            {/* Cancellation Forms */}
             {modalType === 'cancelAppointment' && (
               <Form.Group className="mb-3">
                 <Form.Label>Reason for Cancellation</Form.Label>
@@ -1100,19 +1047,16 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
               </Form.Group>
             )}
 
-            {/* Review Appointment (Accept/Decline) */}
             {modalType === 'reviewAppointment' && (
               <p>Would you like to accept or decline this appointment request?</p>
             )}
 
-            {/* Unblock Availability */}
             {modalType === 'unblockAvailability' && (
               <p>Do you want to make this time slot available for appointments?</p>
             )}
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          {/* For reviewAppointment, show Accept and Decline buttons */}
           {modalType === 'reviewAppointment' && (
             <>
               <Button variant="success" onClick={handleSubmit}>
@@ -1130,14 +1074,11 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             </>
           )}
 
-          {/* For other modal types, show the appropriate submit button */}
           {modalType !== 'reviewAppointment' && (
             <Button
               variant={
                 modalType === 'cancelAppointment' || modalType === 'deleteAvailability'
                   ? 'danger'
-                  : modalType === 'confirmAppointment'
-                  ? 'success'
                   : 'primary'
               }
               onClick={handleSubmit}
@@ -1149,11 +1090,9 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
               {modalType === 'modifyAvailability' && 'Save Changes'}
               {modalType === 'unblockAvailability' && 'Make Available'}
               {modalType === 'deleteAvailability' && 'Remove Time Slot'}
-              {modalType === 'confirmAppointment' && 'Confirm Appointment'}
             </Button>
           )}
 
-          {/* Extra buttons for certain modal types */}
           {modalType === 'modifyAppointment' && (
             <Button
               variant="danger"
@@ -1166,7 +1105,6 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
             </Button>
           )}
 
-          {/* Add Remove Time Slot button for Modify Availability */}
           {modalType === 'modifyAvailability' && (
             <Button
               variant="danger"

@@ -1,5 +1,6 @@
 // dashbaord
 import Default from "../Components/Dashboard/Default/Default";
+import { Route } from "react-router-dom";
 import Ecommerce from "../Components/Dashboard/Ecommerce/Ecommerce";
 import General from "../Components/Widgeta/General";
 import Chart from "../Components/Widgeta/Chart";
@@ -122,6 +123,7 @@ import StudentDashboard from "../Components/AppointementModule/StudentDashboard"
 import PsychologistDashboard from "../Components/AppointementModule/PsychologistDashboard";
 import CaseManagement from "../Components/AppointementModule/CaseManagement";
 import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
+import AppointmentCalendar from "../Components/AppointementModule/AppointmentCalendar";
 
 export const routes = [
   //dashboard

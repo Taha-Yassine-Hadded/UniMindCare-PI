@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Heart, MessageSquare, ThumbsDown, Calendar, CheckCircle, Edit, XCircle } from 'react-feather';
+import { Bell, Calendar, CheckCircle, XCircle } from 'react-feather';
 import { P } from '../../../AbstractElements';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import io from 'socket.io-client';
 
@@ -9,41 +9,42 @@ import io from 'socket.io-client';
 const socket = io('http://localhost:5000', {
   transports: ['websocket'],
   reconnection: true,
-  auth: { token: localStorage.getItem('token') || sessionStorage.getItem('token') }, // Include token for authentication
+  auth: { token: localStorage.getItem('token') || sessionStorage.getItem('token') },
 });
 
-// Log connection status
 socket.on('connect', () => {
-  console.log('Connecté au serveur WebSocket avec l\'ID:', socket.id);
+  console.log('Connected to WebSocket server with ID:', socket.id);
 });
 
 socket.on('connect_error', (error) => {
-  console.error('Erreur de connexion WebSocket:', error.message);
+  console.error('WebSocket connection error:', error.message);
 });
 
 const Notification = ({ active, setActive }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const navigate = useNavigate();
 
-  // Fetch current user’s ID from /api/users/me
+  // Fetch current user’s ID and role from /api/users/me
   const fetchCurrentUser = async () => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
-      console.log('Aucun token trouvé, utilisateur non connecté');
+      console.log('No token found, user not logged in');
       return null;
     }
 
     try {
       const response = await axios.get('http://localhost:5000/api/users/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Utilisateur connecté:', response.data);
-      return response.data.userId;
+      console.log('Logged-in user:', response.data);
+      setCurrentUserId(response.data.userId || response.data._id);
+      setUserRole(response.data.role); // Adjust based on your API (e.g., 'student' or 'psychiatre')
+      return response.data.userId || response.data._id;
     } catch (error) {
-      console.error('Erreur lors de la récupération de l\'utilisateur:', error.response?.data || error.message);
+      console.error('Error fetching user:', error.response?.data || error.message);
       return null;
     }
   };
@@ -51,123 +52,100 @@ const Notification = ({ active, setActive }) => {
   // Fetch notifications from /api/notifications
   const fetchNotifications = async () => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) {
-      console.log('Aucun token trouvé, utilisateur non connecté');
-      return;
-    }
+    if (!token) return;
 
     try {
       const response = await axios.get('http://localhost:5000/api/notifications', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Notifications récupérées:', response.data);
+      console.log('Notifications fetched:', response.data);
       setNotifications(response.data);
       setUnreadCount(response.data.filter((notif) => !notif.read).length);
     } catch (error) {
-      console.error('Erreur lors de la récupération des notifications:', error.response?.data || error.message);
+      console.error('Error fetching notifications:', error.response?.data || error.message);
     }
   };
 
-  // Initialize component by fetching user and notifications
+  // Initialize component
   useEffect(() => {
     const initialize = async () => {
       const userId = await fetchCurrentUser();
       if (userId) {
-        setCurrentUserId(userId);
         await fetchNotifications();
       } else {
-        console.log('Échec de la récupération de l\'userId, Socket.IO non initialisé');
+        console.log('Failed to fetch userId, Socket.IO not initialized');
       }
     };
     initialize();
   }, []);
 
-  // Set up Socket.IO listener for new notifications
+  // Set up Socket.IO listener
   useEffect(() => {
-    if (!currentUserId) {
-      console.log('currentUserId non défini, Socket.IO non initialisé');
-      return;
-    }
+    if (!currentUserId) return;
 
-    console.log('Rejoindre la salle pour userId:', currentUserId);
+    console.log('Joining room for userId:', currentUserId);
     socket.emit('join', currentUserId);
 
     socket.on('new_notification', (notification) => {
-      console.log('Nouvelle notification reçue via WebSocket:', notification);
-      console.log('Destinataire de la notification:', notification.recipient?._id);
-      console.log('Utilisateur connecté:', currentUserId);
-
+      console.log('New notification received via WebSocket:', notification);
       if (notification.recipient?._id.toString() === currentUserId.toString()) {
-        console.log('Mise à jour des notifications et du compteur');
-        setNotifications((prevNotifications) => {
-          // Prevent duplicate notifications
-          if (prevNotifications.some((notif) => notif._id === notification._id)) {
-            console.log('Notification déjà présente:', notification._id);
-            return prevNotifications;
-          }
-          const updatedNotifications = [notification, ...prevNotifications];
-          console.log('Notifications mises à jour:', updatedNotifications);
+        setNotifications((prev) => {
+          if (prev.some((notif) => notif._id === notification._id)) return prev;
+          const updatedNotifications = [notification, ...prev];
+          console.log('Updated notifications:', updatedNotifications);
           return updatedNotifications;
         });
         if (!notification.read) {
-          setUnreadCount((prevCount) => {
-            const newCount = prevCount + 1;
-            console.log('Nouveau unreadCount:', newCount);
-            return newCount;
-          });
+          setUnreadCount((prev) => prev + 1);
         }
-      } else {
-        console.log('Notification ignorée: destinataire incorrect', {
-          receivedRecipient: notification.recipient?._id,
-          currentUserId,
-        });
       }
     });
 
     return () => {
-      console.log('Nettoyage du listener new_notification pour userId:', currentUserId);
+      console.log('Cleaning up new_notification listener for userId:', currentUserId);
       socket.off('new_notification');
     };
   }, [currentUserId]);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log('Notifications state:', notifications);
-    console.log('Unread count:', unreadCount);
-  }, [notifications, unreadCount]);
-
-  // Mark a notification as read
-  const markAsRead = async (notificationId) => {
+  // Mark a notification as read and navigate to appropriate dashboard
+  const markAsReadAndNavigate = async (notificationId, appointmentId) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) {
-      console.log('Aucun token trouvé pour marquer la notification comme lue');
-      return;
-    }
+    if (!token) return;
 
     try {
-      setNotifications((prevNotifications) =>
-        prevNotifications.filter((notif) => notif._id !== notificationId)
-      );
-      setUnreadCount((prevCount) => Math.max(prevCount - 1, 0));
+      // Optimistic UI update
+      setNotifications((prev) => prev.filter((notif) => notif._id !== notificationId));
+      setUnreadCount((prev) => Math.max(prev - 1, 0));
 
+      // Mark as read on the server
       await axios.put(
         `http://localhost:5000/api/notifications/${notificationId}/read`,
         {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Navigate based on user role
+      if (appointmentId && userRole) {
+        const dashboardPath =
+          userRole.toLowerCase() === 'student'
+            ? `${process.env.PUBLIC_URL}/appointment/student-dashboard`
+            : userRole.toLowerCase() === 'psychiatre'
+            ? `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`
+            : `${process.env.PUBLIC_URL}/appointment/student-dashboard`; // Fallback
+        navigate(`${dashboardPath}?highlight=${appointmentId}`);
+      }
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de la notification:', error.response?.data || error.message);
-      await fetchNotifications(); // Re-fetch on error to restore state
+      console.error('Error marking notification as read:', error);
+      await fetchNotifications(); // Re-fetch on error
     }
   };
 
-  // Format time ago for display
+  // Handle notification click
+  const handleNotificationClick = (notification) => {
+    markAsReadAndNavigate(notification._id, notification.appointment?._id);
+  };
+
+  // Format time ago
   const formatTimeAgo = (date) => {
     const now = new Date();
     const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
@@ -175,25 +153,12 @@ const Notification = ({ active, setActive }) => {
     if (diffInSeconds < 60) return `${diffInSeconds} sec`;
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hr`;
-    return `${Math.floor(diffInSeconds / 86400)} jours`;
-  };
-
-  // Handle link click to mark notification as read
-  const handleLinkClick = (e, notificationId) => {
-    e.stopPropagation();
-    markAsRead(notificationId);
+    return `${Math.floor(diffInSeconds / 86400)} days`;
   };
 
   // Get icon based on notification type
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'like_post':
-      case 'like_comment':
-        return <Heart />;
-      case 'dislike_comment':
-        return <ThumbsDown />;
-      case 'comment':
-        return <MessageSquare />;
       case 'appointment_booked':
       case 'appointment_modified':
         return <Calendar />;
@@ -209,53 +174,31 @@ const Notification = ({ active, setActive }) => {
 
   // Get notification message
   const getNotificationMessage = (notif) => {
-    const senderName = notif.isAnonymous
-      ? notif.anonymousPseudo || 'Utilisateur anonyme'
-      : notif.sender?.Name || 'Inconnu';
+    const senderName = notif.sender?.Name || 'Unknown';
     const appointmentDate = notif.appointment?.date
-      ? new Date(notif.appointment.date).toLocaleString()
-      : 'une date inconnue';
+      ? new Date(notif.appointment.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : 'unknown time';
+    const appointmentDay = notif.appointment?.date
+      ? new Date(notif.appointment.date).toLocaleDateString()
+      : 'unknown date';
 
     switch (notif.type) {
-      case 'like_post':
-        return `${senderName} a aimé votre publication "${notif.post?.title || 'Inconnue'}"`;
-      case 'like_comment':
-        return `${senderName} a aimé votre commentaire sur "${notif.post?.title || 'Inconnue'}"`;
-      case 'dislike_comment':
-        return `${senderName} n'a pas aimé votre commentaire sur "${notif.post?.title || 'Inconnue'}"`;
-      case 'comment':
-        return `${senderName} a commenté votre publication "${notif.post?.title || 'Inconnue'}"`;
       case 'appointment_booked':
-        return `${senderName} a réservé un rendez-vous pour le ${appointmentDate}`;
+        return `${senderName} a réservé un rendez-vous à ${appointmentDate} le ${appointmentDay}`;
       case 'appointment_confirmed':
-        return `${senderName} a confirmé votre rendez-vous pour le ${appointmentDate}`;
+        return `${senderName} a confirmé le rendez-vous à ${appointmentDate} le ${appointmentDay}`;
       case 'appointment_modified':
-        return `${senderName} a modifié le rendez-vous du ${appointmentDate}`;
+        return `${senderName} a modifié le rendez-vous à ${appointmentDate} le ${appointmentDay}`;
       case 'appointment_cancelled':
-        return `${senderName} a annulé le rendez-vous du ${appointmentDate}`;
+        return `${senderName} a annulé le rendez-vous à ${appointmentDate} le ${appointmentDay}`;
       case 'appointment_rejected':
-        return `${senderName} a rejeté votre demande de rendez-vous pour le ${appointmentDate}`;
+        return `${senderName} a rejeté votre demande de rendez-vous pour le ${appointmentDate} le ${appointmentDay}`;
       default:
-        return notif.message || 'Nouvelle notification';
+        return notif.message || 'New notification';
     }
   };
 
-  // Get link for notification
-  const getNotificationLink = (notif) => {
-    if (['like_post', 'like_comment', 'dislike_comment', 'comment'].includes(notif.type)) {
-      return `${process.env.PUBLIC_URL}/blog/${notif.post?._id}`;
-    }
-    if (['appointment_booked', 'appointment_confirmed', 'appointment_modified', 'appointment_cancelled', 'appointment_rejected'].includes(notif.type)) {
-      return `${process.env.PUBLIC_URL}/appointments/${notif.appointment?._id}`;
-    }
-    return '#';
-  };
-
-  // Filter unread notifications
   const unreadNotifications = notifications.filter((notif) => !notif.read);
-
-  // Debug rendered notifications
-  console.log('unreadNotifications rendered:', unreadNotifications);
 
   return (
     <li className="onhover-dropdown">
@@ -278,28 +221,23 @@ const Notification = ({ active, setActive }) => {
           </span>
         )}
       </div>
-      <ul
-        className={`notification-dropdown onhover-show-div ${
-          active === 'notificationbox' ? 'active' : ''
-        }`}
-      >
+      <ul className={`notification-dropdown onhover-show-div ${active === 'notificationbox' ? 'active' : ''}`}>
         <li>
           <Bell />
           <h6 className="f-18 mb-0">Notifications</h6>
         </li>
         {unreadNotifications.length > 0 ? (
           unreadNotifications.slice(0, 5).map((notif) => (
-            <li key={notif._id} style={{ cursor: 'pointer' }}>
+            <li
+              key={notif._id}
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleNotificationClick(notif)}
+            >
               <div className="d-flex align-items-center">
                 <div className="flex-shrink-0">{getNotificationIcon(notif.type)}</div>
                 <div className="flex-grow-1">
                   <P>
-                    <Link
-                      to={getNotificationLink(notif)}
-                      onClick={(e) => handleLinkClick(e, notif._id)}
-                    >
-                      {getNotificationMessage(notif)}
-                    </Link>
+                    {getNotificationMessage(notif)}
                     <span className="pull-right">{formatTimeAgo(notif.createdAt)}</span>
                   </P>
                 </div>
@@ -308,13 +246,13 @@ const Notification = ({ active, setActive }) => {
           ))
         ) : (
           <li>
-            <P>Aucune nouvelle notification.</P>
+            <P>No new notifications.</P>
           </li>
         )}
         <li>
-          <Link className="btn btn-primary" to={`${process.env.PUBLIC_URL}/notifications`}>
-            Voir toutes les notifications
-          </Link>
+          <a className="btn btn-primary" href={`${process.env.PUBLIC_URL}/notifications`}>
+            View all notifications
+          </a>
         </li>
       </ul>
     </li>
