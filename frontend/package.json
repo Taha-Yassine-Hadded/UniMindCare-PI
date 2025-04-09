@@ -33,6 +33,7 @@
     "framer-motion": "^12.6.3",
     "html-react-parser": "^5.2.2",
     "i18next-browser-languagedetector": "^6.1.5",
+    "jspdf": "^3.0.1",
     "jwt-decode": "^4.0.0",
     "latest-version": "^7.0.0",
     "leaflet": "^1.9.4",

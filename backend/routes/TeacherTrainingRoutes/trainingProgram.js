@@ -27,6 +27,16 @@ router.get('/my-programs', validateToken, authorizeRoles('psychologist'), async 
   }
 });
 
+// Get all programs
+router.get('/all-programs', validateToken, async (req, res) => {
+  try {
+    const programs = await TrainingProgram.find();
+    res.json(programs);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Get program details
 router.get('/:id', validateToken, async (req, res) => {
   try {

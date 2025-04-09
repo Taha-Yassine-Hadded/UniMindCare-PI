@@ -11,6 +11,16 @@ const ProgramService = {
     }
   },
 
+  // Get all programs
+  getAllPrograms: async () => {
+    try {
+      const response = await apiClient.get('/programs/all-programs');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
   // Create a new program
   createProgram: async (programData) => {
     try {

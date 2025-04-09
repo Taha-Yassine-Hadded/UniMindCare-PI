@@ -119,10 +119,28 @@ import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
 import EmergencyClaim from "../Components/EmergencyClaim/EmergencyClaimButton"; // Importation du nouveau composant
 import EmergencyDashboard from "../Components/EmergencyClaim/EmergencyDashboard";
-
-
+import ProgramList from "../Components/TeacherTraining/ProgramList";
+import ProgramDetails from "../Components/TeacherTraining/ProgramDetails";
+import AllProgram from "../Components/TeacherView/AllProgram";
+import ViewProgramDetails from "../Components/TeacherView/ViewProgramDetails";
 
 export const routes = [
+
+  //Psychologist Training Dashboard
+  { path: `${process.env.PUBLIC_URL}/teacher-training/my-programs`, Component: <ProgramList /> },
+  { path: `${process.env.PUBLIC_URL}/teacher-training/program-details/:id`, Component: <ProgramDetails /> },
+  
+  //Psychologist Training Dashboard
+  { path: `${process.env.PUBLIC_URL}/teacher-training/all-programs`, Component: <AllProgram /> },
+  { path: `${process.env.PUBLIC_URL}/teacher-training/view-details/:id`, Component: <ViewProgramDetails /> },
+
+
+
+
+
+
+
+
   //dashboard
   //<Route path="/notifications" element={<NotificationsPage />} />,
   { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },

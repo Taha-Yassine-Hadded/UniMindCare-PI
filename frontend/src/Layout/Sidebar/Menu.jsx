@@ -883,6 +883,21 @@ export const MENU = [
           },
         ],
       },
+
+      {
+        url: `${process.env.PUBLIC_URL}/teacher-training/my-programs`,
+        icon: <FileText />,
+        title: "Psychologist Dashboard",
+        type: "link",
+        bookmark: true,
+      },
+      {
+        url: `${process.env.PUBLIC_URL}/teacher-training/all-programs`,
+        icon: <FileText />,
+        title: "Training Programs",
+        type: "link",
+        bookmark: true,
+      },
      
       {
         title: "Editor",

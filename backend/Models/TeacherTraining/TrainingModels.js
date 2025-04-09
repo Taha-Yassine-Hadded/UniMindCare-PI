@@ -20,7 +20,6 @@ const trainingContentSchema = new mongoose.Schema({
     options: [String],
     correctAnswer: String
   }],
-  order: Number,
   trainingProgramId: mongoose.Schema.Types.ObjectId
 });
 
