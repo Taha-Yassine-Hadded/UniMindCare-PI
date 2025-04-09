@@ -384,13 +384,39 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
     }
   };
 
-  // Helper function to check if a time slot is available
-  const isSlotAvailable = (start, end) => {
-    return availability.some((slot) => {
-      if (slot.status !== 'available') return false;
-      return slot.start <= end && slot.end >= start;
-    });
-  };
+ // Replace the existing isSlotAvailable function with this one:
+const isSlotAvailable = (start, end) => {
+  // For debugging - log all relevant information
+  console.log("--- AVAILABILITY CHECK ---");
+  console.log("Checking if slot is available:", 
+    new Date(start).toLocaleString(), "to", new Date(end).toLocaleString());
+  console.log("Available slots:", availability.length);
+  
+  // Convert input dates to timestamps for reliable comparison
+  const startTime = start instanceof Date ? start.getTime() : new Date(start).getTime();
+  const endTime = end instanceof Date ? end.getTime() : new Date(end).getTime();
+  
+  // Loop through all availability slots
+  for (const slot of availability) {
+    // Skip non-available slots
+    if (slot.status !== 'available') continue;
+    
+    // Ensure slot times are properly converted to Date objects
+    const slotStart = slot.start instanceof Date ? slot.start.getTime() : new Date(slot.start).getTime();
+    const slotEnd = slot.end instanceof Date ? slot.end.getTime() : new Date(slot.end).getTime();
+    
+    console.log(`Checking slot: ${new Date(slotStart).toLocaleString()} to ${new Date(slotEnd).toLocaleString()}`);
+    
+    // Check if appointment fits within the available slot
+    if (slotStart <= startTime && slotEnd >= endTime) {
+      console.log("✅ FOUND AVAILABLE SLOT!");
+      return true;
+    }
+  }
+  
+  console.log("❌ NO AVAILABLE SLOTS FOUND");
+  return false;
+};
 
   // Handle form submission based on modal type
   const handleSubmit = async () => {
@@ -435,6 +461,12 @@ const AppointmentCalendar = ({ role, userId, selectedPsychologistId }) => {
           }
 
           if (role === 'student' && !isSlotAvailable(newStart, newEnd)) {
+            console.error("Availability check failed for:", newStart, newEnd);
+            console.log("Available slots:", availability.map(slot => ({
+              start: new Date(slot.start).toLocaleString(),
+              end: new Date(slot.end).toLocaleString(),
+              status: slot.status
+            })));
             toast.error("Please select a time within the psychologist's available slots.");
             return;
           }

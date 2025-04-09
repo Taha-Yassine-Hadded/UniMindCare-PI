@@ -27,7 +27,7 @@ const Notification = ({ active, setActive }) => {
   const [userRole, setUserRole] = useState(null);
   const navigate = useNavigate();
 
-  // Fetch current user’s ID and role from /api/users/me
+  // Fetch current user's ID and role from /api/users/me
   const fetchCurrentUser = async () => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
@@ -40,8 +40,10 @@ const Notification = ({ active, setActive }) => {
         headers: { Authorization: `Bearer ${token}` },
       });
       console.log('Logged-in user:', response.data);
-      setCurrentUserId(response.data.userId || response.data._id);
-      setUserRole(response.data.Role?.[0]); // Access first role since it's an array      return response.data.userId || response.data._id;
+      const userId = response.data.userId || response.data._id;
+      setCurrentUserId(userId);
+      setUserRole(response.data.Role?.[0]); // Access first role since it's an array
+      return userId;
     } catch (error) {
       console.error('Error fetching user:', error.response?.data || error.message);
       return null;
@@ -78,7 +80,7 @@ const Notification = ({ active, setActive }) => {
     initialize();
   }, []);
 
-  // Set up Socket.IO listener
+  // Set up Socket.IO listener with improved handling
   useEffect(() => {
     if (!currentUserId) return;
 
@@ -86,17 +88,46 @@ const Notification = ({ active, setActive }) => {
     socket.emit('join', currentUserId);
 
     socket.on('new_notification', (notification) => {
-      console.log('New notification received via WebSocket:', notification);
-      if (notification.recipient?._id.toString() === currentUserId.toString()) {
-        setNotifications((prev) => {
-          if (prev.some((notif) => notif._id === notification._id)) return prev;
-          const updatedNotifications = [notification, ...prev];
-          console.log('Updated notifications:', updatedNotifications);
-          return updatedNotifications;
+      console.log('New notification received in dropdown:', notification);
+      
+      // Debug the notification type specifically for appointment confirmations
+      if (notification.type === 'appointment_confirmed') {
+        console.log('CONFIRMATION NOTIFICATION RECEIVED:', notification);
+      }
+      
+      try {
+        // Handle all possible recipient structures
+        const recipientId = (notification.recipient?._id || notification.recipient || '').toString();
+        const currentId = (currentUserId || '').toString();
+        
+        console.log('ID comparison:', {
+          recipientId,
+          currentId,
+          match: recipientId === currentId
         });
-        if (!notification.read) {
-          setUnreadCount((prev) => prev + 1);
+        
+        if (recipientId === currentId) {
+          // Add to notifications and ensure UI update
+          setNotifications(prev => {
+            // Check by _id to prevent duplicates
+            if (prev.some(n => n._id === notification._id)) {
+              console.log('Duplicate notification prevented');
+              return prev;
+            }
+            console.log('Adding new notification to dropdown');
+            return [notification, ...prev];
+          });
+          
+          // Update unread count
+          if (!notification.read) {
+            console.log('Incrementing unread count');
+            setUnreadCount(prev => prev + 1);
+          }
+        } else {
+          console.log('Notification not for current user, ignoring');
         }
+      } catch (error) {
+        console.error('Error processing notification:', error);
       }
     });
 
@@ -110,49 +141,74 @@ const Notification = ({ active, setActive }) => {
   const markAsReadAndNavigate = async (notificationId, appointmentId) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return;
-  
+
     try {
-      // Optimistic UI update
-      setNotifications((prev) => prev.map(notif => 
-        notif._id === notificationId ? {...notif, read: true} : notif
-      ));
-      setUnreadCount((prev) => Math.max(prev - 1, 0));
-  
-      // Mark as read on the server
-      await axios.put(
-        `http://localhost:5000/api/notifications/${notificationId}/read`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+      // Debug the notification click
+      console.log('Marking notification as read:', notificationId);
+      console.log('Appointment ID for navigation:', appointmentId);
+      
+      // Update UI optimistically first - ensure this happens regardless of API call
+      setNotifications((prev) => 
+        prev.map(notif => notif._id === notificationId ? {...notif, read: true} : notif)
       );
-  
+      setUnreadCount((prev) => Math.max(prev - 1, 0));
+      
+      // Set a flag to prevent multiple navigation attempts
+      let navigationAttempted = false;
+
+      // Mark as read on the server with proper error handling
+      try {
+        await axios.put(
+          `http://localhost:5000/api/notifications/${notificationId}/read`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log('Successfully marked notification as read on server');
+      } catch (error) {
+        console.error('Error marking notification as read on server:', error);
+        // Don't revert optimistic UI updates - they should still work locally
+      }
+
       // Navigate based on user role
-      if (appointmentId && userRole) {
+      if (appointmentId && userRole && !navigationAttempted) {
+        navigationAttempted = true;
         // Get user role and force lowercase for comparison
         const role = (userRole || '').toLowerCase();
         let dashboardPath = role === 'student' 
           ? "/appointment/student-dashboard" 
-          : role === 'psychiatre' || role === 'psychologist'
+          : (role === 'psychiatre' || role === 'psychologist')
           ? "/appointment/psychologist-dashboard"
           : "/appointment/student-dashboard"; // Fallback
-          
-        console.log(`Navigating to: ${dashboardPath}?highlight=${appointmentId}`);
         
-        // Add process.env.PUBLIC_URL if your router uses it
-        if (process.env.PUBLIC_URL) {
-          dashboardPath = `${process.env.PUBLIC_URL}${dashboardPath}`;
-        }
+        // Ensure we have a valid URL with the highlight parameter
+        const navigationUrl = `${process.env.PUBLIC_URL}${dashboardPath}?highlight=${appointmentId}`;
+        console.log(`Navigating to: ${navigationUrl}`);
         
-        window.location.href = `${dashboardPath}?highlight=${appointmentId}`;
+        // Force window navigation to ensure it works in all cases
+        window.location.href = navigationUrl;
+      } else {
+        console.warn('Navigation skipped - missing data:', { 
+          hasAppointmentId: !!appointmentId,
+          userRole,
+          navigationAttempted
+        });
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-      await fetchNotifications(); // Re-fetch on error
+      console.error('Unexpected error in markAsReadAndNavigate:', error);
     }
   };
 
   // Handle notification click
   const handleNotificationClick = (notification) => {
-    markAsReadAndNavigate(notification._id, notification.appointment?._id);
+    console.log('Notification clicked:', notification);
+    // Make sure we extract the appointment ID correctly for all notification types
+    const appointmentId = notification.appointment?._id || notification.appointment;
+    
+    if (!appointmentId) {
+      console.error('No appointment ID found in notification:', notification);
+    }
+    
+    markAsReadAndNavigate(notification._id, appointmentId);
   };
 
   // Format time ago
