@@ -41,8 +41,7 @@ const Notification = ({ active, setActive }) => {
       });
       console.log('Logged-in user:', response.data);
       setCurrentUserId(response.data.userId || response.data._id);
-      setUserRole(response.data.role); // Adjust based on your API (e.g., 'student' or 'psychiatre')
-      return response.data.userId || response.data._id;
+      setUserRole(response.data.Role?.[0]); // Access first role since it's an array      return response.data.userId || response.data._id;
     } catch (error) {
       console.error('Error fetching user:', error.response?.data || error.message);
       return null;
@@ -126,13 +125,17 @@ const Notification = ({ active, setActive }) => {
 
       // Navigate based on user role
       if (appointmentId && userRole) {
-        const dashboardPath =
-          userRole.toLowerCase() === 'student'
-            ? `${process.env.PUBLIC_URL}/appointment/student-dashboard`
-            : userRole.toLowerCase() === 'psychiatre'
-            ? `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`
-            : `${process.env.PUBLIC_URL}/appointment/student-dashboard`; // Fallback
-        navigate(`${dashboardPath}?highlight=${appointmentId}`);
+        // Get user role and force lowercase for comparison
+        const role = (userRole || '').toLowerCase();
+        const dashboardPath = role === 'student' 
+          ? "/appointment/student-dashboard" 
+          : role === 'psychiatre' || role === 'psychologist'
+          ? "/appointment/psychologist-dashboard"
+          : "/appointment/student-dashboard"; // Fallback
+          
+        console.log(`Navigating to: ${dashboardPath}?highlight=${appointmentId}`);
+        // Use window.location.href for a full page navigation
+        window.location.href = `${dashboardPath}?highlight=${appointmentId}`;
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
