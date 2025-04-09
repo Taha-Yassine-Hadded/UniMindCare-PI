@@ -4,6 +4,17 @@ const User = require("../Models/Users"); // Import the User model
 const { transporter } = require("../config/emailConfig");
 const loginLink = "http://localhost:3000/tivo/authentication/login-simple";
 const bcrypt = require("bcryptjs");
+const { validateToken } = require('../middleware/authentication');
+
+
+router.get('/auth/me', validateToken, async (req, res) => {
+  try {
+    res.json({ userId: req.user.userId });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 /* POST to add a new user */
 router.post("/add", async function (req, res, next) {

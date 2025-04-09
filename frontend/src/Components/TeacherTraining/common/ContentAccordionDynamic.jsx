@@ -80,49 +80,43 @@ const ContentAccordionDynamic = ({ isOpen, toggle, contents, onDelete, onRefresh
   const handleDownloadQuiz = (quiz) => {
     const doc = new jsPDF();
     let yOffset = 10;
-
+  
     doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
     doc.text(`Quiz: ${quiz.title || 'Untitled'}`, 10, yOffset);
     yOffset += 10;
-
+  
     if (quiz.questions && quiz.questions.length > 0) {
       doc.setFontSize(12);
       quiz.questions.forEach((question, index) => {
         doc.setFont('helvetica', 'bold');
         doc.text(`${index + 1}. ${question.text || 'Question not specified'}`, 10, yOffset);
         yOffset += 6;
-
+  
         doc.setFont('helvetica', 'normal');
-        if (question.options && question.options.length > 0) {
-          question.options.forEach((option, optIndex) => {
-            const isCorrect = option === question.correctAnswer;
-            if (isCorrect) {
-              doc.setTextColor(0, 128, 0);
-            } else {
-              doc.setTextColor(0, 0, 0);
-            }
-            doc.text(`   ${String.fromCharCode(97 + optIndex)}. ${option}`, 10, yOffset);
-            yOffset += 5;
-          });
-        }
+        question.options?.forEach((option, optIndex) => {
+          doc.setTextColor(0, 0, 0);
+          doc.text(`   ${String.fromCharCode(97 + optIndex)}. ${option}`, 10, yOffset);
+          yOffset += 5;
+        });
+  
         yOffset += 5;
       });
     } else {
       doc.setFontSize(12);
       doc.text('No questions available for this quiz.', 10, yOffset);
     }
-
+  
     doc.save(`${quiz.title || 'quiz'}.pdf`);
   };
 
   const handleDownloadPDF = (content) => {
     if (content.contentUrl) {
-      // Create a temporary link to trigger the download
       const link = document.createElement('a');
       link.href = content.contentUrl;
-      link.download = ''; // The file name is set by the signed URL's responseDisposition
+      link.download = '';
       link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      link.rel = 'noopener noreferrer'; // Fixed the syntax error here
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -275,35 +269,27 @@ const ContentAccordionDynamic = ({ isOpen, toggle, contents, onDelete, onRefresh
         primaryBtnText="Close"
         onPrimaryBtnClick={toggleModal}
         showSecondaryBtn={false}
+        bodyClass="p-4"
       >
         {selectedQuiz && (
-          <div>
-            <h6>Questions:</h6>
-            {selectedQuiz.questions && selectedQuiz.questions.length > 0 ? (
-              <ol>
-                {selectedQuiz.questions.map((question, index) => (
-                  <li key={index} style={{ marginBottom: '20px' }}>
-                    <strong>{question.text || 'Question not specified'}</strong>
-                    <ul style={{ listStyleType: 'none', paddingLeft: 0 }}>
-                      {question.options && question.options.map((option, optIndex) => (
-                        <li key={optIndex}>
-                          <span
-                            style={{
-                              color: option === question.correctAnswer ? 'green' : 'black',
-                              fontWeight: option === question.correctAnswer ? 'bold' : 'normal'
-                            }}
-                          >
-                            {option}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p>No questions available for this quiz.</p>
-            )}
+        <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+          <h6>Questions:</h6>
+          {selectedQuiz.questions && selectedQuiz.questions.length > 0 ? (
+            selectedQuiz.questions.map((question, index) => (
+              <div key={index} style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #ccc', borderRadius: '8px' }}>
+                <strong>{index + 1}. {question.text || 'Question not specified'}</strong>
+                <ul style={{ marginTop: '0.5rem', paddingLeft: '1rem' }}>
+                  {question.options && question.options.map((option, optIndex) => (
+                    <li key={optIndex}>
+                      {option}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          ) : (
+            <p>No questions available for this quiz.</p>
+          )}
           </div>
         )}
       </CommonModal>

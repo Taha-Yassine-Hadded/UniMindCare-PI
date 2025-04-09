@@ -7,6 +7,7 @@ import Swal from 'sweetalert2';
 const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
   const [formData, setFormData] = useState({
     title: '',
+    description: '', // Add description field
     type: 'video',
     contentUrl: '',
     meetingLink: '',
@@ -71,6 +72,7 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
     try {
       const contentData = new FormData();
       contentData.append('title', formData.title);
+      contentData.append('description', formData.description || ''); // Add this line
       contentData.append('type', formData.type);
       
       if (formData.type === 'video') {
@@ -125,6 +127,17 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
           value={formData.title}
           onChange={handleChange}
           required
+        />
+      </FormGroup>
+
+      <FormGroup>
+        <Label for="description">Description (Optional)</Label>
+        <Input
+          type="textarea"
+          name="description"
+          id="description"
+          value={formData.description}
+          onChange={handleChange}
         />
       </FormGroup>
 

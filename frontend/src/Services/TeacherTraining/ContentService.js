@@ -21,15 +21,14 @@ const ContentService = {
     }
   },
 
-  // Update existing content
-  updateContent: async (contentId, updates) => {
-    try {
-      const response = await apiClient.patch(`/training-content/${contentId}`, updates);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
+  // Updated method to submit quiz results
+  submitQuizResult: async (contentId, result) => {
+    const response = await apiClient.post(`/training-content/${contentId}/submit-quiz-result`, {
+      result
+    });
+    return response.data;
   },
+
 
   // Delete content
   deleteContent: async (contentId) => {

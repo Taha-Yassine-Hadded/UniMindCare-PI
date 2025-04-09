@@ -61,6 +61,26 @@ const ProgramService = {
     }
   },
 
+  // Recommend a program
+  recommendProgram: async (programId) => {
+    try {
+      const response = await apiClient.post(`/programs/${programId}/recommend`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Unrecommend a program
+  unrecommendProgram: async (programId) => {
+    try {
+      const response = await apiClient.post(`/programs/${programId}/unrecommend`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+
 };
 
 export default ProgramService;

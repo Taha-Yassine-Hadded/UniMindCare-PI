@@ -5,7 +5,15 @@ const trainingProgramSchema = new mongoose.Schema({
   title: String,
   description: String,
   psychologistId: mongoose.Schema.Types.ObjectId,
-  passingScore: Number
+  recommendedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // Assuming you have a User model
+    default: [] // Default to an empty array
+  }],
+  creationDate: {
+    type: Date,
+    default: Date.now // Automatically set to the current date/time when created
+  }
 });
 
 // 2. Training Content (videos, PDFs, quizzes, etc.)
@@ -20,7 +28,27 @@ const trainingContentSchema = new mongoose.Schema({
     options: [String],
     correctAnswer: String
   }],
-  trainingProgramId: mongoose.Schema.Types.ObjectId
+  trainingProgramId: mongoose.Schema.Types.ObjectId,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  results: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    result: {
+      type: Number,
+      min: 0,
+      max: 100,
+      required: true
+    }
+  }]
 });
 
 // 3. User Progress
