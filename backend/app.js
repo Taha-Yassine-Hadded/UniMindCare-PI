@@ -1,4 +1,5 @@
 
+
 require('dotenv').config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -12,18 +13,21 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
-const UserVerification = require('./Models/UserVerification'); 
-const User = require('./Models/Users');
+const UserVerification = require('./models/UserVerification'); 
+const appointementRoutes = require('./routes/appointmentRoutes');
+const caseRoutes = require('./routes/caseRoutes');
+const availabilityRoutes = require('./routes/availabilityRoutes');
+const notificationsRoutes = require('./routes/notifications');
 
+const User = require('./Models/Users');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
 const crypto = require('crypto');
 const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
-const transporter = require('./config/emailConfig');
+const { transporter } = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
-const notificationsRoutes = require('./routes/notifications');
 const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
 const evaluationRoutes = require("./routes/evalution");
@@ -68,6 +72,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Middleware pour passer io à toutes les routes
+app.use((req, res, next) => {
+  req.io = io; // Ajouter io à l'objet req pour qu'il soit accessible dans les routes
+  next();
+});
+
+// Gestion des connexions WebSocket
+io.on('connection', (socket) => {
+  console.log('Un utilisateur s\'est connecté via WebSocket:', socket.id);
+
+  // Associer l'utilisateur à une salle basée sur son ID
+  socket.on('join', (userId) => {
+    socket.join(userId);
+    console.log(`Utilisateur ${userId} a rejoint sa salle`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Un utilisateur s\'est déconnecté:', socket.id);
+  });
+});
 
 // Middleware pour passer io à toutes les routes
 app.use((req, res, next) => {
@@ -781,6 +806,18 @@ app.closeAll = async () => {
   }
 };
 
+
+
+
+
+
+/*Partie salma gestion appointements */
+
+
+app.use('/api/appointments', appointementRoutes);
+app.use('/api/cases', caseRoutes);
+app.use('/api/availability', availabilityRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 
 

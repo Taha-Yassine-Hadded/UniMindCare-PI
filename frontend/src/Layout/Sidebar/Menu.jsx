@@ -28,6 +28,8 @@ import {
   Users,
   Zap,
   ShoppingBag,
+  Calendar,
+  Clipboard,
   AlertTriangle,
 } from "react-feather";
 
@@ -236,6 +238,9 @@ export const MENU = [
         type: "link",
         bookmark: true,
       },
+
+    
+
       {
         url: `${process.env.PUBLIC_URL}/kanban-board`,
         icon: <Monitor />,
@@ -274,6 +279,47 @@ export const MENU = [
         icon: <Clock />,
         type: "link",
         title: "To-Do",
+      },
+    ],
+  },
+  {
+    className: "menu-box",
+    menu: [
+      {
+        title: "Mental Health Services",
+        icon: <Heart />,
+        type: "sub",
+        menu: [
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/doctor-list`,
+            type: "link",
+            title: "List of Psychologists",
+            userRole: "student", // Only visible to students
+            icon: <List />,
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/student-dashboard`,
+            type: "link", 
+            title: "Appointments Calendar",
+            userRole: "student", // Only visible to students
+            icon: <Calendar />,
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`,
+            type: "link",
+            title: "Appointments Calendar", 
+            userRole: "psychiatre", // Only visible to psychologists
+            icon: <Calendar />,
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/case-management`,
+            type: "link",
+            title: "Case Management",
+            userRole: "psychiatre", // Only visible to psychologists
+            icon: <Clipboard />,
+          }
+         
+        ],
       },
     ],
   },
@@ -1903,5 +1949,6 @@ export const SEARCHMENU = [
       },
     ],
   },
+  
 ];
 

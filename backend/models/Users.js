@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
   Classe: { type: String },
   Role: {
     type: [String],
-    enum: ['student', 'admin', 'psychologist', 'teacher'],
+    enum: ['student', 'admin', 'psychiatre', 'teacher'],
     required: true
   }, 
   PhoneNumber: { type: String },

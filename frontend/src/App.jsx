@@ -21,6 +21,7 @@ import GoogleChartProvider from "./Helper/GoogleChart/GoogleChartProvider"
 import ChartistProvider from "./Helper/Chartist/ChartistProvider"
 import AnimationThemeProvider from './Helper/AnimationTheme/AnimationThemeProvider'
 
+
 const App = () => {
   return (
     <div className='App'>

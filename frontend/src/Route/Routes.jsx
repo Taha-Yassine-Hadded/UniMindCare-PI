@@ -1,4 +1,5 @@
 import Default from "../Components/Dashboard/Default/Default";
+import { Route } from "react-router-dom";
 import Ecommerce from "../Components/Dashboard/Ecommerce/Ecommerce";
 import General from "../Components/Widgeta/General";
 import Chart from "../Components/Widgeta/Chart";
@@ -115,17 +116,22 @@ import CheckOutContain from "../Components/Eccommerce/CheckOut/index";
 import AddProductName from "../Components/Eccommerce/AddProduct";
 import FileManagerContain from "../Components/FileManager/index";
 import MapJsContain from "../Components/Maps/pigeon-maps";
-import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import WeatherDashboard from "../Components/Weather/WeatherDashboard"; 
 import EmergencyClaim from "../Components/EmergencyClaim/EmergencyClaimButton"; // Importation du nouveau composant
 import EmergencyDashboard from "../Components/EmergencyClaim/EmergencyDashboard";
 import Feedback from "../Components/FormFARAH/FeedbackEtudiant";
-import StudentDashboard from "../Components/StudentDashboard";
 import TeacherDashboard from "../Components/TeacherDashboard";
 import Statistics from "../Components/Statistics";
 import StatisticsEtudiant from "../Components/StudentStats";
 import Yoga from "../Components/EmergencyClaim/YogaSeance";
 import BlogStats from "../Components/Blog/BlogStats";
+import DoctorsList from "../Components/AppointementModule/DoctorsList";
+// Add these imports at the top with other imports
+import StudentDashboard from "../Components/AppointementModule/StudentDashboard";
+import PsychologistDashboard from "../Components/AppointementModule/PsychologistDashboard";
+import CaseManagement from "../Components/AppointementModule/CaseManagement";
+import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
+import AppointmentCalendar from "../Components/AppointementModule/AppointmentCalendar";
 
 export const routes = [
   //dashboard
@@ -302,4 +308,12 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/form-widget/rangepicker`, Component: <RangePicker /> },
   { path: `${process.env.PUBLIC_URL}/ecommerce/checkout`, Component: <CheckOutContain /> },
   { path: `${process.env.PUBLIC_URL}/ecommerce/Add-product`, Component: <AddProductName /> },
+
+// Appointment Module
+  {path : `${process.env.PUBLIC_URL}/appointment/doctor-list`, Component: <DoctorsList />},
+  { path: `${process.env.PUBLIC_URL}/appointment/student-dashboard`, Component: <StudentDashboard /> },
+  { path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
+  {path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagement />},
+  { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
+
 ];

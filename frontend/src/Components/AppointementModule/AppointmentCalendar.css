@@ -1,0 +1,192 @@
+.my-calendar .rbc,
+.my-calendar .rbc * {
+  background: none !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+.my-calendar .rbc-event-content {
+  background-color: transparent !important;
+  color: inherit !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.my-calendar .rbc-event-label
+ {
+  background-color: transparent !important;
+  color: inherit !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.my-calendar .rbc-button-link {
+  background-color: transparent !important;
+  color: inherit !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.my-calendar .rbc-show-more {
+  background-color: transparent !important;
+  color: inherit !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.my-calendar .rbc-event,
+
+.my-calendar .rbc-day-slot .rbc-event,
+.my-calendar .rbc-day-bg.rbc-selected,
+.my-calendar .rbc-day-slot .rbc-selected,
+.my-calendar .rbc-event:focus,
+.my-calendar .rbc-event.rbc-selected {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  outline: none !important;
+}
+
+/* Then re-introduce only the borders or styles you actually want */
+.my-calendar .rbc-time-view .rbc-time-gutter .rbc-timeslot-group {
+  border-bottom: 1px solid #ddd !important;
+}
+
+/* Appointment colors */
+.my-calendar .rbc-event[data-status="pending"] {
+  background-color: #fdfd96 !important;
+  color: #212529 !important;
+}
+
+.my-calendar .rbc-event[data-status="confirmed"] {
+  background-color: #b0f2b6 !important;
+  color: #212529 !important;
+}
+
+.my-calendar .rbc-event[data-status="cancelled"] {
+  background-color: #ff9e93 !important;
+  color: #212529 !important;
+  
+}
+
+
+
+/* Remove the default purple outline on selection */
+.rbc-event.rbc-selected {
+    outline: none !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+}
+
+
+
+
+
+
+
+/* Make sure availability events stay hidden */
+.rbc-event.availability {
+    display: none !important;
+    background-color: transparent !important;
+    border: none !important;
+}
+
+/* Ensure appointments stand out properly */
+.rbc-event.appointment {
+    z-index: 5 !important;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    transition: all 0.2s ease;
+}
+
+.rbc-event.appointment:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    transform: translateY(-1px);
+}
+
+/* Enhanced strikethrough effect for blocked time slots */
+.blocked-time-slot {
+    position: relative;
+    background-color: rgba(108, 117, 125, 0.05);
+}
+
+.blocked-time-slot::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: rgba(108, 117, 125, 0.7);
+    transform: rotate(-5deg);
+    z-index: 2;
+}
+
+/* More prominent diagonal strikethrough for blocked date cells */
+.blocked-date-cell {
+    position: relative;
+    background-color: rgba(108, 117, 125, 0.05);
+}
+
+.blocked-date-cell::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        linear-gradient(45deg, transparent 45%, rgba(108, 117, 125, 0.5) 45%, rgba(108, 117, 125, 0.5) 55%, transparent 55%);
+    background-size: 8px 8px;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Brighter green styling for available time slots */
+.available-time-slot {
+    background-color: rgba(32, 201, 151, 0.15);
+    border-left: 3px solid #20c997;
+}
+
+/* Styling for available date cells */
+.available-date-cell {
+    background-color: rgba(32, 201, 151, 0.15);
+    border-left: 3px solid #20c997;
+}
+
+/* Style the legend items */
+.legend-section {
+    margin-bottom: 10px;
+}
+
+.legend-section h6 {
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    color: #495057;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+    margin-bottom: 5px;
+}
+
+.legend-color {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    border-radius: 2px;
+}
+
+/* Update legend items to match new style */
+.legend-available {
+    background-color: rgba(32, 201, 151, 0.15);
+    border: 2px solid #20c997;
+}
+
+.legend-blocked {
+    background-image: repeating-linear-gradient(45deg, rgba(108, 117, 125, 0.15), rgba(108, 117, 125, 0.15) 5px, rgba(255, 255, 255, 0.5) 5px, rgba(255, 255, 255, 0.5) 10px);
+    border: 2px solid #6c757d;
+}
