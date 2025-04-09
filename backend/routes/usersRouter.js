@@ -101,7 +101,31 @@ router.post('/signin', async (req, res) => {
     );
 
     console.log('Token généré:', token);
-    res.json({ token });
+    console.log('Données utilisateur renvoyées:', {
+      _id: user._id,
+      Name: user.Name,
+      Identifiant: user.Identifiant,
+      Email: user.Email,
+      Classe: user.Classe,
+      Role: user.Role,
+      PhoneNumber: user.PhoneNumber,
+      imageUrl: user.imageUrl || '/defaultProfile.png',
+      twoFactorEnabled: user.twoFactorEnabled || false,
+    });
+    res.json({
+      token,
+      user: {
+        _id: user._id, // Inclusion explicite de _id
+        Name: user.Name,
+        Identifiant: user.Identifiant,
+        Email: user.Email,
+        Classe: user.Classe,
+        Role: user.Role,
+        PhoneNumber: user.PhoneNumber,
+        imageUrl: user.imageUrl || '/defaultProfile.png',
+        twoFactorEnabled: user.twoFactorEnabled || false,
+      },
+    });
   } catch (error) {
     console.error('Erreur de connexion :', error);
     res.status(500).json({ message: 'Erreur serveur' });

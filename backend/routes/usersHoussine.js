@@ -16,8 +16,19 @@ router.get('/me', async (req, res) => {
         const user = await User.findOne({ Identifiant: decoded.identifiant });
 
         if (!user) return res.status(404).json({ message: 'User not found' });
-
+        console.log('Données renvoyées par /me:', {
+            _id: user._id,
+            Name: user.Name,
+            Identifiant: user.Identifiant,
+            Email: user.Email,
+            Classe: user.Classe,
+            Role: user.Role,
+            PhoneNumber: user.PhoneNumber,
+            imageUrl: user.imageUrl,
+            twoFactorEnabled: user.twoFactorEnabled || false,
+          });
         res.json({
+            _id: user._id, // Ajout de _id
             Name: user.Name,
             Identifiant: user.Identifiant,
             Email: user.Email,

@@ -121,12 +121,16 @@ import StudentDashboard from "../Components/StudentDashboard";
 import TeacherDashboard from "../Components/TeacherDashboard";
 import Statistics from "../Components/Statistics";
 import StatisticsEtudiant from "../Components/StudentStats";
-import Chat from "../Components/chat";
 import UserList from "../Components/userList"; 
+import ChatModal from "../Components/ChatModal";
 export const routes = [
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
     
+    { 
+      path: `${process.env.PUBLIC_URL}/chatModal`, 
+      Component: <ChatModal />
+    },    //statistics
     { 
       path: `${process.env.PUBLIC_URL}/users/list`, 
       Component: <UserList /> 
@@ -135,7 +139,6 @@ export const routes = [
 
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`, Component: <StatisticsEtudiant /> },
 
-    { path: `${process.env.PUBLIC_URL}/dashboard/chat`, Component: <Chat /> },
 
 
   //Feedback

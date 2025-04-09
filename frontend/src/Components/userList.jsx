@@ -1,128 +1,83 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import ChatModal from './ChatModal';
 
 const UserList = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        setLoading(true);
-        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-        
+        console.log('Token utilisé pour fetchUsers:', token);
         if (!token) {
-          navigate("/login");
+          setError('Utilisateur non authentifié. Redirection vers la connexion...');
+          setTimeout(() => navigate('/login'), 2000);
           return;
         }
-
-        const res = await axios.get("http://localhost:5000/api/users/all", {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+        const res = await axios.get('http://localhost:5000/api/users/all?role=student', {
+          headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (res.data && Array.isArray(res.data)) {
-          setUsers(res.data);
-        } else {
-          setError("Format de données invalide");
-        }
+        setUsers(res.data);
       } catch (error) {
-        console.error("Fetch Error:", error);
-        setError(error.response?.data?.message || "Erreur lors du chargement des utilisateurs");
+        setError(error.response?.data?.message || 'Erreur lors du chargement des étudiants');
+        console.error('Erreur fetchUsers:', error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchUsers();
-  }, [navigate]);
+  }, [token, navigate]);
 
-  if (loading) return (
-    <div style={styles.container}>
-      <p>Chargement des utilisateurs...</p>
-    </div>
-  );
-  
-  if (error) return (
-    <div style={styles.container}>
-      <p style={styles.error}>{error}</p>
-    </div>
-  );
+  const openChat = (user) => {
+    console.log('Utilisateur sélectionné pour chat:', user);
+    setSelectedUser({
+      Identifiant: user.Identifiant || user._id, // Si Identifiant n'est pas dans la réponse, utiliser _id temporairement
+      Name: user.Name,
+      Email: user.Email,
+    });
+    setIsChatOpen(true);
+  };
+
+  const closeChat = () => {
+    setIsChatOpen(false);
+    setSelectedUser(null);
+  };
+
+  if (loading) return <div>Chargement des étudiants...</div>;
+  if (error) return <div style={{ color: 'red' }}>{error}</div>;
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>Liste des utilisateurs</h2>
-      {users.length === 0 ? (
-        <p style={styles.noUsers}>Aucun utilisateur trouvé.</p>
-      ) : (
-        <ul style={styles.userList}>
-          {users.map((user) => (
-            <li
-              key={user._id}
-              style={styles.userItem}
-              onClick={() => navigate(`/messages/${user._id}`)}
-            >
-              <span style={styles.userName}>{user.Name}</span>
-              <span style={styles.userEmail}>{user.Email}</span>
-            </li>
-          ))}
-        </ul>
+    <div style={{ padding: '20px' }}>
+      <h2>Liste des étudiants</h2>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {users.map((user) => (
+          <li
+            key={user._id}
+            onClick={() => openChat(user)}
+            style={{
+              padding: '10px',
+              margin: '5px 0',
+              background: '#f0f0f0',
+              cursor: 'pointer',
+            }}
+          >
+            {user.Name} ({user.Email})
+          </li>
+        ))}
+      </ul>
+      {isChatOpen && selectedUser && (
+        <ChatModal receiverUser={selectedUser} onClose={closeChat} />
       )}
     </div>
   );
-};
-
-const styles = {
-  container: {
-    padding: "20px",
-    maxWidth: "800px",
-    margin: "0 auto",
-  },
-  title: {
-    color: "#2c3e50",
-    marginBottom: "20px",
-    textAlign: "center",
-  },
-  userList: {
-    listStyle: "none",
-    padding: 0,
-  },
-  userItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "15px",
-    margin: "10px 0",
-    backgroundColor: "#ffffff",
-    borderRadius: "8px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-    cursor: "pointer",
-    transition: "transform 0.2s ease",
-    "&:hover": {
-      transform: "translateY(-2px)",
-      boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-    },
-  },
-  userName: {
-    fontWeight: "bold",
-    color: "#2c3e50",
-  },
-  userEmail: {
-    color: "#7f8c8d",
-    fontSize: "0.9em",
-  },
-  error: {
-    color: "#e74c3c",
-    textAlign: "center",
-  },
-  noUsers: {
-    textAlign: "center",
-    color: "#7f8c8d",
-  },
 };
 
 export default UserList;
