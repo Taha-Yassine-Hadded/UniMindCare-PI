@@ -125,7 +125,7 @@ const AddUserForm = ({ onUserAdded, toggler }) => {
           <Input type="select" name="Role" value={formData.Role} onChange={handleRoleChange} required>
             <option value="student">Student</option>
             <option value="teacher">Teacher</option>
-            <option value="psychologist">Psychologist</option>
+            <option value="psychiatre">Psychologist</option>
           </Input>
         </FormGroup>
 

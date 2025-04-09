@@ -3,11 +3,14 @@ import { Btn, Breadcrumbs, Spinner } from "../../../AbstractElements";
 import DataTable from "react-data-table-component";
 import { Container, Row, Col, Card, CardBody, Dropdown, DropdownToggle, DropdownMenu, DropdownItem, Input } from "reactstrap";
 import axios from "axios";
+import Swal from 'sweetalert2'; // Import SweetAlert2
 import BasicAreaChartClass from "../../Charts/apexCharts/BasicAreaChartClass";
 import CommonModal from "../../UiKits/Modals/common/modal";
 import AddUserForm from "./AddUserForm";
+import { useNavigate } from "react-router-dom"; // Import useNavigate for redirection
 
 const DataTablesContain = () => {
+  const navigate = useNavigate(); // For navigation
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [filter, setFilter] = useState("student");
@@ -15,11 +18,51 @@ const DataTablesContain = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [modal, setModal] = useState(false);
+  const [userRole, setUserRole] = useState(null); // State for user role
   const toggle = () => setModal(!modal);
   const user_endpoint = "http://localhost:5000/api/users";
 
   const formRef = useRef(null);
 
+  // Fetch user role on component mount
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+        const userResponse = await fetch("http://localhost:5000/api/users/me", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!userResponse.ok) throw new Error(`Erreur HTTP ${userResponse.status}`);
+        const userData = await userResponse.json();
+        const isAdmin = userData.Role && userData.Role.includes("admin");
+        setUserRole(isAdmin ? "admin" : null);
+
+        // If the user is not an admin, redirect to the error page
+        if (!isAdmin) {
+          navigate("/tivo/error/error-page2", { replace: true });
+        }
+      } catch (err) {
+        console.error("Erreur lors de la récupération des données utilisateur :", err);
+        setUserRole(null);
+        // Redirect to error page on error
+        navigate("/tivo/error/error-page2", { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserRole();
+  }, [navigate]);
+
+  // Fetch users (only if the user is an admin)
   const fetchUsers = async () => {
     try {
       const response = await axios.get(`${user_endpoint}`);
@@ -27,14 +70,20 @@ const DataTablesContain = () => {
       setFilteredUsers(response.data.filter((user) => user.Role.includes("student")));
     } catch (error) {
       console.error("Error fetching users:", error);
-    } finally {
-      setLoading(false);
+      Swal.fire({
+        icon: 'error',
+        title: 'Erreur',
+        text: 'Échec de la récupération des utilisateurs : ' + error.message,
+        confirmButtonText: 'OK',
+      });
     }
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (userRole === "admin") {
+      fetchUsers();
+    }
+  }, [userRole]);
 
   useEffect(() => {
     let filtered = users;
@@ -55,9 +104,21 @@ const DataTablesContain = () => {
           user._id === userId ? { ...user, enabled: !enabled } : user
         );
         setUsers(updatedUsers);
+        Swal.fire({
+          icon: 'success',
+          title: 'Succès',
+          text: `Utilisateur ${enabled ? 'désactivé' : 'activé'} avec succès`,
+          confirmButtonText: 'OK',
+        });
       }
     } catch (error) {
       console.error("Error toggling user status:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Erreur',
+        text: `Échec de la mise à jour du statut de l'utilisateur : ${error.message}`,
+        confirmButtonText: 'OK',
+      });
     }
   };
 
@@ -119,6 +180,17 @@ const DataTablesContain = () => {
     }
   };
 
+  // Show loading state while fetching user role
+  if (loading) {
+    return (
+      <Container fluid style={styles.loading}>
+        <div>Chargement...</div>
+      </Container>
+    );
+  }
+
+  // If userRole is not "admin", the redirection has already happened in useEffect
+  // So, we only render the content if userRole is "admin"
   return (
     <Fragment>
       <Breadcrumbs mainTitle="Users Management" parent="Tables" title="Users Management" />
@@ -199,6 +271,17 @@ const DataTablesContain = () => {
       </Container>
     </Fragment>
   );
+};
+
+// Reuse styles for the loading state
+const styles = {
+  loading: {
+    textAlign: "center",
+    marginTop: "100px",
+    fontSize: "20px",
+    color: "#718096",
+    fontFamily: "'Inter', 'Poppins', sans-serif",
+  },
 };
 
 export default DataTablesContain;

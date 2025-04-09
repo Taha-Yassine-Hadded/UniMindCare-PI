@@ -4,6 +4,33 @@ const User = require("../Models/Users"); // Import the User model
 const { transporter } = require("../config/emailConfig");
 const loginLink = "http://localhost:3000/tivo/authentication/login-simple";
 const bcrypt = require("bcryptjs");
+const { validateToken } = require('../middleware/authentication');
+const multer = require('multer'); // For handling file uploads
+const {bucket} = require('../firebase'); // Firebase Storage bucket
+
+// Configure Multer for file uploads
+const storage = multer.memoryStorage(); // Store file in memory before uploading to Firebase
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png/;
+    const mimetype = filetypes.test(file.mimetype);
+    if (mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error('Seules les images JPEG et PNG sont autorisées'));
+  },
+});
+
+router.get('/auth/me', validateToken, async (req, res) => {
+  try {
+    res.json({ userId: req.user.userId });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 /* POST to add a new user */
 router.post("/add", async function (req, res, next) {
@@ -176,6 +203,60 @@ router.put("/disable/:id", async function(req, res, next) {
     // Handle errors
     console.error("Error disabling user:", error);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/* Upload profile picture and update imageUrl */
+router.put('/:identifiant/upload-profile-picture', upload.single('profilePicture'), async (req, res) => {
+  try {
+    const { identifiant } = req.params;
+
+    // Check if a file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: 'Aucune image fournie' });
+    }
+
+    // Find the user by Identifiant
+    const user = await User.findOne({ Identifiant: identifiant });
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Upload the file to Firebase Storage
+    const fileName = `users/${identifiant}/profile/${Date.now()}_${req.file.originalname}`;
+    const file = bucket.file(fileName);
+
+    const stream = file.createWriteStream({
+      metadata: {
+        contentType: req.file.mimetype,
+      },
+    });
+
+    stream.on('error', (err) => {
+      console.error('Erreur lors de l\'upload vers Firebase:', err);
+      res.status(500).json({ message: 'Erreur lors de l\'upload de l\'image' });
+    });
+
+    stream.on('finish', async () => {
+      // Make the file publicly accessible
+      await file.makePublic();
+
+      // Get the public URL
+      const imageUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+      console.log('Image URL:', imageUrl);
+
+      // Update the user's imageUrl in the database
+      user.imageUrl = imageUrl;
+      user.updatedAt = new Date();
+      const updatedUser = await user.save();
+
+      res.status(200).json(updatedUser);
+    });
+
+    stream.end(req.file.buffer);
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'image de profil:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 

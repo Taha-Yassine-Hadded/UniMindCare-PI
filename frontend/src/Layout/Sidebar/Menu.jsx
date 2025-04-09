@@ -57,6 +57,13 @@ export const MENU = [
         ],
       },
       {
+        url: `${process.env.PUBLIC_URL}/table/datatable`,
+        icon: <Monitor />,
+        title: "User Management",
+        type: "link",
+        bookmark: true,
+      },
+      {
         title: "Widgets",
         icon: <Airplay />,
         class: "lan-6",
@@ -424,6 +431,7 @@ export const MENU = [
           },
         ],
       },
+
       {
         title: "Tables",
         icon: <Server />,
@@ -877,6 +885,20 @@ export const MENU = [
   {
     className: "menu-box",
     menu: [
+      {
+        url: `${process.env.PUBLIC_URL}/teacher-training/my-programs`,
+        icon: <Monitor />,
+        title: "Psychologist Dashboard",
+        type: "link",
+        bookmark: true,
+      },
+      {
+        url: `${process.env.PUBLIC_URL}/teacher-training/all-programs`,
+        icon: <FileText />,
+        title: "Training Programs",
+        type: "link",
+        bookmark: true,
+      },
       {
         icon: <Image />,
         title: "Gallery",
