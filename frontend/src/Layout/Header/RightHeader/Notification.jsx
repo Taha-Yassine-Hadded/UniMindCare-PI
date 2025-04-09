@@ -110,31 +110,38 @@ const Notification = ({ active, setActive }) => {
   const markAsReadAndNavigate = async (notificationId, appointmentId) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return;
-
+  
     try {
       // Optimistic UI update
-      setNotifications((prev) => prev.filter((notif) => notif._id !== notificationId));
+      setNotifications((prev) => prev.map(notif => 
+        notif._id === notificationId ? {...notif, read: true} : notif
+      ));
       setUnreadCount((prev) => Math.max(prev - 1, 0));
-
+  
       // Mark as read on the server
       await axios.put(
         `http://localhost:5000/api/notifications/${notificationId}/read`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
+  
       // Navigate based on user role
       if (appointmentId && userRole) {
         // Get user role and force lowercase for comparison
         const role = (userRole || '').toLowerCase();
-        const dashboardPath = role === 'student' 
+        let dashboardPath = role === 'student' 
           ? "/appointment/student-dashboard" 
           : role === 'psychiatre' || role === 'psychologist'
           ? "/appointment/psychologist-dashboard"
           : "/appointment/student-dashboard"; // Fallback
           
         console.log(`Navigating to: ${dashboardPath}?highlight=${appointmentId}`);
-        // Use window.location.href for a full page navigation
+        
+        // Add process.env.PUBLIC_URL if your router uses it
+        if (process.env.PUBLIC_URL) {
+          dashboardPath = `${process.env.PUBLIC_URL}${dashboardPath}`;
+        }
+        
         window.location.href = `${dashboardPath}?highlight=${appointmentId}`;
       }
     } catch (error) {
