@@ -4,7 +4,7 @@ const { sendRemindersToAllUsers } = require('../services/reminderService');
 // Fonction pour initialiser les tâches planifiées
 const initScheduler = () => {
   // Envoyer des rappels tous les samedis à 9h du matin
-  cron.schedule('55 12 * * *', async () => {
+  cron.schedule('58 13 * * *', async () => { //lezmni nhit l wa9t +1 bch te5dem mithl taw 12 lezem nhot 13
     // cron.schedule('0 9 * * 3', async () => {
     console.log('Exécution de la tâche planifiée : envoi des rappels de questionnaire');
     try {

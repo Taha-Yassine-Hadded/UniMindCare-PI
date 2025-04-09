@@ -17,11 +17,82 @@ const Sidebar = () => {
   const [leftArrow, setLeftArrow] = useState(false);
   const [rightArrow, setRightArrow] = useState(false);
   const [width, setWidth] = useState(0);
+  const [userRole, setUserRole] = useState(null);
+  const [filteredMenu, setFilteredMenu] = useState(MENU);
+  
+  // Handle resize for horizontal menu
   const handleResize = () => {
     setWidth(window.innerWidth - 500);
   };
+  
   const id = window.location.pathname.split("/").pop();
   const layout = id;
+  
+  // Get user role from localStorage
+  useEffect(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      // Get the first role from the array, or default to empty string
+      const role = user.Role && user.Role.length > 0 ? user.Role[0].toLowerCase() : '';
+      setUserRole(role);
+      console.log('User role for menu filtering:', role);
+    } catch (error) {
+      console.error('Error parsing user data for sidebar:', error);
+    }
+  }, []);
+  
+  // Improved filtering function - properly handles deeply nested menus
+  const filterMenuByRole = (menuItems, role) => {
+    if (!role) return menuItems;
+    
+    return menuItems.map(menuBox => {
+      // Create a copy of the menu box
+      const newMenuBox = { ...menuBox };
+      
+      // If this menu box has menus, process them
+      if (newMenuBox.menu && newMenuBox.menu.length > 0) {
+        // Process each top-level menu item
+        newMenuBox.menu = newMenuBox.menu.map(menuItem => {
+          // Create a copy of the menu item 
+          const newMenuItem = { ...menuItem };
+          
+          // If this menu item has a submenu, process it
+          if (newMenuItem.menu && newMenuItem.menu.length > 0) {
+            // Filter submenu items based on userRole
+            newMenuItem.menu = newMenuItem.menu.filter(subMenuItem => {
+              // Check if this item has a userRole restriction
+              if (subMenuItem.userRole) {
+                // Keep only if the role matches
+                return subMenuItem.userRole === role;
+              }
+              // Keep items without role restrictions
+              return true;
+            });
+          }
+          
+          return newMenuItem;
+        });
+      }
+      
+      return newMenuBox;
+    });
+  };
+  
+  // Filter menu items based on user role
+  useEffect(() => {
+    if (userRole) {
+      console.log('Filtering menu for role:', userRole);
+      const filtered = filterMenuByRole(MENU, userRole);
+      setFilteredMenu(filtered);
+      
+      // Debug output to see what's being filtered
+      console.log('Original menu structure:', MENU);
+      console.log('Filtered menu structure:', filtered);
+    } else {
+      setFilteredMenu(MENU);
+    }
+  }, [userRole]);
+  
   useEffect(() => {
     setLeftArrow(true);
   }, []);
@@ -34,6 +105,7 @@ const Sidebar = () => {
       window.removeEventListener("resize", handleResize);
     };
   }, [layout]);
+  
   const scrollToRight = () => {
     if (margin <= -2598 || margin <= -2034) {
       if (width === 492) {
@@ -48,6 +120,7 @@ const Sidebar = () => {
       setMargin((margin) => (margin += -width));
     }
   };
+  
   const scrollToLeft = () => {
     if (margin >= -width) {
       setMargin(0);
@@ -58,6 +131,7 @@ const Sidebar = () => {
       setRightArrow(false);
     }
   };
+  
   return (
     <div className={`sidebar-wrapper ${togglSidebar ? "close_icon" : ""} `} id="sidebar-wrapper">
       <div>
@@ -70,7 +144,7 @@ const Sidebar = () => {
             <ul className="sidebar-links" style={{ display: "block" }} id="simple-bar">
               <SimpleBar style={{ height: "300px" }}>
                 <BackBtn/>
-                {MENU.map((item, i) => (
+                {filteredMenu.map((item, i) => (
                   <Fragment key={i}>
                     <li className={item.className}>
                       <SidebarSubMenu menu={item.menu} isOpen={isOpen} setIsOpen={setIsOpen} level={0} />

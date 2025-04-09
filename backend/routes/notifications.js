@@ -2,16 +2,19 @@
 const express = require('express');
 const router = express.Router();
 const Notification = require('../Models/Notification');
-const passport = require('../routes/passportConfig');
+const passport = require('../routes/passportConfig'); // Assumant que passportConfig.js est utilisé
 
 // Récupérer les notifications de l'utilisateur connecté
 router.get('/', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     console.log('Utilisateur connecté pour GET /notifications:', req.user);
     const notifications = await Notification.find({ recipient: req.user._id })
-      .populate('sender', 'Name')
-      .populate('post', 'title')
+      .populate('sender', 'Name') // Nom de l'expéditeur (commun aux deux)
+      .populate('recipient', 'Name') // Nom du destinataire (pour les rendez-vous)
+      .populate('post', 'title') // Titre du post (pour les notifications sociales)
+      .populate('appointment') // Détails du rendez-vous (pour les notifications d'appointment)
       .sort({ createdAt: -1 });
+    console.log('Notifications récupérées avec succès:', notifications.length);
     res.status(200).json(notifications);
   } catch (error) {
     console.error('Erreur lors de la récupération des notifications:', error);

@@ -28,6 +28,8 @@ import {
   Users,
   Zap,
   ShoppingBag,
+  Calendar,
+  Clipboard,
   AlertTriangle,
 } from "react-feather";
 
@@ -53,6 +55,13 @@ export const MENU = [
             class: "lan-5",
           },
         ],
+      },
+      {
+        url: `${process.env.PUBLIC_URL}/table/datatable`,
+        icon: <Monitor />,
+        title: "User Management",
+        type: "link",
+        bookmark: true,
       },
       {
         title: "Widgets",
@@ -138,6 +147,52 @@ export const MENU = [
             bookmark: true,
 
           },
+
+
+          {
+            url: `${process.env.PUBLIC_URL}/dashboard/statistics`,
+            title: "Statistics Dashboard",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`,
+            title: "Statistics Students",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`,
+            title: "Feedback etudiant",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/student`,
+            title: "demande de sortir",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/teacher`,
+            title: "autorisation de tri",
+            type: "link",
+            bookmark: true,
+
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/yoga`,
+            title: "Seance Yoga",
+            type: "link",
+            bookmark: true,
+
+          },
+          
+         
         ],
       },
     
@@ -190,6 +245,9 @@ export const MENU = [
         type: "link",
         bookmark: true,
       },
+
+    
+
       {
         url: `${process.env.PUBLIC_URL}/kanban-board`,
         icon: <Monitor />,
@@ -228,6 +286,47 @@ export const MENU = [
         icon: <Clock />,
         type: "link",
         title: "To-Do",
+      },
+    ],
+  },
+  {
+    className: "menu-box",
+    menu: [
+      {
+        title: "Mental Health Services",
+        icon: <Heart />,
+        type: "sub",
+        menu: [
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/doctor-list`,
+            type: "link",
+            title: "List of Psychologists",
+            userRole: "student", // Only visible to students
+            icon: <List />,
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/student-dashboard`,
+            type: "link", 
+            title: "Appointments Calendar",
+            userRole: "student", // Only visible to students
+            icon: <Calendar />,
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`,
+            type: "link",
+            title: "Appointments Calendar", 
+            userRole: "psychiatre", // Only visible to psychologists
+            icon: <Calendar />,
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/appointment/case-management`,
+            type: "link",
+            title: "Case Management",
+            userRole: "psychiatre", // Only visible to psychologists
+            icon: <Clipboard />,
+          }
+         
+        ],
       },
     ],
   },
@@ -332,6 +431,7 @@ export const MENU = [
           },
         ],
       },
+
       {
         title: "Tables",
         icon: <Server />,
@@ -793,6 +893,13 @@ export const MENU = [
         bookmark: true,
       },
       {
+        url: `${process.env.PUBLIC_URL}/teacher-training/all-programs`,
+        icon: <FileText />,
+        title: "Training Programs",
+        type: "link",
+        bookmark: true,
+      },
+      {
         icon: <Image />,
         title: "Gallery",
         type: "sub",
@@ -844,6 +951,11 @@ export const MENU = [
             type: "link",
             title: "Add Post",
           },
+          {
+            url: `${process.env.PUBLIC_URL}/blog/statBlog`,
+            type: "link",
+            title: "Stat Blog",
+          },
         ],
       },
       {
@@ -889,13 +1001,6 @@ export const MENU = [
             title: "Detail Course",
           },
         ],
-      },
-      {
-        url: `${process.env.PUBLIC_URL}/teacher-training/all-programs`,
-        icon: <FileText />,
-        title: "Training Programs",
-        type: "link",
-        bookmark: true,
       },
      
       {
@@ -1002,7 +1107,7 @@ export const SEARCHMENU = [
           },
           {
             url: `${process.env.PUBLIC_URL}/ecommerce/Add-product`,
-            title: "Add Product",
+            title: "Ajouter evaluation",
             type: "link",
           },
           {
@@ -1740,6 +1845,11 @@ export const SEARCHMENU = [
             type: "link",
             title: "Add Post",
           },
+          {
+            url: `${process.env.PUBLIC_URL}/blog/statBlog`,
+            type: "link",
+            title: "Stat Blog",
+          },
         ],
       },
       {
@@ -1861,5 +1971,6 @@ export const SEARCHMENU = [
       },
     ],
   },
+  
 ];
 

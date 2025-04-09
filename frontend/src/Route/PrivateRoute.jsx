@@ -35,11 +35,13 @@ const PrivateRoute = () => {
           Role: data.Role || "",
           PhoneNumber: data.PhoneNumber || "",
           imageUrl: data.imageUrl || "/defaultProfile.png",
+          userId: data.userId || data._id || "",
         };
         setAuthenticated(true);
         setUserData(normalizedData);
         localStorage.setItem('user', JSON.stringify(normalizedData));
         console.log("PrivateRoute - Données utilisateur:", normalizedData);
+       
       } catch (error) {
         setAuthenticated(false);
         console.error("PrivateRoute - Échec de l'authentification:", error.response?.data || error.message);

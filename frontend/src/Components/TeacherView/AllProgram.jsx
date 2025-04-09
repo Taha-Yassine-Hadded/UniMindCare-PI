@@ -7,11 +7,50 @@ import ProgramService from '../../Services/TeacherTraining/ProgramService';
 const AllProgram = () => {
   const [programs, setPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]); // Filtered and sorted programs
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Updated to true initially for role fetching
   const [searchTerm, setSearchTerm] = useState(''); // State for search input
   const [sortOption, setSortOption] = useState('creationDate'); // State for sort option (default: creationDate)
+  const [userRole, setUserRole] = useState(null); // State for user role
 
   const navigate = useNavigate();
+
+  // Fetch user role on component mount
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+        const userResponse = await fetch("http://localhost:5000/api/users/me", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!userResponse.ok) throw new Error(`Erreur HTTP ${userResponse.status}`);
+        const userData = await userResponse.json();
+        const isTeacher = userData.Role && userData.Role.includes("teacher");
+        setUserRole(isTeacher ? "teacher" : null);
+
+        // If the user is not a teacher, redirect to the error page
+        if (!isTeacher) {
+          navigate("/tivo/error/error-page2", { replace: true });
+        }
+      } catch (err) {
+        console.error("Erreur lors de la récupération des données utilisateur :", err);
+        setUserRole(null);
+        // Redirect to error page on error
+        navigate("/tivo/error/error-page2", { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserRole();
+  }, [navigate]);
 
   // Fetch programs function
   const fetchPrograms = async () => {
@@ -28,10 +67,12 @@ const AllProgram = () => {
     }
   };
 
-  // Fetch programs on component mount
+  // Fetch programs only if the user is a teacher
   useEffect(() => {
-    fetchPrograms();
-  }, []);
+    if (userRole === "teacher") {
+      fetchPrograms();
+    }
+  }, [userRole]);
 
   // Handle search and sorting whenever searchTerm or sortOption changes
   useEffect(() => {
@@ -71,6 +112,17 @@ const AllProgram = () => {
     });
   };
 
+  // Show loading state while fetching user role
+  if (loading) {
+    return (
+      <Container fluid style={styles.loading}>
+        <div>Chargement...</div>
+      </Container>
+    );
+  }
+
+  // If userRole is not "teacher", the redirection has already happened in useEffect
+  // So, we only render the content if userRole is "teacher"
   return (
     <Fragment>
       <Breadcrumbs mainTitle="Program List" parent="Teacher Training" title="Program List" />
@@ -170,6 +222,17 @@ const AllProgram = () => {
       </Container>
     </Fragment>
   );
+};
+
+// Reuse styles for the loading state
+const styles = {
+  loading: {
+    textAlign: "center",
+    marginTop: "100px",
+    fontSize: "20px",
+    color: "#718096",
+    fontFamily: "'Inter', 'Poppins', sans-serif",
+  },
 };
 
 export default AllProgram;

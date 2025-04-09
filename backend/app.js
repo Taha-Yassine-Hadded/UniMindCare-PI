@@ -1,4 +1,5 @@
 
+
 require('dotenv').config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -12,7 +13,12 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
-const UserVerification = require('./Models/UserVerification'); 
+const UserVerification = require('./models/UserVerification'); 
+const appointementRoutes = require('./routes/appointmentRoutes');
+const caseRoutes = require('./routes/caseRoutes');
+const availabilityRoutes = require('./routes/availabilityRoutes');
+const notificationsRoutes = require('./routes/notifications');
+
 const User = require('./Models/Users');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
@@ -20,19 +26,20 @@ const crypto = require('crypto');
 const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { GridFsStorage } = require('multer-gridfs-storage');
-const transporter = require('./config/emailConfig');
+const { transporter } = require('./config/emailConfig');
 const postsRouter = require('./routes/posts');
-const notificationsRoutes = require('./routes/notifications');const { initScheduler } = require('./utils/scheduler');
+const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
-
-
+const evaluationRoutes = require("./routes/evalution");
+const crisisRoutes = require("./routes/crisisData"); // Nouvelle route
+const weatherRoutes = require("./routes/weather");
+const feedbackRoutes = require("./routes/feedbackRoutes"); // Assurez-vous que le chemin est correct
 // Servir les fichiers statiques depuis le dossier images
-
 var indexRouter = require('./routes/index');
 var usersRoutes = require('./routes/users');
-
 const passport = require('./routes/passportConfig'); // Import the configured passport instance
 const usersRouter = require('./routes/usersRouter');
+const exitRequestRoutes = require('./routes/exitRequests'); // Chemin correct vers tes routes
 
 const http = require('http'); // Ajout pour WebSocket
 const { Server } = require('socket.io'); // Ajout de Socket.IO
@@ -58,6 +65,7 @@ app.use(bodyParser.json());
 // view engine setup
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
+app.use("/api", exitRequestRoutes);
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -87,7 +95,27 @@ io.on('connection', (socket) => {
   });
 });
 
-app.use('/', indexRouter);
+// Middleware pour passer io à toutes les routes
+app.use((req, res, next) => {
+  req.io = io; // Ajouter io à l'objet req pour qu'il soit accessible dans les routes
+  next();
+});
+
+// Gestion des connexions WebSocket
+io.on('connection', (socket) => {
+  console.log('Un utilisateur s\'est connecté via WebSocket:', socket.id);
+
+  // Associer l'utilisateur à une salle basée sur son ID
+  socket.on('join', (userId) => {
+    socket.join(userId);
+    console.log(`Utilisateur ${userId} a rejoint sa salle`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Un utilisateur s\'est déconnecté:', socket.id);
+  });
+});
+
 app.use("/api/users", usersRoutes);
 
 app.use('/api/posts', postsRouter);
@@ -96,6 +124,14 @@ app.use('/api/posts', postsRouter);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/notifications', notificationsRoutes);
 
+app.use("/api", (req, res, next) => {
+  console.log("Requête reçue sur /api :", req.method, req.url);
+  next();
+}, evaluationRoutes);
+app.use('/', indexRouter);
+
+app.use('/api/crisis', crisisRoutes); // Nouvelle route pour la crise
+app.use("/api", feedbackRoutes); // Monter les routes de feedback sous /api
 // MongoDB connection
 /*mongoose
   .connect(process.env.MONGO_URI)
@@ -181,7 +217,6 @@ app.use('/api/crisis', crisisDataRoutes);
 
 // Partie meteo
 // Importer la route de météo
-const weatherRoutes = require('./routes/Weather');
 app.use('/api/weather', weatherRoutes);
 
 
@@ -785,6 +820,18 @@ app.closeAll = async () => {
   }
 };
 
+
+
+
+
+
+/*Partie salma gestion appointements */
+
+
+app.use('/api/appointments', appointementRoutes);
+app.use('/api/cases', caseRoutes);
+app.use('/api/availability', availabilityRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 
 

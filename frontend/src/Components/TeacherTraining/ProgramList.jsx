@@ -13,14 +13,54 @@ const ProgramList = () => {
   const [modal, setModal] = useState(false);
   const [programs, setPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Updated to true initially for role fetching
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('creationDate');
+  const [userRole, setUserRole] = useState(null); // State for user role
 
   const navigate = useNavigate();
   const toggle = () => setModal(!modal);
   const formRef = useRef(null);
 
+  // Fetch user role on component mount
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+        const userResponse = await fetch("http://localhost:5000/api/users/me", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!userResponse.ok) throw new Error(`Erreur HTTP ${userResponse.status}`);
+        const userData = await userResponse.json();
+        const isPsychiatre = userData.Role && userData.Role.includes("psychiatre");
+        setUserRole(isPsychiatre ? "psychiatre" : null);
+
+        // If the user is not a psychiatrist, redirect to the error page
+        if (!isPsychiatre) {
+          navigate("/tivo/error/error-page2", { replace: true });
+        }
+      } catch (err) {
+        console.error("Erreur lors de la récupération des données utilisateur :", err);
+        setUserRole(null);
+        // Redirect to error page on error
+        navigate("/tivo/error/error-page2", { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserRole();
+  }, [navigate]);
+
+  // Fetch programs function
   const fetchPrograms = async () => {
     try {
       setLoading(true);
@@ -30,15 +70,25 @@ const ProgramList = () => {
       console.log(programData);
     } catch (error) {
       console.error('Error fetching programs:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Erreur',
+        text: 'Échec de la récupération des programmes : ' + error.message,
+        confirmButtonText: 'OK',
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch programs only if the user is a psychiatrist
   useEffect(() => {
-    fetchPrograms();
-  }, []);
+    if (userRole === "psychiatre") {
+      fetchPrograms();
+    }
+  }, [userRole]);
 
+  // Handle search and sorting
   useEffect(() => {
     let updatedPrograms = [...programs];
 
@@ -118,6 +168,17 @@ const ProgramList = () => {
     });
   };
 
+  // Show loading state while fetching user role
+  if (loading) {
+    return (
+      <Container fluid style={styles.loading}>
+        <div>Chargement...</div>
+      </Container>
+    );
+  }
+
+  // If userRole is not "psychiatre", the redirection has already happened in useEffect
+  // So, we only render the content if userRole is "psychiatre"
   return (
     <Fragment>
       <Breadcrumbs mainTitle="My Programs" parent="Teacher Training" title="My Programs" />
@@ -258,6 +319,17 @@ const ProgramList = () => {
       </Container>
     </Fragment>
   );
+};
+
+// Reuse styles for the loading state
+const styles = {
+  loading: {
+    textAlign: "center",
+    marginTop: "100px",
+    fontSize: "20px",
+    color: "#718096",
+    fontFamily: "'Inter', 'Poppins', sans-serif",
+  },
 };
 
 export default ProgramList;

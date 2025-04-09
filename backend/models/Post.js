@@ -21,6 +21,8 @@ const postSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   comments: [commentSchema],
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Ajout du tableau de commentaires
+  views: { type: Number, default: 0 }, // Nouveau champ pour les vues
+  tags: [{ type: String }], // Champ pour les tags/catégories (si pertinent pour les sujets)
 });
 
 module.exports = mongoose.model('Post', postSchema);

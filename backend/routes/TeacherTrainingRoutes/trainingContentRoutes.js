@@ -22,7 +22,6 @@ const upload = multer({
 router.post(
   '/:trainingProgramId',
   validateToken,
-  authorizeRoles('psychologist'),
   upload.single('file'),
   async (req, res) => {
     try {
@@ -148,7 +147,7 @@ router.post('/:contentId/submit-quiz-result', validateToken, async (req, res) =>
 
 
 // Delete content (unchanged, already handles Firebase Storage deletion)
-router.delete('/:contentId', validateToken, authorizeRoles('psychologist'), async (req, res) => {
+router.delete('/:contentId', validateToken, async (req, res) => {
   try {
     const content = await TrainingContent.findById(req.params.contentId);
     if (!content) return res.status(404).json({ message: 'Content not found' });

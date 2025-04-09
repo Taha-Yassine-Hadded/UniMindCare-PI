@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const router = express.Router();
-const User = require('../models/Users');
+const User = require('../Models/Users');
 const jwt = require('jsonwebtoken'); // Ajoutez ceci si vous utilisez JWT
 const speakeasy = require('speakeasy'); // Pour générer le secret 2FA
 const qrcode = require('qrcode');     // Pour générer le QR code
@@ -15,6 +15,8 @@ router.get('/me', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findOne({ Identifiant: decoded.identifiant });
 
+       
+
         if (!user) return res.status(404).json({ message: 'User not found' });
 
         res.json({
@@ -26,6 +28,7 @@ router.get('/me', async (req, res) => {
             Role: user.Role,
             PhoneNumber: user.PhoneNumber,
             imageUrl: user.imageUrl,
+            userId: user._id,
             twoFactorEnabled: user.twoFactorEnabled || false // Ajout du statut 2FA
         });
     } catch (error) {
@@ -119,6 +122,7 @@ router.put('/:identifiant', async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
+
         const { Name, Email, Classe, Role, PhoneNumber, Password, imageUrl } = req.body;
         const user = await User.findOne({ Identifiant: req.params.identifiant });
         if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
@@ -129,6 +133,7 @@ router.put('/:identifiant', async (req, res) => {
         user.Role = Role || user.Role;
         user.PhoneNumber = PhoneNumber || user.PhoneNumber;
         user.imageUrl = imageUrl || user.imageUrl;
+        if (Password) user.Password = Password; // Devrait être hashé en production !
         if (Password) user.Password = Password; // Devrait être hashé en production !
 
         await user.save();

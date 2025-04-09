@@ -5,7 +5,7 @@ const { TrainingContent } = require('../../Models/TeacherTraining/TrainingModels
 const { validateToken, authorizeRoles } = require('../../middleware/authentication');
 
 // Create new program
-router.post('/', validateToken, authorizeRoles('psychologist'), async (req, res) => {
+router.post('/', validateToken, async (req, res) => {
   try {
     const program = new TrainingProgram({
       ...req.body,
@@ -59,7 +59,7 @@ router.get('/:id', validateToken, async (req, res) => {
 });
 
 // Update program
-router.patch('/:id', validateToken, authorizeRoles('psychologist'), async (req, res) => {
+router.patch('/:id', validateToken, async (req, res) => {
   try {
     const program = await TrainingProgram.findOne({
       _id: req.params.id,
@@ -82,7 +82,7 @@ router.patch('/:id', validateToken, authorizeRoles('psychologist'), async (req, 
 });
 
 // Delete program
-router.delete('/:id', validateToken, authorizeRoles('psychologist'), async (req, res) => {
+router.delete('/:id', validateToken, async (req, res) => {
   try {
     const program = await TrainingProgram.findOne({
       _id: req.params.id,

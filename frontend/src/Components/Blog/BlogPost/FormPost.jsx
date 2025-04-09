@@ -7,12 +7,15 @@ import 'react-quill/dist/quill.snow.css';
 import Swal from 'sweetalert2';
 import Dropzone from 'react-dropzone-uploader';
 import 'react-dropzone-uploader/dist/styles.css'; // Importer les styles de Dropzone
+import { useNavigate } from 'react-router-dom'; // Importer useNavigate
 
 const FormPost = ({ onPostSuccess }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [image, setImage] = useState(null); // État pour stocker le fichier image
+  const [tags, setTags] = useState(''); // Nouveau champ pour les tags
+  const navigate = useNavigate();
 
   // Fonction appelée lorsque les fichiers changent dans Dropzone
   const handleChangeStatus = ({ meta, file }, status) => {
@@ -59,6 +62,7 @@ const FormPost = ({ onPostSuccess }) => {
     formData.append('content', content);
     formData.append('isAnonymous', isAnonymous);
     if (image) formData.append('image', image); // Ajoute l'image si elle existe
+    formData.append('tags', JSON.stringify(tags.split(',').map(tag => tag.trim()))); // Convertir les tags en tableau
 
     try {
       const response = await axios.post(
@@ -84,7 +88,8 @@ const FormPost = ({ onPostSuccess }) => {
         text: 'Votre post a été publié avec succès.',
       });
       if (onPostSuccess) onPostSuccess();
-    } catch (error) {
+      navigate(`${process.env.PUBLIC_URL}/blog/blogDetail`);
+        } catch (error) {
       Swal.fire({
         icon: 'error',
         title: 'Erreur lors de la publication',
@@ -124,6 +129,16 @@ const FormPost = ({ onPostSuccess }) => {
           theme="snow"
         />
       </FormGroup>
+      <FormGroup>
+                  <Label for="tags">Tags (séparés par des virgules)</Label>
+                  <Input
+                    type="text"
+                    id="tags"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="ex: anxiété, dépression, stress"
+                  />
+                </FormGroup>
       <FormGroup>
         <Label for="image">Image (facultatif)</Label>
         <div className="m-0 dz-message needsclick">
