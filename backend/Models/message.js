@@ -1,8 +1,9 @@
+// Models/message.js
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
-  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  sender: { type: String, required: true }, // Identifiant (ex: "233AFT08946")
+  receiver: { type: String, required: true }, // Identifiant (ex: "233AFT08947")
   message: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
 });

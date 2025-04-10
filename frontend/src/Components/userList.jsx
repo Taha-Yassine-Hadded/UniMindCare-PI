@@ -38,14 +38,17 @@ const UserList = () => {
 
   const openChat = (user) => {
     console.log('Utilisateur sélectionné pour chat:', user);
+    if (!user.Identifiant) {
+      console.error('Identifiant manquant pour l’utilisateur:', user);
+      return; // Empêche l’ouverture du chat si Identifiant est absent
+    }
     setSelectedUser({
-      Identifiant: user.Identifiant || user._id, // Si Identifiant n'est pas dans la réponse, utiliser _id temporairement
+      Identifiant: user.Identifiant, // Utiliser Identifiant
       Name: user.Name,
       Email: user.Email,
     });
     setIsChatOpen(true);
   };
-
   const closeChat = () => {
     setIsChatOpen(false);
     setSelectedUser(null);

@@ -44,12 +44,12 @@ const feedbackRoutes = require('./routes/feedbackRoutes');
 const exitRequestRoutes = require('./routes/exitRequests');
 const questionnaireRoutes = require('./routes/Response');
 const usersStatisticsRoutes = require('./routes/usersStatistics');
+const authMiddleware = require('./middleware/auth'); // Auth middleware pour les routes sécurisées
 
 // Utilitaires et middlewares
 const { transporter } = require('./config/emailConfig');
 const { initScheduler } = require('./utils/scheduler');
 const passport = require('./routes/passportConfig');
-// Note : authMiddleware sera défini ci-dessous, donc on supprime l'importation de './middleware/auth'
 const { spawn } = require('child_process');
 
 // Initialisation de l'application et du serveur
@@ -71,24 +71,6 @@ mongoose
   })
   .then(() => console.log('Connexion à MongoDB réussie'))
   .catch((err) => console.error('Erreur de connexion à MongoDB:', err));
-
-// Middleware d'authentification pour les routes
-const authMiddleware = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    console.log('authMiddleware - Token reçu:', token);
-    if (!token) {
-      return res.status(401).json({ message: 'Authentification requise' });
-    }
-    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('authMiddleware - Token décodé:', decodedToken);
-    req.user = decodedToken;
-    next();
-  } catch (error) {
-    console.error('authMiddleware - Erreur:', error.message);
-    res.status(401).json({ message: 'Token invalide' });
-  }
-};
 
 // Middleware Socket.IO pour authentification
 io.use(async (socket, next) => {
@@ -127,8 +109,8 @@ io.on('connection', (socket) => {
       }
 
       const newMessage = new Message({
-        sender: senderUser.Identifiant,
-        receiver: receiverUser.Identifiant,
+        sender: senderUser.Identifiant, // Utiliser Identifiant
+        receiver: receiverUser.Identifiant, // Utiliser Identifiant
         message,
         timestamp: new Date(),
       });
@@ -138,7 +120,7 @@ io.on('connection', (socket) => {
       io.to(sender).emit('receiveMessage', newMessage);
       callback({ success: true });
     } catch (error) {
-      console.error('Erreur lors de l\'envoi du message:', error);
+      console.error('Erreur lors de l\'envoi du message :', error);
       callback({ error: 'Erreur lors de l\'envoi du message' });
     }
   });
@@ -193,7 +175,7 @@ app.use('/api/auth', authMiddleware);
 
 // Endpoint pour l'historique des messages
 app.get('/messages/:userId1/:userId2', authMiddleware, async (req, res) => {
-  const { userId1, userId2 } = req.params; // userId1 et userId2 sont maintenant des Identifiants
+  const { userId1, userId2 } = req.params; // userId1 et userId2 sont des Identifiants (ex: "233AFT08946")
   try {
     const messages = await Message.find({
       $or: [
@@ -203,7 +185,7 @@ app.get('/messages/:userId1/:userId2', authMiddleware, async (req, res) => {
     }).sort({ timestamp: 1 });
     res.json(messages);
   } catch (error) {
-    console.error('Erreur récupération messages:', error);
+    console.error('Erreur lors de la récupération des messages :', error);
     res.status(500).json({ message: 'Erreur lors de la récupération des messages' });
   }
 });

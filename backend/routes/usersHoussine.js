@@ -5,7 +5,7 @@ const User = require('../Models/Users');
 const jwt = require('jsonwebtoken'); // Ajoutez ceci si vous utilisez JWT
 const speakeasy = require('speakeasy'); // Pour générer le secret 2FA
 const qrcode = require('qrcode');     // Pour générer le QR code
-
+const authMiddleware = require('../middleware/auth'); // Importer authMiddleware
 
 router.get('/me', async (req, res) => {
     try {
@@ -147,12 +147,13 @@ router.put('/:identifiant', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
-router.get("/all", async (req, res) => {
+router.get("/all", authMiddleware, async (req, res) => {
     try {
-      const users = await User.find({}, "Name Email _id"); // Récupérer uniquement les champs nécessaires
+      const { role } = req.query;
+      const users = await User.find(role ? { Role: role } : {}, "Name Email Identifiant");
       res.json(users);
     } catch (error) {
-      console.error("Erreur lors de la récupération des utilisateurs:", error);
+      console.error("Erreur lors de la récupération des utilisateurs :", error);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
