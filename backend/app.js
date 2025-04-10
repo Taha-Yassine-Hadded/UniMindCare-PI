@@ -104,18 +104,19 @@ io.on('connection', (socket) => {
       if (!senderUser || !receiverUser) {
         return callback({ error: 'Utilisateur ou destinataire introuvable' });
       }
+      console.log('Socket.IO - Comparaison:', { sender, socketIdentifiant: socket.user.identifiant });
       if (sender !== socket.user.identifiant) {
         return callback({ error: 'Non autorisé' });
       }
-
+  
       const newMessage = new Message({
-        sender: senderUser.Identifiant, // Utiliser Identifiant
-        receiver: receiverUser.Identifiant, // Utiliser Identifiant
+        sender: senderUser.Identifiant,
+        receiver: receiverUser.Identifiant,
         message,
         timestamp: new Date(),
       });
       await newMessage.save();
-
+  
       io.to(receiver).emit('receiveMessage', newMessage);
       io.to(sender).emit('receiveMessage', newMessage);
       callback({ success: true });

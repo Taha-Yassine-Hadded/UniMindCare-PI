@@ -35,7 +35,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
 
     newSocket.on('connect', () => {
       console.log('ChatModal - Connecté à Socket.IO avec ID:', newSocket.id);
-      newSocket.emit('join', currentUser.Identifiant); // Utiliser Identifiant
+      newSocket.emit('join', currentUser.Identifiant);
     });
 
     newSocket.on('connect_error', (err) => {
@@ -47,7 +47,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
       try {
         console.log('ChatModal - Fetching messages pour:', {
           sender: currentUser.Identifiant,
-          receiver: receiverUser.Identifiant, // Assumer que receiverUser a aussi Identifiant
+          receiver: receiverUser.Identifiant,
         });
         const response = await axios.get(
           `http://localhost:5000/messages/${currentUser.Identifiant}/${receiverUser.Identifiant}`,
@@ -102,12 +102,13 @@ const ChatModal = ({ receiverUser, onClose }) => {
       if (response?.error) {
         setError(response.error);
         console.error('ChatModal - Erreur réponse Socket.IO:', response.error);
+      } else {
+        setNewMessage('');
+        console.log('ChatModal - Message envoyé avec succès');
       }
     });
-    setNewMessage('');
   };
 
-  // ... (le reste du code, styles et JSX, reste identique à votre version précédente)
   const styles = {
     modal: {
       position: 'fixed',
