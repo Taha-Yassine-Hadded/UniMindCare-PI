@@ -111,7 +111,7 @@ const sendReminderEmail = async (user) => {
       <p>Votre bien-être est notre priorité ! Nous vous rappelons que notre questionnaire de bien-être est <strong>maintenant disponible</strong> pour cette semaine.</p>
       
       <div class="reminder">
-        <h2>🎉 C'est mardi : le questionnaire est ouvert !</h2>
+        <h2>🎉 C'est mercredi : le questionnaire est ouvert !</h2>
         
         <p class="quote">"Prendre soin de sa santé mentale est aussi important que prendre soin de sa santé physique. Un moment de réflexion aujourd'hui peut transformer votre demain."</p>
         

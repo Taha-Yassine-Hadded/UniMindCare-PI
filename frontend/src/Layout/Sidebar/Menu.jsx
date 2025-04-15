@@ -102,7 +102,7 @@ export const MENU = [
           },
           {
             url: `${process.env.PUBLIC_URL}/ecommerce/Add-product`,
-            title: "Add Product",
+            title: "Add evaluation",
             type: "link",
           },
           {
@@ -140,13 +140,13 @@ export const MENU = [
             title: "Wishlist",
             type: "link",
           },
-          {
+         /* {
             url: `${process.env.PUBLIC_URL}/emergency-dashboard`,
             title: "Emergency Dashboard",
             type: "link",
             bookmark: true,
 
-          },
+          },*/
 
 
           {
@@ -155,6 +155,12 @@ export const MENU = [
             type: "link",
             bookmark: true,
 
+          },
+          {
+            url: `${process.env.PUBLIC_URL}/dashboard/statistics`,
+            title: "Statistics",
+            type: "link",
+            bookmark: true,
           },
           {
             url: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`,
@@ -182,15 +188,14 @@ export const MENU = [
             title: "autorisation de tri",
             type: "link",
             bookmark: true,
-
           },
-          {
+         /* {
             url: `${process.env.PUBLIC_URL}/yoga`,
             title: "Seance Yoga",
             type: "link",
             bookmark: true,
 
-          },
+          },*/
           
          
         ],

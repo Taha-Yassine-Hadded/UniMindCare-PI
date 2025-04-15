@@ -90,6 +90,9 @@ const decodeJWT = (token) => {
   }
 };
 
+
+
+
 // Fonction pour obtenir le token depuis le stockage
 const getToken = () => {
   return localStorage.getItem("token") || sessionStorage.getItem("token") || "";
@@ -170,6 +173,54 @@ async function checkCameraStatus() {
   }
 }
 
+
+async function fetchYogaChallenges(identifiant) {
+    try {
+      const response = await fetchWithAuth(`http://localhost:5005/yoga_challenges/${identifiant}`);
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Erreur lors de la récupération des défis yoga:", error.message);
+      return {
+        challenges: [],
+        rewards: [],
+        userPoints: 0,
+        userLevel: 1
+      };
+    }
+  }
+  
+  async function claimReward(identifiant, rewardId) {
+    try {
+      const response = await fetchWithAuth(
+        `http://localhost:5005/claim_reward/${identifiant}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ rewardId }),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Erreur lors de la réclamation de la récompense:", error.message);
+      throw error;
+    }
+  }
+
+
+
 // Composant qui affiche une pose de yoga avec effet de survol
 const YogaPoseCard = ({ name, icon, description, difficulty, duration }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -239,56 +290,90 @@ const YogaPoseCard = ({ name, icon, description, difficulty, duration }) => {
 };
 
 // Composant pour les défis
-const ChallengeCard = ({ title, description, points, progress, locked, unlockRequirement }) => {
-  return (
-    <motion.div 
-      whileHover={{ y: -5 }}
-      className={`challenge-card p-3 border rounded-4 shadow-sm mb-3 ${locked ? 'bg-light' : 'bg-white'}`}
-    >
-      <div className="d-flex align-items-center mb-2">
-        <div className={`rounded-circle p-2 me-3 ${locked ? 'bg-secondary bg-opacity-10' : 'bg-primary bg-opacity-10'}`}>
-          <FontAwesomeIcon 
-            icon={locked ? faLock : faTrophy} 
-            className={locked ? "text-secondary" : "text-primary"} 
-            style={{opacity: locked ? 0.7 : 1}}
-          />
-        </div>
-        <div>
-          <h6 className={`mb-0 fw-bold ${locked ? 'text-secondary' : ''}`} style={{opacity: locked ? 0.7 : 1}}>{title}</h6>
-          {locked ? (
-            <small className="text-muted">Débloque en: {unlockRequirement}</small>
-          ) : (
-            <small className="text-primary">{points} points</small>
-          )}
-        </div>
-      </div>
-      
-      <p className={`small mb-2 ${locked ? 'text-muted' : ''}`} style={{opacity: locked ? 0.7 : 1}}>
-        {description}
-      </p>
-      
-      {!locked && (
-        <div className="progress-container">
-          <div className="d-flex justify-content-between align-items-center mb-1">
-            <small className="text-muted">Progression</small>
-            <small className="text-primary fw-bold">{progress}%</small>
+const ChallengeCard = ({ title, description, points, progress, locked, unlockRequirement, completed }) => {
+    return (
+      <motion.div 
+        whileHover={{ y: -5 }}
+        className={`challenge-card p-3 border rounded-4 shadow-sm mb-3 ${
+          locked ? 'bg-light' : completed ? 'bg-success bg-opacity-10' : 'bg-white'
+        }`}
+      >
+        <div className="d-flex align-items-center mb-2">
+          <div className={`rounded-circle p-2 me-3 ${
+            locked ? 'bg-secondary bg-opacity-10' : 
+            completed ? 'bg-success bg-opacity-10' : 
+            'bg-primary bg-opacity-10'
+          }`}>
+<FontAwesomeIcon 
+  icon={
+    locked ? faLock : 
+    completed ? faCheckCircle : 
+    points >= 5000 ? faMedal :  // Utiliser l'icône médaille pour les défis majeurs
+    faTrophy
+  } 
+  className={
+    locked ? "text-secondary" : 
+    completed ? "text-success" : 
+    points >= 5000 ? "text-warning" :  // Couleur dorée pour les défis majeurs
+    "text-primary"
+  } 
+  style={{opacity: locked ? 0.7 : 1}}
+/>
           </div>
-          <Progress 
-            value={progress} 
-            className="progress-sm" 
-            style={{height: "6px", borderRadius: "3px"}} 
-            color="primary"
-          />
+          <div>
+            <h6 className={`mb-0 fw-bold ${
+              locked ? 'text-secondary' : 
+              completed ? 'text-success' : 
+              ''
+            }`} style={{opacity: locked ? 0.7 : 1}}>
+              {title}
+            </h6>
+            {locked ? (
+              <small className="text-muted">Débloque en: {unlockRequirement}</small>
+            ) : (
+              <small className={completed ? "text-success" : "text-primary"}>
+                {points} points {completed && "• Complété"}
+              </small>
+            )}
+          </div>
         </div>
-      )}
-    </motion.div>
-  );
-};
+        
+        <p className={`small mb-2 ${locked ? 'text-muted' : ''}`} style={{opacity: locked ? 0.7 : 1}}>
+          {description}
+        </p>
+        
+        {!locked && !completed && (
+          <div className="progress-container">
+            <div className="d-flex justify-content-between align-items-center mb-1">
+              <small className="text-muted">Progression</small>
+              <small className="text-primary fw-bold">{progress}%</small>
+            </div>
+            <Progress 
+              value={progress} 
+              className="progress-sm" 
+              style={{height: "6px", borderRadius: "3px"}} 
+              color="primary"
+            />
+          </div>
+        )}
+        
+        {completed && (
+          <div className="text-success text-center mt-2">
+            <FontAwesomeIcon icon={faCheckCircle} className="me-2" />
+            <small className="fw-bold">Défi complété</small>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
 
 // Composant principal
 const YogaInterface = () => {
     const [loading, setLoading] = useState(false);
     const [yogaActive, setYogaActive] = useState(false);
+    const [challenges, setChallenges] = useState([]);
+const [rewards, setRewards] = useState([]);
+const [loadingChallenges, setLoadingChallenges] = useState(false);
     const [userInfo, setUserInfo] = useState({ name: "Utilisateur", identifiant: "" });
     const [yogaStats, setYogaStats] = useState({
         points: 0,
@@ -445,6 +530,38 @@ useEffect(() => {
         }
     };
 }, [yogaActive, sessionTimer, sessionStartTime]);
+
+
+
+
+useEffect(() => {
+    // Charger les défis et récompenses
+    const loadChallenges = async () => {
+      if (userInfo.identifiant && activeTab === "challenges") {
+        setLoadingChallenges(true);
+        try {
+          const challengesData = await fetchYogaChallenges(userInfo.identifiant);
+          setChallenges(challengesData.challenges || []);
+          setRewards(challengesData.rewards || []);
+          
+          // Mettre à jour les points de l'utilisateur si nécessaire
+          if (challengesData.userPoints !== yogaStats.points) {
+            setYogaStats(prev => ({
+              ...prev,
+              points: challengesData.userPoints
+            }));
+          }
+        } catch (error) {
+          console.error("Erreur lors du chargement des défis:", error);
+        } finally {
+          setLoadingChallenges(false);
+        }
+      }
+    };
+    
+    loadChallenges();
+  }, [userInfo.identifiant, activeTab]); // Recharger quand on change d'onglet
+
 
     // Configuration pour le graphique
     const chartOptions = {
@@ -731,37 +848,7 @@ const yogaPoses = [
     }
 ];
 
-const challenges = [
-    {
-        title: "7 jours consécutifs",
-        description: "Pratiquez le yoga pendant 7 jours d'affilée pour compléter ce défi.",
-        points: 100,
-        progress: (yogaStats.streak / 7) * 100,
-        locked: false
-    },
-    {
-        title: "Maître de la pose T",
-        description: "Maintenez la pose T parfaitement pendant 2 minutes au total.",
-        points: 50,
-        progress: 60,
-        locked: false
-    },
-    {
-        title: "Expert en équilibre",
-        description: "Complétez 5 séances avec des poses d'équilibre avancées.",
-        points: 150,
-        progress: 40,
-        locked: false
-    },
-    {
-        title: "Marathon de yoga",
-        description: "Complétez une séance de 30 minutes sans interruption.",
-        points: 200,
-        progress: 0,
-        locked: true,
-        unlockRequirement: "Niveau 3"
-    }
-];
+
 
 // Composant pour les réalisations
 const AchievementItem = ({ title, date, icon, color }) => {
@@ -1421,18 +1508,34 @@ return (
                                     
                                     <Row>
                                         <Col lg={8} className="mb-4">
-                                            <div className="challenges-wrapper pe-lg-4">
-                                                {challenges.map((challenge, index) => (
-                                                    <ChallengeCard key={index} {...challenge} />
-                                                ))}
-                                                
-                                                <div className="text-center mt-3">
-                                                    <Button color="link" className="text-decoration-none">
-                                                        <FontAwesomeIcon icon={faChevronDown} className="me-2" />
-                                                        Voir plus de défis
-                                                    </Button>
-                                                </div>
-                                            </div>
+                                        <div className="challenges-wrapper pe-lg-4">
+  {loadingChallenges ? (
+    <div className="text-center py-4">
+      <div className="spinner-border text-primary" role="status">
+        <span className="visually-hidden">Chargement...</span>
+      </div>
+      <p className="mt-2">Chargement des défis...</p>
+    </div>
+  ) : challenges.length > 0 ? (
+    challenges.map((challenge, index) => (
+      <ChallengeCard 
+        key={challenge.id || index}
+        title={challenge.title}
+        description={challenge.description}
+        points={challenge.points}
+        progress={challenge.progress}
+        locked={challenge.locked}
+        unlockRequirement={challenge.unlockRequirement}
+        completed={challenge.completed}
+      />
+    ))
+  ) : (
+    <div className="text-center py-4">
+      <FontAwesomeIcon icon={faTrophy} className="mb-3" style={{fontSize: "2rem", opacity: 0.3}} />
+      <p>Aucun défi disponible pour le moment</p>
+    </div>
+  )}
+</div>
                                         </Col>
                                         
                                         <Col lg={4}>
@@ -1442,68 +1545,69 @@ return (
                                                 </div>
                                                 
                                                 <ul className="list-unstyled">
-                                                    <li className="reward-item border-bottom py-3 d-flex align-items-center">
-                                                        <div className="reward-icon rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                            style={{ width: 36, height: 36, backgroundColor: "rgba(99, 102, 241, 0.1)" }}
-                                                        >
-                                                            <FontAwesomeIcon icon={faMagic} className="text-primary" />
-                                                        </div>
-                                                        <div className="flex-grow-1">
-                                                            <h6 className="mb-0 fw-semibold">Thème spécial</h6>
-                                                            <small className="text-muted">200 points</small>
-                                                        </div>
-                                                        <Button 
-                                                            color="primary"
-                                                            size="sm"
-                                                            className="rounded-pill"
-                                                            disabled={yogaStats.points < 200}
-                                                        >
-                                                            {yogaStats.points >= 200 ? "Débloquer" : "Bloqué"}
-                                                        </Button>
-                                                    </li>
-                                                    
-                                                    <li className="reward-item border-bottom py-3 d-flex align-items-center">
-                                                        <div className="reward-icon rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                            style={{ width: 36, height: 36, backgroundColor: "rgba(99, 102, 241, 0.1)" }}
-                                                        >
-                                                            <FontAwesomeIcon icon={faCertificate} className="text-primary" />
-                                                        </div>
-                                                        <div className="flex-grow-1">
-                                                            <h6 className="mb-0 fw-semibold">Badge expert</h6>
-                                                            <small className="text-muted">500 points</small>
-                                                        </div>
-                                                        <Button 
-                                                            color="primary"
-                                                            size="sm"
-                                                            outline
-                                                            className="rounded-pill"
-                                                            disabled={yogaStats.points < 500}
-                                                        >
-                                                            {yogaStats.points >= 500 ? "Débloquer" : "Bloqué"}
-                                                        </Button>
-                                                    </li>
-                                                    
-                                                    <li className="reward-item py-3 d-flex align-items-center">
-                                                        <div className="reward-icon rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                            style={{ width: 36, height: 36, backgroundColor: "rgba(99, 102, 241, 0.1)" }}
-                                                        >
-                                                            <FontAwesomeIcon icon={faGift} className="text-primary" />
-                                                        </div>
-                                                        <div className="flex-grow-1">
-                                                            <h6 className="mb-0 fw-semibold">Programmes spéciaux</h6>
-                                                            <small className="text-muted">1000 points</small>
-                                                        </div>
-                                                        <Button 
-                                                            color="primary"
-                                                            size="sm"
-                                                            outline
-                                                            className="rounded-pill"
-                                                            disabled={yogaStats.points < 1000}
-                                                        >
-                                                            {yogaStats.points >= 1000 ? "Débloquer" : "Bloqué"}
-                                                        </Button>
-                                                    </li>
-                                                </ul>
+  {rewards.length > 0 ? (
+    rewards.map((reward, index) => (
+      <li key={reward.id || index} className="reward-item border-bottom py-3 d-flex align-items-center">
+        <div className="reward-icon rounded-circle d-flex align-items-center justify-content-center me-3"
+          style={{ 
+            width: 36, 
+            height: 36, 
+            backgroundColor: reward.claimed 
+              ? "rgba(16, 185, 129, 0.1)" 
+              : "rgba(99, 102, 241, 0.1)" 
+          }}
+        >
+          <FontAwesomeIcon 
+            icon={reward.claimed ? faCheckCircle : faMagic} 
+            className={reward.claimed ? "text-success" : "text-primary"} 
+          />
+        </div>
+        <div className="flex-grow-1">
+          <h6 className="mb-0 fw-semibold">{reward.title}</h6>
+          <small className="text-muted">{reward.points} points</small>
+        </div>
+        <Button 
+          color={reward.claimed ? "success" : "primary"}
+          size="sm"
+          className="rounded-pill"
+          disabled={!reward.available || reward.claimed}
+          onClick={() => {
+            if (reward.available && !reward.claimed) {
+              claimReward(userInfo.identifiant, reward.id)
+                .then(() => {
+                  // Actualiser les défis et récompenses
+                  fetchYogaChallenges(userInfo.identifiant)
+                    .then(data => {
+                      setChallenges(data.challenges || []);
+                      setRewards(data.rewards || []);
+                      
+                      // Mettre à jour les points de l'utilisateur
+                      if (data.userPoints !== yogaStats.points) {
+                        setYogaStats(prev => ({
+                          ...prev,
+                          points: data.userPoints
+                        }));
+                      }
+                    });
+                })
+                .catch(error => {
+                  console.error("Erreur lors de la réclamation:", error);
+                  alert("Erreur lors de la réclamation de la récompense");
+                });
+            }
+          }}
+        >
+          {reward.claimed ? "Réclamé" : reward.available ? "Débloquer" : "Bloqué"}
+        </Button>
+      </li>
+    ))
+  ) : (
+    <li className="text-center py-4">
+      <FontAwesomeIcon icon={faGift} className="mb-3" style={{fontSize: "2rem", opacity: 0.3}} />
+      <p>Aucune récompense disponible</p>
+    </li>
+  )}
+</ul>
                                                 
                                                 <div className="next-milestone p-3 rounded-4 mt-3" 
     style={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}

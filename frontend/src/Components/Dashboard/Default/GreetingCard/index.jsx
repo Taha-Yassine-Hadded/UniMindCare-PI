@@ -93,7 +93,7 @@ const itemVariants = {
   show: { y: 0, opacity: 1, transition: { duration: 0.5 } }
 };
 
-// Composant RecommendationCard personnalisé
+
 const RecommendationCard = ({ recommendation, timeSlot, palette }) => {
   // Sélectionner une icône en fonction du titre/contenu de la recommandation
   const getRecommendationIcon = () => {
@@ -219,11 +219,48 @@ const RecommendationCard = ({ recommendation, timeSlot, palette }) => {
             fontSize: '15px',
             lineHeight: 1.7,
             color: '#4B5563',
-            marginBottom: '0'
+            marginBottom: recommendation.url ? '12px' : '0'
           }}
         >
           {recommendation.description}
         </motion.p>
+        
+        {/* Afficher l'URL si elle existe et n'est pas vide */}
+        {recommendation.url && recommendation.url.trim() !== "" && (
+          <motion.a
+            href={recommendation.url}
+            target="_blank" 
+            rel="noopener noreferrer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontSize: '14px',
+              color: palette.primary,
+              fontWeight: '600',
+              textDecoration: 'none'
+            }}
+          >
+            En savoir plus
+            <svg 
+              width="16" 
+              height="16" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              style={{ marginLeft: '6px' }}
+            >
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </motion.a>
+        )}
       </div>
     </motion.div>
   );
@@ -513,9 +550,9 @@ const Greetingcard = () => {
                     {getWeatherIcon()}
                   </div>
                   <div>
-                    <h6 style={styles.date} className="text-capitalize">
-                      {weather ? new Date(weather.day).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : getFormattedDate()}
-                    </h6>
+                  <h6 style={styles.date} className="text-capitalize">
+  {getFormattedDate()} {/* Toujours utiliser la date locale */}
+</h6>
                     <h4 style={styles.greeting}>
                       {getGreeting()}, <span style={styles.username}>{username}</span>
                     </h4>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitExitRequest } from '../Services/api';
 
-function StudentDashboard({ token: propToken }) {
+function StudentsDashboard({ token: propToken }) {
   const navigate = useNavigate();
   const token = propToken || localStorage.getItem('token') || sessionStorage.getItem('token');
   console.log("Token dans StudentDashboard:", token);
@@ -135,4 +135,4 @@ const styles = {
   }
 };
 
-export default StudentDashboard;
+export default StudentsDashboard;

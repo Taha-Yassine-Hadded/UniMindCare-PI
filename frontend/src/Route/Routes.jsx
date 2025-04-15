@@ -131,11 +131,13 @@ import Yoga from "../Components/EmergencyClaim/YogaSeance";
 import BlogStats from "../Components/Blog/BlogStats";
 import DoctorsList from "../Components/AppointementModule/DoctorsList";
 // Add these imports at the top with other imports
+import StudentsDashboard from "../Components/StudentsDashboard";
 import StudentDashboard from "../Components/AppointementModule/StudentDashboard";
 import PsychologistDashboard from "../Components/AppointementModule/PsychologistDashboard";
 import CaseManagement from "../Components/AppointementModule/CaseManagement";
 import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import AppointmentCalendar from "../Components/AppointementModule/AppointmentCalendar";
+import QuestionnaireHistory from "../Components/EmergencyClaim/QuestionnaireHistory";
 
 export const routes = [
 
@@ -148,7 +150,8 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/teacher-training/view-details/:id`, Component: <ViewProgramDetails /> },
 
 
-
+   //Questionnaire History
+   { path: `${process.env.PUBLIC_URL}/emergency-claim/questionnaire-history`, Component: <QuestionnaireHistory /> },
 
 
 
@@ -173,7 +176,7 @@ export const routes = [
   //Feedback
   { path: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`, Component: <Feedback /> },
 
-  { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard /> },
+  { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentsDashboard /> },
   { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
 
   { path: `${process.env.PUBLIC_URL}/blog/statBlog`, Component: <BlogStats /> },

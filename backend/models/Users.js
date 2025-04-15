@@ -27,7 +27,9 @@ const userSchema = new mongoose.Schema({
     enum: ['student', 'admin', 'psychiatre', 'teacher'],
     required: true
   }, 
-  PhoneNumber: { type: String },
+  PhoneNumber: { type: String ,
+    trim: true,
+   },
   imageUrl: { type: String },
   verified: { type: Boolean, default: false },
   enabled: { type: Boolean, default: false },

@@ -1,11 +1,14 @@
 const cron = require('node-cron');
 const { sendRemindersToAllUsers } = require('../services/reminderService');
+const { sendWeatherNotificationsToAllUsers } = require('../services/weatherNotificationService');
 
 // Fonction pour initialiser les tâches planifiées
 const initScheduler = () => {
-  // Envoyer des rappels tous les samedis à 9h du matin
-  cron.schedule('58 13 * * *', async () => { //lezmni nhit l wa9t +1 bch te5dem mithl taw 12 lezem nhot 13
-    // cron.schedule('0 9 * * 3', async () => {
+  // Configuration du fuseau horaire local correct
+  const localTimezone = "Europe/Paris"; 
+  
+  // 1. Planificateur pour les rappels d'emails hebdomadaires
+  cron.schedule('30 10 * * *', async () => {
     console.log('Exécution de la tâche planifiée : envoi des rappels de questionnaire');
     try {
       const result = await sendRemindersToAllUsers();
@@ -15,46 +18,37 @@ const initScheduler = () => {
     }
   }, {
     scheduled: true,
-    timezone: "Europe/Paris" // Ajustez selon votre fuseau horaire
+    timezone: localTimezone
   });
   
-  console.log('Planificateur initialisé : les rappels seront envoyés tous les samedis à 9h');
-};
-
-module.exports = {
-  initScheduler
-};
-
-
-
-
-/*
-
-const cron = require('node-cron');
-const { sendRemindersToAllUsers } = require('../services/reminderService');
-
-// Fonction pour initialiser les tâches planifiées
-const initScheduler = () => {
-  // Envoyer des rappels à 14:08 pour tester (au lieu de "tous les samedis à 9h")
-  cron.schedule('8 14 * * *', async () => {
-    console.log('TEST - Exécution de la tâche planifiée : envoi des rappels de questionnaire');
+  console.log(`Planificateur initialisé : les rappels seront envoyés à 13h58 (${localTimezone})`);
+  
+  // 2. Planificateur pour l'envoi des notifications météo
+  cron.schedule('30 10 * * *', async () => {
+    console.log(`Exécution planifiée à ${new Date().toLocaleTimeString()} : envoi des notifications météo quotidiennes`);
     try {
-      const result = await sendRemindersToAllUsers();
-      console.log(`TEST - Tâche terminée à ${new Date().toLocaleTimeString()} : ${result.success} emails envoyés avec succès, ${result.failed} échecs`);
+      const result = await sendWeatherNotificationsToAllUsers();
+      if (result.skipped) {
+        console.log(`Notifications météo non envoyées : ${result.reason}`);
+      } else {
+        console.log(`Tâche terminée : 
+          Emails - ${result.email.success} envoyés avec succès, ${result.email.failed} échecs
+          Total utilisateurs: ${result.total}`);
+      }
     } catch (error) {
-      console.error('Erreur lors de l\'exécution de la tâche planifiée :', error);
+      console.error('Erreur lors de l\'envoi des notifications météo :', error);
     }
   }, {
-    scheduled: true
-    // Suppression du timezone pour simplifier le test
+    scheduled: true,
+    timezone: localTimezone
   });
   
-  console.log('Planificateur initialisé : TEST - les rappels seront envoyés à 14:08');
+  // Afficher l'heure actuelle au démarrage pour vérifier
+  const now = new Date();
+  console.log(`Heure actuelle du système: ${now.toLocaleTimeString()} ${now.toLocaleDateString()}`);
+  console.log(`Planificateur initialisé : les notifications météo seront envoyées tous les jours à 20h10 (${localTimezone})`);
 };
 
 module.exports = {
   initScheduler
 };
-
-
-*/

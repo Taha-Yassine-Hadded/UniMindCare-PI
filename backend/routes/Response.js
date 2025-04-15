@@ -92,6 +92,75 @@ const questions = [
   }
 ];
 
+
+// Ajouter cette route pour obtenir des statistiques agrégées par période
+router.get('/stats/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { period } = req.query; // 'week', 'month', 'year'
+    
+    // Déterminer la date de début selon la période
+    const startDate = new Date();
+    if (period === 'week') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (period === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (period === 'year') {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    } else {
+      // Par défaut, toutes les données
+      startDate.setFullYear(startDate.getFullYear() - 10);
+    }
+    
+    // Récupérer les réponses dans la période spécifiée
+    const responses = await Response.find({
+      userId,
+      createdAt: { $gte: startDate }
+    }).sort({ createdAt: 1 });
+    
+    // Calculer les statistiques
+    const stats = {
+      count: responses.length,
+      averageScore: 0,
+      trend: [],
+      distribution: {
+        excellent: 0, // <= 15
+        good: 0,      // 16-25
+        medium: 0,    // 26-35
+        concerning: 0, // 36-45
+        critical: 0    // > 45
+      }
+    };
+    
+    if (responses.length > 0) {
+      // Calculer la moyenne
+      const totalScore = responses.reduce((sum, resp) => sum + resp.score, 0);
+      stats.averageScore = totalScore / responses.length;
+      
+      // Calculer la distribution
+      responses.forEach(resp => {
+        const score = resp.score;
+        if (score <= 15) stats.distribution.excellent++;
+        else if (score <= 25) stats.distribution.good++;
+        else if (score <= 35) stats.distribution.medium++;
+        else if (score <= 45) stats.distribution.concerning++;
+        else stats.distribution.critical++;
+      });
+      
+      // Calculer la tendance (simplifié pour cet exemple)
+      stats.trend = responses.map(resp => ({
+        date: resp.createdAt,
+        score: resp.score
+      }));
+    }
+    
+    res.json(stats);
+  } catch (error) {
+    console.error("Erreur lors de la récupération des statistiques:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
 // Récupérer les questions
 /*
 router.get('/questions', (req, res) => {
@@ -127,7 +196,7 @@ function getNextSaturday() {
 
 */
 
-
+/*
 // Modifier la vérification du jour (remplacer samedi (6) par mardi (2))
 router.get('/questions', (req, res) => {
   // Vérifier si aujourd'hui est un mardi (jour 2 de la semaine en JavaScript)
@@ -158,11 +227,11 @@ function getNextTuesday() {
   
   return nextTuesday.toISOString().split('T')[0]; // Format YYYY-MM-DD
 }
+*/
 
 
 
 
-/*
 router.get('/questions', (req, res) => {
   // Vérifier si aujourd'hui est un mercredi (jour 3 de la semaine en JavaScript)
   const today = new Date();
@@ -194,7 +263,6 @@ function getNextWednesday() {
   return nextWednesday.toISOString().split('T')[0]; // Format YYYY-MM-DD
 }
 
-*/
 
 
 
@@ -542,7 +610,7 @@ router.post('/send-reminders', async (req, res) => {
 
 */
 
-
+/*
 // Modifier également la vérification pour l'envoi des rappels
 router.post('/send-reminders', async (req, res) => {
   try {
@@ -565,7 +633,7 @@ router.post('/send-reminders', async (req, res) => {
   }
 });
 
-/*
+
 router.post('/send-reminders', async (req, res) => {
   try {
     // Vérifier si c'est mercredi (jour 3 de la semaine en JavaScript)
@@ -586,8 +654,8 @@ router.post('/send-reminders', async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 });
-
 */
+
 
 
 module.exports = router;
