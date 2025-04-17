@@ -143,4 +143,16 @@ router.put('/:identifiant', async (req, res) => {
     }
 });
 
+// Route pour récupérer les badges d'un utilisateur
+router.get('/:id/badges', async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id).select('badges');
+      if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      res.status(200).json(user.badges || []);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des badges:', error);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
 module.exports = router;

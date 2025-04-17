@@ -39,7 +39,12 @@ const userSchema = new mongoose.Schema({
   twoFactorEnabled: { type: Boolean, default: false },
   // Nouveau champ pour les enseignants
   enableExitRequestSorting: { type: Boolean, default: false }, // Ajouté  // champ ajouté pour la vérification de l'email
-}, { 
+  badges: [{
+    name: { type: String, required: true }, // Nom du badge (ex: "Écoute active")
+    description: { type: String }, // Description du badge
+    awardedAt: { type: Date, default: Date.now } // Date d'attribution
+  }]
+}, {
   collection: 'users',
   timestamps: true,
   strict: false

@@ -1,4 +1,3 @@
-// routes/posts.js
 const express = require('express');
 const router = express.Router();
 const Post = require('../Models/Post');
@@ -6,6 +5,7 @@ const Notification = require('../Models/Notification');
 const passport = require('../routes/passportConfig');
 const multer = require('multer');
 const path = require('path');
+const { checkAndAwardBadges } = require('../utils/badgeUtils'); // Fixed the import path
 
 // Configuration de multer pour stocker les images
 const storage = multer.diskStorage({
@@ -41,10 +41,14 @@ router.post(
         isAnonymous: isAnonymous || false,
         anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
         imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
-        tags: tags ? JSON.parse(tags) : [], // Les tags sont envoyés sous forme de tableau JSON
+        tags: tags ? JSON.parse(tags) : [],
       });
       await post.save();
-      res.status(201).json(post);
+
+      // Vérifier les badges après avoir publié
+      const { newBadge } = await checkAndAwardBadges(req.user._id);
+
+      res.status(201).json({ post, newBadge });
     } catch (error) {
       console.error('Erreur lors de la création:', error);
       res.status(500).json({ message: 'Erreur serveur' });
@@ -55,7 +59,7 @@ router.post(
 // Route pour récupérer toutes les publications
 router.get('/', async (req, res) => {
   try {
-    const posts = await Post.find().populate('author', 'Name');
+    const posts = await Post.find().populate('author', 'Name badges'); // Include badges in populate
     console.log('Publications récupérées:', posts);
     res.status(200).json(posts);
   } catch (error) {
@@ -64,6 +68,36 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Route to delete a post
+router.delete('/:id', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Publication non trouvée' });
+    }
+
+    // Check if the authenticated user is the author of the post
+    if (post.author.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Vous n'êtes pas autorisé à supprimer cette publication" });
+    }
+
+    // Delete the post
+    await Post.deleteOne({ _id: req.params.id });
+
+    // Delete associated notifications (e.g., likes, comments)
+    await Notification.deleteMany({ post: req.params.id });
+
+    // Fetch the updated list of posts to return to the frontend
+    const updatedPosts = await Post.find()
+      .populate('author', 'Name badges')
+      .populate('comments.author', 'Name badges');
+
+    res.status(200).json({ message: 'Publication supprimée avec succès', posts: updatedPosts });
+  } catch (error) {
+    console.error('Erreur lors de la suppression de la publication:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
 
 router.get('/stats', async (req, res) => {
   try {
@@ -115,7 +149,7 @@ router.get('/stats', async (req, res) => {
     posts.forEach(post => {
       const engagement = (post.likes?.length || 0) + (post.comments?.length || 0);
       (post.tags || []).forEach(tag => {
-        tagCounts[tag] = (tagCounts[tag] || 0) + (engagement > 0 ? engagement : 1); // Ajouter 1 si engagement est 0
+        tagCounts[tag] = (tagCounts[tag] || 0) + (engagement > 0 ? engagement : 1);
       });
     });
     const popularTags = Object.entries(tagCounts)
@@ -139,13 +173,11 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-
-
 router.get('/:id', async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate('author', 'Name')
-      .populate('comments.author');
+      .populate('author', 'Name badges') // Include badges in populate
+      .populate('comments.author', 'Name badges'); // Include badges for comment authors
     if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
     // Incrémenter le compteur de vues
     post.views += 1;
@@ -181,8 +213,8 @@ router.post('/:id/like', passport.authenticate('jwt', { session: false }), async
       // Créer une notification pour l'auteur de la publication (sauf si c'est l'utilisateur lui-même)
       if (post.author.toString() !== userId.toString()) {
         notification = new Notification({
-          recipient: post.author, // Correct: Post author (e.g., "Baha")
-          sender: userId, // User who liked the post (e.g., "Farah")
+          recipient: post.author,
+          sender: userId,
           type: 'like_post',
           post: post._id,
           isAnonymous: post.isAnonymous,
@@ -201,11 +233,15 @@ router.post('/:id/like', passport.authenticate('jwt', { session: false }), async
     }
 
     await post.save();
+
+    // Vérifier les badges après avoir liké
+    const { newBadge } = await checkAndAwardBadges(userId);
+
     const updatedPost = await Post.findById(req.params.id)
-      .populate('author', 'Name')
-      .populate('comments.author');
+      .populate('author', 'Name badges')
+      .populate('comments.author', 'Name badges');
     console.log('Post mis à jour:', updatedPost);
-    res.status(200).json(updatedPost);
+    res.status(200).json({ post: updatedPost, newBadge });
   } catch (error) {
     console.error('Erreur lors du like:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -238,11 +274,11 @@ router.post('/:id/comments', passport.authenticate('jwt', { session: false }), a
     // Créer une notification pour l'auteur de la publication (sauf si c'est l'utilisateur lui-même)
     if (post.author.toString() !== req.user._id.toString()) {
       const notification = new Notification({
-        recipient: post.author, // Correct: Post author (e.g., "Baha")
-        sender: req.user._id, // User who commented (e.g., "Farah")
+        recipient: post.author,
+        sender: req.user._id,
         type: 'comment',
         post: post._id,
-        comment: newComment._id, // ID du commentaire (subdocument)
+        comment: newComment._id,
         isAnonymous: isAnonymous || false,
         anonymousPseudo: isAnonymous ? comment.anonymousPseudo : null,
       });
@@ -257,10 +293,13 @@ router.post('/:id/comments', passport.authenticate('jwt', { session: false }), a
       console.log(`Notification émise via WebSocket à ${post.author.toString()}`);
     }
 
+    // Vérifier les badges après avoir commenté
+    const { newBadge } = await checkAndAwardBadges(req.user._id);
+
     const updatedPost = await Post.findById(req.params.id)
-      .populate('author', 'Name')
-      .populate('comments.author', 'Name');
-    res.status(201).json(updatedPost);
+      .populate('author', 'Name badges')
+      .populate('comments.author', 'Name badges');
+    res.status(201).json({ post: updatedPost, newBadge });
   } catch (error) {
     console.error("Erreur lors de l'ajout du commentaire:", error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -287,11 +326,11 @@ router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { 
       // Créer une notification pour l'auteur du commentaire (sauf si c'est l'utilisateur lui-même)
       if (comment.author.toString() !== userId.toString()) {
         const notification = new Notification({
-          recipient: comment.author, // Correct: Comment author (e.g., "Baha")
-          sender: userId, // User who liked the comment (e.g., "Farah")
+          recipient: comment.author,
+          sender: userId,
           type: 'like_comment',
           post: post._id,
-          comment: comment._id, // ID du commentaire (subdocument)
+          comment: comment._id,
           isAnonymous: comment.isAnonymous,
           anonymousPseudo: comment.isAnonymous ? comment.anonymousPseudo : null,
         });
@@ -308,10 +347,14 @@ router.post('/:postId/comments/:commentId/like', passport.authenticate('jwt', { 
     }
 
     await post.save();
+
+    // Vérifier les badgesphysics à jour pour les badges
+    const { newBadge } = await checkAndAwardBadges(userId);
+
     const updatedPost = await Post.findById(req.params.postId)
-      .populate('author', 'Name')
-      .populate('comments.author', 'Name');
-    res.status(200).json(updatedPost);
+      .populate('author', 'Name badges')
+      .populate('comments.author', 'Name badges');
+    res.status(200).json({ post: updatedPost, newBadge });
   } catch (error) {
     console.error('Erreur lors du like:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -338,11 +381,11 @@ router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt',
       // Créer une notification pour l'auteur du commentaire (sauf si c'est l'utilisateur lui-même)
       if (comment.author.toString() !== userId.toString()) {
         const notification = new Notification({
-          recipient: comment.author, // Correct: Comment author (e.g., "Baha")
-          sender: userId, // User who disliked the comment (e.g., "Farah")
+          recipient: comment.author,
+          sender: userId,
           type: 'dislike_comment',
           post: post._id,
-          comment: comment._id, // ID du commentaire (subdocument)
+          comment: comment._id,
           isAnonymous: comment.isAnonymous,
           anonymousPseudo: comment.isAnonymous ? comment.anonymousPseudo : null,
         });
@@ -359,10 +402,14 @@ router.post('/:postId/comments/:commentId/dislike', passport.authenticate('jwt',
     }
 
     await post.save();
+
+    // Vérifier les badges après avoir disliké un commentaire
+    const { newBadge } = await checkAndAwardBadges(userId);
+
     const updatedPost = await Post.findById(req.params.postId)
-      .populate('author', 'Name')
-      .populate('comments.author', 'Name');
-    res.status(200).json(updatedPost);
+      .populate('author', 'Name badges')
+      .populate('comments.author', 'Name badges');
+    res.status(200).json({ post: updatedPost, newBadge });
   } catch (error) {
     console.error('Erreur lors du dislike:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -387,8 +434,8 @@ router.delete('/:postId/comments/:commentId', passport.authenticate('jwt', { ses
     await post.save();
 
     const updatedPost = await Post.findById(req.params.postId)
-      .populate('author', 'Name')
-      .populate('comments.author');
+      .populate('author', 'Name badges')
+      .populate('comments.author', 'Name badges');
     res.status(200).json(updatedPost);
   } catch (error) {
     console.error('Erreur lors de la suppression du commentaire:', error);

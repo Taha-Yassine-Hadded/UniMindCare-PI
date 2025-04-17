@@ -71,7 +71,7 @@ const BlogComments = ({ postId }) => {
         { content: newComment, isAnonymous },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setComments(response.data.comments);
+      setComments(response.data.post.comments);
       setNewComment('');
       setIsAnonymous(false);
       Swal.fire({
@@ -79,6 +79,15 @@ const BlogComments = ({ postId }) => {
         title: 'Commentaire ajouté !',
         text: 'Votre commentaire a été publié avec succès.',
       });
+
+      // Vérifier si un nouveau badge a été attribué
+      if (response.data.newBadge) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Parfait !',
+          text: `Vous êtes maintenant ${response.data.newBadge.name} !`,
+        });
+      }
     } catch (error) {
       Swal.fire({
         icon: 'error',
@@ -101,7 +110,16 @@ const BlogComments = ({ postId }) => {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setComments(response.data.comments);
+      setComments(response.data.post.comments);
+
+      // Vérifier si un nouveau badge a été attribué
+      if (response.data.newBadge) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Parfait !',
+          text: `Vous êtes maintenant ${response.data.newBadge.name} !`,
+        });
+      }
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Erreur', text: 'Erreur lors du like.' });
     }
@@ -120,7 +138,16 @@ const BlogComments = ({ postId }) => {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setComments(response.data.comments);
+      setComments(response.data.post.comments);
+
+      // Vérifier si un nouveau badge a été attribué
+      if (response.data.newBadge) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Parfait !',
+          text: `Vous êtes maintenant ${response.data.newBadge.name} !`,
+        });
+      }
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Erreur', text: 'Erreur lors du dislike.' });
     }
@@ -187,6 +214,26 @@ const BlogComments = ({ postId }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <H6 attrH6={{ className: 'mt-0' }}>
                         {item.isAnonymous ? item.anonymousPseudo : item.author?.Name || 'Inconnu'}
+                        {!item.isAnonymous && item.author?.badges?.length > 0 && (
+                          <span style={{ marginLeft: '10px' }}>
+                            {item.author.badges.map((badge, index) => (
+                              <span
+                                key={index}
+                                style={{
+                                  background: '#f7c948',
+                                  color: '#333',
+                                  padding: '2px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  marginRight: '5px',
+                                }}
+                                title={badge.description}
+                              >
+                                {badge.name}
+                              </span>
+                            ))}
+                          </span>
+                        )}
                       </H6>
                       <small style={{ color: '#888' }}>
                         {new Date(item.createdAt).toLocaleDateString('fr-FR')}
@@ -239,13 +286,13 @@ const BlogComments = ({ postId }) => {
             />
           </FormGroup>
           <FormGroup check>
-  <Input
-    type="checkbox"
-    checked={isAnonymous}
-    onChange={(e) => setIsAnonymous(e.target.checked)} // Fix: Update isAnonymous state
-  />
-  {' '}Publier en tant qu'anonyme
-</FormGroup>
+            <Input
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+            />
+            {' '}Publier en tant qu'anonyme
+          </FormGroup>
           <Button color="primary" type="submit">Publier</Button>
         </Form>
       </CardBody>

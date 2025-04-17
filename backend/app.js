@@ -13,7 +13,7 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
-const UserVerification = require('./models/UserVerification'); 
+const UserVerification = require('./Models/UserVerification'); 
 const appointementRoutes = require('./routes/appointmentRoutes');
 const caseRoutes = require('./routes/caseRoutes');
 const availabilityRoutes = require('./routes/availabilityRoutes');
@@ -32,7 +32,7 @@ const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
 const evaluationRoutes = require("./routes/evalution");
 const crisisRoutes = require("./routes/crisisData"); // Nouvelle route
-const weatherRoutes = require("./routes/weather");
+const weatherRoutes = require("./routes/Weather");
 const feedbackRoutes = require("./routes/feedbackRoutes"); // Assurez-vous que le chemin est correct
 // Servir les fichiers statiques depuis le dossier images
 var indexRouter = require('./routes/index');
@@ -649,17 +649,78 @@ app.post('/register', upload.single('imageFile'), async (req, res) => {
 
     await newVerification.save();
 
-    // Envoyer l'email
+    // Template HTML moderne pour l'email de vérification
+    const htmlTemplate = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Vérifiez votre compte UniMindCare</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+      </style>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif; background-color: #f4f7fa;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="padding: 20px 0;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); border-radius: 10px; overflow: hidden;">
+              <!-- Header -->
+              <tr>
+                <td align="center" bgcolor="#4a6fdc" style="padding: 30px 20px;">
+                  <img src="http://localhost:5000/images/logo2.png" alt="UniMindCare Logo" width="120" style="display: block; margin-bottom: 15px;">
+                  <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">Vérifiez votre compte</h1>
+                </td>
+              </tr>
+              
+              <!-- Body -->
+              <tr>
+                <td bgcolor="#ffffff" style="padding: 40px 30px;">
+                  <h2 style="margin: 0 0 20px 0; font-size: 22px; color: #333333;">Bonjour ${savedUser.Name},</h2>
+                  <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 24px; color: #555555;">
+                    Merci de vous être inscrit sur UniMindCare. Pour terminer votre inscription, veuillez utiliser le code de vérification ci-dessous :
+                  </p>
+                  
+                  <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 25px 0; text-align: center; border-left: 5px solid #4a6fdc;">
+                    <h2 style="margin: 0; font-size: 38px; letter-spacing: 5px; color: #4a6fdc; font-weight: 700;">${verificationCode}</h2>
+                  </div>
+                  
+                  <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 24px; color: #555555;">
+                    Ce code expirera dans <strong>15 minutes</strong>. Si vous n'avez pas demandé ce code, vous pouvez ignorer cet e-mail.
+                  </p>
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td bgcolor="#f0f2f5" style="padding: 20px 30px; text-align: center;">
+                  <p style="margin: 0 0 10px 0; font-size: 14px; color: #666666;">
+                    Ceci est un message automatique, merci de ne pas y répondre.
+                  </p>
+                  <p style="margin: 0; font-size: 14px; color: #666666;">
+                    &copy; ${new Date().getFullYear()} UniMindCare. Tous droits réservés.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+    `;
+
+    // Envoyer l'email avec le nouveau template
     const mailOptions = {
       from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
       to: savedUser.Email,
-      subject: 'Vérification de votre compte',
+      subject: 'Vérification de votre compte UniMindCare',
       text: `Votre code de vérification est : ${verificationCode}`,
-      html: `<p>Votre code de vérification est :</p><h2>${verificationCode}</h2>`
+      html: htmlTemplate
     };
 
     await transporter.sendMail(mailOptions);
-
 
     res.status(201).send('Utilisateur enregistré avec succès. Vérifiez votre email avec le code envoyé.');
   } catch (err) {

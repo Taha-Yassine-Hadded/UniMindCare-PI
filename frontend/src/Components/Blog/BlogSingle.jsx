@@ -1,4 +1,3 @@
-// BlogSingleContain.js
 import React, { Fragment, useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Breadcrumbs, H4, LI, UL } from '../../AbstractElements';
@@ -64,7 +63,7 @@ const BlogSingleContain = () => {
     fetchCurrentUser();
   }, []);
 
-  console.log('Valeur de currentUser:', currentUser); // Log pour vérifier currentUser
+  console.log('Valeur de currentUser:', currentUser);
 
   // Récupérer la publication
   useEffect(() => {
@@ -108,7 +107,16 @@ const BlogSingleContain = () => {
       );
 
       console.log('Réponse de la requête de like:', response.data);
-      setPost(response.data);
+      setPost(response.data.post);
+
+      // Vérifier si un nouveau badge a été attribué
+      if (response.data.newBadge) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Parfait !',
+          text: `Vous êtes maintenant ${response.data.newBadge.name} !`,
+        });
+      }
     } catch (error) {
       console.error('Erreur lors du like:', error.response?.data || error.message);
       Swal.fire({
@@ -192,6 +200,26 @@ const BlogSingleContain = () => {
                         <LI>
                           <i className="icofont icofont-user"></i>
                           {post.isAnonymous ? (post.anonymousPseudo || 'Anonyme') : (post.author?.Name || 'Inconnu')}
+                          {!post.isAnonymous && post.author?.badges?.length > 0 && (
+                            <span style={{ marginLeft: '10px' }}>
+                              {post.author.badges.map((badge, index) => (
+                                <span
+                                  key={index}
+                                  style={{
+                                    background: '#f7c948',
+                                    color: '#333',
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    fontSize: '12px',
+                                    marginRight: '5px',
+                                  }}
+                                  title={badge.description}
+                                >
+                                  {badge.name}
+                                </span>
+                              ))}
+                            </span>
+                          )}
                         </LI>
                         <li
                           style={{ pointerEvents: 'auto' }}
