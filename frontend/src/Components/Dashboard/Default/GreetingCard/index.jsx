@@ -4,16 +4,13 @@ import { Card, CardBody, Col, Row } from "reactstrap";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { Cloud, CloudRain, Droplet, Sun, Sunset, Thermometer } from "react-feather";
-import WeatherDashboard from '../../../Weather/WeatherDashboard';
 
 // Composant d'horloge
 const ClockIcon = ({ curHr, curMi, meridiem }) => {
-  // Formater l'heure pour afficher toujours 2 chiffres
   const formatTime = (time) => {
     return time < 10 ? `0${time}` : time;
   };
 
-  // Définir les styles pour l'horloge
   const clockStyle = {
     display: 'flex',
     flexDirection: 'column',
@@ -49,7 +46,7 @@ const ClockIcon = ({ curHr, curMi, meridiem }) => {
   );
 };
 
-const Greetingcard = () => {
+const GreetingCard = () => {
   const today = new Date();
   const curHr = today.getHours();
   const curMi = today.getMinutes();
@@ -58,6 +55,15 @@ const Greetingcard = () => {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Récupérer les informations de l'utilisateur depuis localStorage ou sessionStorage
+  const user = JSON.parse(localStorage.getItem("user") || sessionStorage.getItem("user"));
+  const role = user?.Role?.[0] || "Non défini";
+
+  // Définir la couleur du tableau de bord en fonction du rôle
+  const getDashboardColor = (role) => {
+    return role === "Student" ? "#ff3333" : "#ffffff"; // Rouge pour Student, blanc sinon
+  };
+
   // Styles CSS intégrés
   const styles = {
     profileGreeting: {
@@ -65,6 +71,7 @@ const Greetingcard = () => {
       overflow: 'hidden',
       boxShadow: '0 8px 25px rgba(0, 0, 0, 0.05)',
       transition: 'all 0.3s ease',
+      backgroundColor: getDashboardColor(role), // Appliquer la couleur dynamique
     },
     weatherIcon: {
       display: 'flex',
@@ -83,21 +90,21 @@ const Greetingcard = () => {
       overflow: 'hidden',
       transition: 'all 0.3s ease',
       boxShadow: '0 3px 10px rgba(0, 0, 0, 0.08)',
-      background: '#fffbea',  // Fond légèrement crème
-      padding: '16px',        // Padding intégré
-      borderLeft: '4px solid #ffc107', // Bordure latérale jaune
+      background: '#fffbea',
+      padding: '16px',
+      borderLeft: '4px solid #ffc107',
     },
     recommendationTitle: {
-      fontWeight: 700,        // Plus gras
-      color: '#000000',       // Noir
-      fontSize: '17px',       // Taille augmentée
-      marginBottom: '10px',   // Marge inférieure
+      fontWeight: 700,
+      color: '#000000',
+      fontSize: '17px',
+      marginBottom: '10px',
     },
     recommendationText: {
-      fontSize: '15px',       // Taille augmentée
-      lineHeight: 1.6,        // Interligne plus grand
-      color: '#000000',       // Noir
-      fontWeight: 400,        // Normal
+      fontSize: '15px',
+      lineHeight: 1.6,
+      color: '#000000',
+      fontWeight: 400,
     },
     spinner: {
       display: 'flex',
@@ -158,7 +165,6 @@ const Greetingcard = () => {
         const formattedDate = formatDate(today);
         const timeSlot = getTimeSlot();
         
-        // Appel à l'API pour récupérer les dernières données météo avec recommandations
         const response = await axios.get(`http://localhost:5000/api/weather/latest?date=${formattedDate}&timeSlot=${timeSlot}`);
         
         if (response.data) {
@@ -198,6 +204,12 @@ const Greetingcard = () => {
     <Col xxl="6" xl="6" lg="6" className="dash-45 box-col-40">
       <Card style={styles.profileGreeting} className="profile-greeting">
         <CardBody>
+          {/* Ajout du message de bienvenue et du rôle de l'utilisateur */}
+          <div className="mb-3">
+            <H4 className="mb-2">Bienvenue !</H4>
+            <P>Votre rôle : {role || "Non défini"}</P>
+          </div>
+
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div className="d-flex align-items-center">
               <div style={styles.weatherIcon} className="weather-icon me-3">
@@ -291,24 +303,24 @@ const Greetingcard = () => {
           )}
           
           <div className="mt-3 text-end">
-  <Link 
-    to="/tivo/dashboard/weather-dashboard" 
-    className="btn btn-sm btn-outline-primary"
-    style={{
-      borderRadius: '8px',
-      padding: '0.375rem 0.75rem',
-      transition: 'all 0.2s ease' ,
-      color: '#000000', 
-      fontWeight: 500   
-    }}
-  >
-    Voir prévisions complètes
-  </Link>
-</div>
+            <Link 
+              to="/tivo/dashboard/weather-dashboard" 
+              className="btn btn-sm btn-outline-primary"
+              style={{
+                borderRadius: '8px',
+                padding: '0.375rem 0.75rem',
+                transition: 'all 0.2s ease',
+                color: '#000000',
+                fontWeight: 500
+              }}
+            >
+              Voir prévisions complètes
+            </Link>
+          </div>
         </CardBody>
       </Card>
     </Col>
   );
 };
 
-export default Greetingcard;
+export default GreetingCard;
