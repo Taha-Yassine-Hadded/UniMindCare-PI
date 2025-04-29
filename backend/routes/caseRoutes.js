@@ -60,16 +60,24 @@ router.post('/', async (req, res) => {
 // Psychologist: Get all cases
 router.get('/', async (req, res) => {
     const { psychologistId } = req.query;
-    const query = { archived: false };
-    if (psychologistId) {
-        if (!mongoose.Types.ObjectId.isValid(psychologistId)) {
-            return res.status(400).json({ message: 'Invalid psychologistId format' });
-        }
-        query.psychologistId = psychologistId;
-    }
-
     try {
-        const cases = await Case.find(query)
+        let cases;
+        
+        if (psychologistId) {
+            if (!mongoose.Types.ObjectId.isValid(psychologistId)) {
+                return res.status(400).json({ message: 'Invalid psychologistId format' });
+            }
+            
+            // Find cases where:
+            // 1. Either the case's psychologistId matches OR
+            // 2. Any appointment within the case has this psychologistId
+            cases = await Case.find({
+                $or: [
+                    { psychologistId }, 
+                    { 'appointments.psychologistId': psychologistId }
+                ],
+                archived: false
+            })
             .populate('studentId', 'Name')
             .populate({
                 path: 'appointments',
@@ -77,7 +85,33 @@ router.get('/', async (req, res) => {
                     path: 'studentId',
                     select: 'Name'
                 }
+            })
+            .populate({
+                path: 'appointments',
+                populate: {
+                    path: 'psychologistId',
+                    select: 'Name'
+                }
             });
+        } else {
+            cases = await Case.find({ archived: false })
+                .populate('studentId', 'Name')
+                .populate({
+                    path: 'appointments',
+                    populate: {
+                        path: 'studentId',
+                        select: 'Name'
+                    }
+                })
+                .populate({
+                    path: 'appointments',
+                    populate: {
+                        path: 'psychologistId',
+                        select: 'Name'
+                    }
+                });
+        }
+        
         res.json(cases);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching cases', error: error.message });

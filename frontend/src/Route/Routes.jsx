@@ -130,6 +130,7 @@ import StatisticsEtudiant from "../Components/StudentStats";
 import Yoga from "../Components/EmergencyClaim/YogaSeance";
 import BlogStats from "../Components/Blog/BlogStats";
 import DoctorsList from "../Components/AppointementModule/DoctorsList";
+import CaseManagementPage from "../Components/AppointementModule/CaseManagementPage";
 // Add these imports at the top with other imports
 import StudentsDashboard from "../Components/StudentsDashboard";
 import StudentDashboard from "../Components/AppointementModule/StudentDashboard";
@@ -336,7 +337,7 @@ export const routes = [
   {path : `${process.env.PUBLIC_URL}/appointment/doctor-list`, Component: <DoctorsList />},
   { path: `${process.env.PUBLIC_URL}/appointment/student-dashboard`, Component: <StudentDashboard /> },
   { path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
-  {path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagement />},
+  {path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagementPage />},
   { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
 
 ];
