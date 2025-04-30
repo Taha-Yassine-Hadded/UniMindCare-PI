@@ -30,6 +30,8 @@ const userSchema = new mongoose.Schema({
   PhoneNumber: { type: String },
   imageUrl: { type: String },
   verified: { type: Boolean, default: false },
+  inappropriateCommentsCount: { type: Number, default: 0 },
+  lastInappropriateComment: { type: Date },
   enabled: { type: Boolean, default: false },
   otp: { type: String },
   otpExpires: { type: Date },
@@ -49,6 +51,19 @@ const userSchema = new mongoose.Schema({
   timestamps: true,
   strict: false
 });
+
+// Create a method to handle inappropriate comment strikes baha
+userSchema.methods.incrementInappropriateComments = async function() {
+  this.inappropriateCommentsCount += 1;
+  this.lastInappropriateComment = new Date();
+  
+  // Disable account after 3 strikes
+  if (this.inappropriateCommentsCount >= 3) {
+    this.enabled = false;
+  }
+  
+  return this.save();
+};
 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);
 

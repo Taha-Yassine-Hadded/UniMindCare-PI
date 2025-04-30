@@ -5,7 +5,12 @@ const Notification = require('../Models/Notification');
 const passport = require('../routes/passportConfig');
 const multer = require('multer');
 const path = require('path');
+const axios = require('axios'); // Add axios for HTTP requests
 const { checkAndAwardBadges } = require('../utils/badgeUtils'); // Fixed the import path
+const InappropriateComment = require('../Models/InappropriateComment');
+const mongoose = require('mongoose');
+const { transporter } = require('../config/emailConfig');
+const User = require('../Models/Users');
 
 // Configuration de multer pour stocker les images
 const storage = multer.diskStorage({
@@ -34,6 +39,24 @@ router.post(
     const { title, content, isAnonymous, tags } = req.body;
 
     try {
+      // Appeler l'API Flask pour analyser le contenu
+      const flaskResponse = await axios.post('http://127.0.0.1:5011/api/analyze', {
+        text: `${title} ${content}`,
+      });
+
+      const analysis = flaskResponse.data;
+      console.log('Analyse du contenu:', analysis);
+
+      // Vérifier si le contenu est inapproprié ou indique de la détresse
+      if (analysis.is_inappropriate) {
+        return res.status(400).json({ message: 'Contenu inapproprié détecté. Veuillez modifier votre publication.' });
+      }
+
+      if (analysis.is_distress) {
+        // Vous pouvez ajouter une logique ici, comme enregistrer un indicateur de détresse
+        console.log('Détresse détectée dans la publication.');
+      }
+
       const post = new Post({
         title,
         content,
@@ -42,11 +65,22 @@ router.post(
         anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
         imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
         tags: tags ? JSON.parse(tags) : [],
+         // Optionnel : enregistrer le score de détresse
       });
       await post.save();
 
       // Vérifier les badges après avoir publié
       const { newBadge } = await checkAndAwardBadges(req.user._id);
+
+      // Appeler l'API de recommandation (si nécessaire)
+      try {
+        await axios.post('http://localhost:5010/api/recommend', {
+          post_id: post._id.toString(),
+        });
+        console.log(`Requête de recommandation envoyée pour le post ${post._id}`);
+      } catch (error) {
+        console.error('Erreur lors de l\'appel à l\'API de recommandation:', error.message);
+      }
 
       res.status(201).json({ post, newBadge });
     } catch (error) {
@@ -173,6 +207,46 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// Route pour récupérer tous les posts pour l'admin
+router.get('/admin', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    // Vérifier si l'utilisateur est admin
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Récupérer tous les posts avec les informations des auteurs
+    const posts = await Post.find()
+      .populate('author', 'Name Email Identifiant Role enabled imageUrl')
+      .sort({ createdAt: -1 }); // Trier du plus récent au plus ancien
+
+    // Format posts to include user enabled status
+    const postsWithUserStatus = posts.map(post => {
+      const postObj = post.toObject();
+      
+      // Ensure we have author information even if it's anonymous
+      if (postObj.isAnonymous) {
+        postObj.anonymousDetails = {
+          pseudonym: postObj.anonymousPseudo || 'Anonyme'
+        };
+      }
+      
+      // Add user status information if author exists
+      if (postObj.author) {
+        // Using the user's enabled status, not the post's
+        postObj.userEnabled = postObj.author.enabled !== undefined ? postObj.author.enabled : true;
+      }
+      
+      return postObj;
+    });
+
+    res.status(200).json(postsWithUserStatus);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des posts pour admin:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
@@ -249,59 +323,170 @@ router.post('/:id/like', passport.authenticate('jwt', { session: false }), async
 });
 
 // Route pour ajouter un commentaire
+// Update your existing comment post route
+
 router.post('/:id/comments', passport.authenticate('jwt', { session: false }), async (req, res) => {
   const { content, isAnonymous } = req.body;
 
   try {
-    const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: 'Publication non trouvée' });
+    // First check if the user is enabled
+    if (!req.user.enabled) {
+      return res.status(403).json({ message: 'Votre compte est désactivé. Veuillez contacter l\'administrateur.' });
+    }
 
-    const comment = {
+    const post = await Post.findById(req.params.id).populate('comments.author', 'Name Email badges');
+    if (!post) {
+      return res.status(404).json({ message: 'Publication non trouvée' });
+    }
+
+    // Check if content is inappropriate using Flask API
+    const flaskResponse = await axios.post('http://127.0.0.1:5011/api/analyze', {
+      text: content,
+    });
+
+    const analysis = flaskResponse.data;
+    
+    // Check if the content is inappropriate
+    if (analysis.is_inappropriate) {
+      // Create an inappropriate comment record even if not posted
+      const inappropriateComment = new InappropriateComment({
+        content: content,
+        author: req.user._id,
+        postId: post._id,
+        postTitle: post.title,
+        reason: analysis.reason || 'Contenu inapproprié détecté'
+      });
+      
+      await inappropriateComment.save();
+      
+      // Increment user's strike count
+      req.user.inappropriateCommentsCount = (req.user.inappropriateCommentsCount || 0) + 1;
+      req.user.lastInappropriateComment = new Date();
+      
+      // Check if user has reached 3 strikes
+      if (req.user.inappropriateCommentsCount >= 3) {
+        req.user.enabled = false;
+        await req.user.save();
+
+        // Send email notification to admin
+  try {
+    // Find admin users
+    const adminUsers = await User.find({ Role: { $in: ['admin'] } }, { Email: 1 });
+    
+    if (adminUsers && adminUsers.length > 0) {
+      const adminEmails = adminUsers.map(admin => admin.Email);
+      
+      const mailOptions = {
+        from: `"UniMindCare System" <${process.env.EMAIL_USER}>`,
+        to: adminEmails.join(','),
+        subject: `🚨 Compte utilisateur désactivé - ${req.user.Name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+            <h2 style="color: #d32f2f;">Compte utilisateur désactivé</h2>
+            <p>Un compte utilisateur a été automatiquement désactivé pour violation des règles communautaires:</p>
+            <ul style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+              <li><strong>Nom:</strong> ${req.user.Name}</li>
+              <li><strong>Email:</strong> ${req.user.Email}</li>
+              <li><strong>Identifiant:</strong> ${req.user.Identifiant}</li>
+              <li><strong>Raison:</strong> 3 commentaires inappropriés</li>
+              <li><strong>Dernier commentaire:</strong> "${content}"</li>
+              <li><strong>Date:</strong> ${new Date().toLocaleString()}</li>
+            </ul>
+             <p>Vous pouvez réactiver ce compte depuis le panneau d'administration si nécessaire.</p>
+            <a href="http://localhost:3000/blog-admin" style="background: #1976d2; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">Accéder au panneau admin</a>
+          </div>
+        `
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`Email de notification envoyé aux administrateurs pour l'utilisateur désactivé: ${req.user._id}`);
+    }
+  } catch (emailError) {
+    console.error('Erreur lors de l\'envoi de l\'email de notification:', emailError);
+    // Continue execution - don't block the response due to email error
+  }
+        
+        return res.status(403).json({ 
+          message: 'Votre compte a été désactivé après 3 commentaires inappropriés.',
+          strikes: req.user.inappropriateCommentsCount
+        });
+      }
+      
+      await req.user.save();
+      
+      // Warn the user about their strikes
+      return res.status(400).json({ 
+        message: `Commentaire inapproprié détecté. Attention: ${req.user.inappropriateCommentsCount}/3 avertissements.`,
+        strikes: req.user.inappropriateCommentsCount
+      });
+    }
+
+    // Generate a unique ID for the comment (MongoDB will do this automatically)
+    const commentId = new mongoose.Types.ObjectId();
+
+    // Create the new comment with explicit ID
+    const newComment = {
+      _id: commentId, // Explicitly set the ID
       content,
       author: req.user._id,
       isAnonymous: isAnonymous || false,
       anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
+      createdAt: new Date(),
       likes: [],
       dislikes: [],
+      isInappropriate: false,
+      flagReason: '',
+      flaggedAt: null
     };
 
-    post.comments.push(comment);
+    post.comments.push(newComment);
     await post.save();
 
-    // Récupérer l'ID du commentaire nouvellement créé
-    const newComment = post.comments[post.comments.length - 1];
-
-    // Créer une notification pour l'auteur de la publication (sauf si c'est l'utilisateur lui-même)
+    // CREATE NOTIFICATION FOR POST AUTHOR - THIS WAS MISSING
+    // Only send notification if commenter is not the post author
     if (post.author.toString() !== req.user._id.toString()) {
       const notification = new Notification({
         recipient: post.author,
         sender: req.user._id,
         type: 'comment',
         post: post._id,
-        comment: newComment._id,
+        comment: commentId,
         isAnonymous: isAnonymous || false,
-        anonymousPseudo: isAnonymous ? comment.anonymousPseudo : null,
+        anonymousPseudo: isAnonymous ? newComment.anonymousPseudo : null,
       });
       await notification.save();
-      console.log('Notification créée pour comment:', notification);
+      console.log('Notification created for new comment:', notification);
 
-      // Émettre une notification via WebSocket
+      // Send WebSocket notification to post author
       const populatedNotification = await Notification.findById(notification._id)
         .populate('sender', 'Name')
         .populate('post', 'title');
       req.io.to(post.author.toString()).emit('new_notification', populatedNotification);
-      console.log(`Notification émise via WebSocket à ${post.author.toString()}`);
+      console.log(`WebSocket notification sent to ${post.author.toString()}`);
     }
 
-    // Vérifier les badges après avoir commenté
-    const { newBadge } = await checkAndAwardBadges(req.user._id);
-
+    // Get the updated post WITH POPULATED AUTHOR data
     const updatedPost = await Post.findById(req.params.id)
       .populate('author', 'Name badges')
       .populate('comments.author', 'Name badges');
-    res.status(201).json({ post: updatedPost, newBadge });
+
+    // Get the newly created comment from the populated post
+    const createdComment = updatedPost.comments.find(comment => 
+      comment._id.toString() === commentId.toString()
+    );
+
+    console.log('New comment created with ID:', createdComment._id);
+
+    // Check if user earned any badges
+    const { newBadge } = await checkAndAwardBadges(req.user._id);
+
+    res.status(201).json({ 
+      post: updatedPost,
+      newBadge,
+      comment: createdComment // Return the specific comment that was created
+    });
   } catch (error) {
-    console.error("Erreur lors de l'ajout du commentaire:", error);
+    console.error('Erreur lors de l\'ajout du commentaire:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
@@ -442,5 +627,14 @@ router.delete('/:postId/comments/:commentId', passport.authenticate('jwt', { ses
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
+
+
+
+// Add this route after the other existing routes
+
+// Route pour récupérer tous les posts pour l'admin
+
+
+
 
 module.exports = router;

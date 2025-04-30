@@ -136,6 +136,8 @@ import PsychologistDashboard from "../Components/AppointementModule/Psychologist
 import CaseManagement from "../Components/AppointementModule/CaseManagement";
 import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import AppointmentCalendar from "../Components/AppointementModule/AppointmentCalendar";
+import BlogAdmin from "../Components/Tables/Reactstrap/BasicTable/BlogAdmin";
+import AdminOnly from "../Components/Commons/AdminOnly";
 
 export const routes = [
 
@@ -147,7 +149,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/teacher-training/all-programs`, Component: <AllProgram /> },
   { path: `${process.env.PUBLIC_URL}/teacher-training/view-details/:id`, Component: <ViewProgramDetails /> },
 
-
+  { path: `${process.env.PUBLIC_URL}/blog-admin`, Component: <AdminOnly /> }, // Ajout de la route pour BlogAdmin
 
 
 

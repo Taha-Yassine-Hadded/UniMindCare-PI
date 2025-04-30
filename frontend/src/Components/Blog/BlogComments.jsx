@@ -54,7 +54,7 @@ const BlogComments = ({ postId }) => {
       });
       return;
     }
-
+  
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
       Swal.fire({
@@ -64,7 +64,7 @@ const BlogComments = ({ postId }) => {
       });
       return;
     }
-
+  
     try {
       const response = await axios.post(
         `http://localhost:5000/api/posts/${postId}/comments`,
@@ -79,7 +79,7 @@ const BlogComments = ({ postId }) => {
         title: 'Commentaire ajouté !',
         text: 'Votre commentaire a été publié avec succès.',
       });
-
+  
       // Vérifier si un nouveau badge a été attribué
       if (response.data.newBadge) {
         Swal.fire({
@@ -89,11 +89,40 @@ const BlogComments = ({ postId }) => {
         });
       }
     } catch (error) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Erreur',
-        text: error.response?.data?.message || 'Une erreur est survenue, veuillez réessayer.',
-      });
+      // Check if the user's account has been disabled due to 3 inappropriate comments
+      if (error.response && error.response.status === 403 && 
+          error.response.data.strikes && error.response.data.strikes >= 3) {
+        // Clear auth tokens
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        
+        // Show SweetAlert before redirecting
+        Swal.fire({
+          icon: 'error',
+          title: 'Compte désactivé',
+          text: 'Votre compte a été désactivé après 3 commentaires inappropriés. Veuillez contacter l\'administrateur.',
+          confirmButtonText: 'OK'
+        }).then((result) => {
+          // Redirect to login page after user clicks OK
+          window.location.href = '/login';
+        });
+      } 
+      // Handle other error cases where content is inappropriate but under 3 strikes
+      else if (error.response && error.response.data.strikes) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Contenu inapproprié',
+          text: `${error.response.data.message} (${error.response.data.strikes}/3 avertissements)`,
+        });
+      }
+      // Handle general errors
+      else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur',
+          text: error.response?.data?.message || 'Une erreur est survenue, veuillez réessayer.',
+        });
+      }
     }
   };
 
@@ -213,7 +242,8 @@ const BlogComments = ({ postId }) => {
                   <div className="flex-grow-1">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <H6 attrH6={{ className: 'mt-0' }}>
-                        {item.isAnonymous ? item.anonymousPseudo : item.author?.Name || 'Inconnu'}
+                        {item.isAnonymous ? item.anonymousPseudo :  (item.author?.Name || 
+   (currentUser && item.author?._id === currentUser._id ? currentUser.Name : 'Inconnu'))}
                         {!item.isAnonymous && item.author?.badges?.length > 0 && (
                           <span style={{ marginLeft: '10px' }}>
                             {item.author.badges.map((badge, index) => (
