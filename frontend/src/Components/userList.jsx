@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import { FiSearch, FiPaperclip, FiMic, FiVideo, FiSend } from 'react-icons/fi';
+import { FiSearch, FiPaperclip, FiMic, FiMicOff, FiVideo, FiSend } from 'react-icons/fi';
 
 const UserList = () => {
   const navigate = useNavigate();
@@ -15,8 +15,11 @@ const UserList = () => {
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [socket, setSocket] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const mediaRecorderRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null); // Reference for file input
+  const fileInputRef = useRef(null);
 
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
@@ -32,12 +35,10 @@ const UserList = () => {
     setSocket(socketInstance);
 
     socketInstance.on('onlineUsers', (onlineUsersList) => {
-      console.log('Online users updated:', onlineUsersList);
       setOnlineUsers(onlineUsersList);
     });
 
     socketInstance.on('connect_error', (err) => {
-      console.error('Erreur connexion Socket.IO:', err.message);
       setError('Erreur de connexion au serveur');
     });
 
@@ -56,7 +57,6 @@ const UserList = () => {
 
     const fetchUsers = async () => {
       try {
-        console.log('Token utilisé pour fetchUsers:', token);
         if (!token) {
           setError('Utilisateur non authentifié. Redirection vers la connexion...');
           setTimeout(() => navigate('/login'), 2000);
@@ -68,7 +68,6 @@ const UserList = () => {
         setUsers(res.data);
       } catch (error) {
         setError(error.response?.data?.message || 'Erreur lors du chargement des étudiants');
-        console.error('Erreur fetchUsers:', error);
       } finally {
         setLoading(false);
       }
@@ -106,11 +105,7 @@ const UserList = () => {
   }, [messages]);
 
   const openChat = (user) => {
-    console.log('Utilisateur sélectionné pour chat:', user);
-    if (!user.Identifiant) {
-      console.error('Identifiant manquant pour l’utilisateur:', user);
-      return;
-    }
+    if (!user.Identifiant) return;
     setSelectedUser({
       Identifiant: user.Identifiant,
       Name: user.Name,
@@ -130,7 +125,7 @@ const UserList = () => {
       sender: currentUser.Identifiant,
       receiver: selectedUser.Identifiant,
       message: newMessage,
-      type: 'text', // Indicate this is a text message
+      type: 'text',
     };
     socket.emit('sendMessage', messageData, (response) => {
       if (response?.error) {
@@ -141,7 +136,6 @@ const UserList = () => {
     });
   };
 
-  // Handle file selection and upload
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !selectedUser) return;
@@ -157,16 +151,15 @@ const UserList = () => {
         },
       });
 
-      const fileUrl = response.data.fileUrl; // Assuming backend returns the file URL
+      const fileUrl = response.data.fileUrl;
       const fileName = file.name;
 
-      // Send the file URL as a message
       const messageData = {
         sender: currentUser.Identifiant,
         receiver: selectedUser.Identifiant,
         message: fileUrl,
         fileName: fileName,
-        type: 'file', // Indicate this is a file message
+        type: 'file',
       };
       socket.emit('sendMessage', messageData, (response) => {
         if (response?.error) {
@@ -175,7 +168,75 @@ const UserList = () => {
       });
     } catch (error) {
       setError(error.response?.data?.message || 'Erreur lors de l’envoi du fichier');
-      console.error('Erreur upload fichier:', error);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      setError('Erreur lors de l’accès au microphone');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+
+      if (audioBlob && selectedUser) {
+        const formData = new FormData();
+        formData.append('file', audioBlob, `voice-message-${Date.now()}.webm`);
+
+        try {
+          const response = await axios.post('http://localhost:5000/api/upload', formData, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+
+          const fileUrl = response.data.fileUrl;
+          const fileName = `voice-message-${Date.now()}.webm`;
+
+          const messageData = {
+            sender: currentUser.Identifiant,
+            receiver: selectedUser.Identifiant,
+            message: fileUrl,
+            fileName: fileName,
+            type: 'audio',
+          };
+          socket.emit('sendMessage', messageData, (response) => {
+            if (response?.error) {
+              setError(response.error);
+            }
+            setAudioBlob(null);
+          });
+        } catch (error) {
+          setError(error.response?.data?.message || 'Erreur lors de l’envoi du message vocal');
+        }
+      }
+    }
+  };
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
     }
   };
 
@@ -193,7 +254,6 @@ const UserList = () => {
       background: '#f4f6f9',
       fontFamily: "'Inter', sans-serif",
     }}>
-      {/* Left Sidebar: User List */}
       <div style={{
         width: '320px',
         background: '#ffffff',
@@ -299,7 +359,6 @@ const UserList = () => {
         </ul>
       </div>
 
-      {/* Right Section: Chat Interface */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -308,7 +367,6 @@ const UserList = () => {
       }}>
         {selectedUser ? (
           <>
-            {/* Chat Header */}
             <div style={{
               padding: '15px 20px',
               borderBottom: '1px solid #e8ecef',
@@ -393,18 +451,20 @@ const UserList = () => {
                   style={{ display: 'none' }}
                   onChange={handleFileUpload}
                 />
-                <button style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  color: '#6c757d',
-                  fontSize: '18px',
-                  transition: 'color 0.2s ease',
-                }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#007bff')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#6c757d')}
+                <button
+                  onClick={handleMicClick}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    color: isRecording ? '#dc3545' : '#6c757d',
+                    fontSize: '18px',
+                    transition: 'color 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = isRecording ? '#dc3545' : '#007bff')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = isRecording ? '#dc3545' : '#6c757d')}
                 >
-                  <FiMic />
+                  {isRecording ? <FiMicOff /> : <FiMic />}
                 </button>
                 <button style={{
                   border: 'none',
@@ -422,7 +482,6 @@ const UserList = () => {
               </div>
             </div>
 
-            {/* Chat Messages */}
             <div style={{
               flex: 1,
               overflow: 'auto',
@@ -465,7 +524,30 @@ const UserList = () => {
                           }),
                     }}
                   >
-                    {msg.type === 'file' ? (
+                    {msg.type === 'text' ? (
+                      <>
+                        <p style={{
+                          margin: 0,
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          wordBreak: 'break-word',
+                        }}>
+                          {msg.message}
+                        </p>
+                        <span style={{
+                          fontSize: '11px',
+                          opacity: 0.7,
+                          marginTop: '5px',
+                          display: 'block',
+                          textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
+                        }}>
+                          {new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </>
+                    ) : msg.type === 'file' ? (
                       <div>
                         <a
                           href={msg.message}
@@ -496,16 +578,17 @@ const UserList = () => {
                           })}
                         </span>
                       </div>
-                    ) : (
-                      <>
-                        <p style={{
-                          margin: 0,
-                          fontSize: '14px',
-                          lineHeight: '1.5',
-                          wordBreak: 'break-word',
-                        }}>
-                          {msg.message}
-                        </p>
+                    ) : msg.type === 'audio' ? (
+                      <div>
+                        <audio
+                          controls
+                          src={msg.message}
+                          style={{
+                            width: '100%',
+                            maxWidth: '250px',
+                            marginBottom: '5px',
+                          }}
+                        />
                         <span style={{
                           fontSize: '11px',
                           opacity: 0.7,
@@ -518,15 +601,14 @@ const UserList = () => {
                             minute: '2-digit',
                           })}
                         </span>
-                      </>
-                    )}
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Chat Input */}
             <div style={{
               padding: '15px 20px',
               borderTop: '1px solid #e8ecef',

@@ -175,7 +175,15 @@ const storage = multer.diskStorage({
   },
 });
 
-const uploadLocal = multer({ storage: storage });
+const uploadLocal = multer({ storage: storage ,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'audio/webm', 'audio/mpeg'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non supporté'), false);
+    }
+  }, });
 
 // Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));
