@@ -62,6 +62,25 @@ const io = socketIo(server, {
     credentials: true,
   },
 });
+// Configure CORS middleware with explicit options at the top
+const corsOptions = {
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Include OPTIONS for preflight requests
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-faceid'], // Add x-auth-faceid to allowed headers
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+// Explicitly handle CORS preflight requests for /api/upload
+app.options('/api/upload', cors(corsOptions));
+app.options('/api/users/me', cors(corsOptions)); // Add preflight handling for /api/users/me
+// Log requests to verify CORS middleware is applied
+app.use((req, res, next) => {
+  console.log(`Request received: ${req.method} ${req.url}`);
+  next();
+});
+
+
 
 // Connexion à MongoDB
 mongoose
@@ -88,37 +107,47 @@ io.use(async (socket, next) => {
   }
 });
 
+// Add a Set to track online users
+const onlineUsers = new Set();
+
 // Gestion des connexions Socket.IO
 io.on('connection', (socket) => {
   console.log(`Utilisateur connecté : ${socket.id} (Identifiant: ${socket.user?.identifiant || 'inconnu'})`);
+
+  // Add user to onlineUsers when they connect
+  if (socket.user?.identifiant) {
+    onlineUsers.add(socket.user.identifiant);
+    io.emit('onlineUsers', Array.from(onlineUsers));
+  }
 
   socket.on('join', (identifiant) => {
     socket.join(identifiant);
     console.log(`Utilisateur ${socket.user?.identifiant} a rejoint la salle ${identifiant}`);
   });
 
-  socket.on('sendMessage', async ({ sender, receiver, message }, callback) => {
+  socket.on('sendMessage', async (messageData, callback) => {
     try {
-      const senderUser = await User.findOne({ Identifiant: sender });
-      const receiverUser = await User.findOne({ Identifiant: receiver });
+      const senderUser = await User.findOne({ Identifiant: messageData.sender });
+      const receiverUser = await User.findOne({ Identifiant: messageData.receiver });
       if (!senderUser || !receiverUser) {
         return callback({ error: 'Utilisateur ou destinataire introuvable' });
       }
-      console.log('Socket.IO - Comparaison:', { sender, socketIdentifiant: socket.user.identifiant });
-      if (sender !== socket.user.identifiant) {
+      if (messageData.sender !== socket.user.identifiant) {
         return callback({ error: 'Non autorisé' });
       }
-  
+
       const newMessage = new Message({
         sender: senderUser.Identifiant,
         receiver: receiverUser.Identifiant,
-        message,
+        message: messageData.message,
+        type: messageData.type || 'text', // Support for file messages
+        fileName: messageData.fileName, // Support for file names
         timestamp: new Date(),
       });
       await newMessage.save();
-  
-      io.to(receiver).emit('receiveMessage', newMessage);
-      io.to(sender).emit('receiveMessage', newMessage);
+
+      io.to(messageData.receiver).emit('receiveMessage', newMessage);
+      io.to(messageData.sender).emit('receiveMessage', newMessage);
       callback({ success: true });
     } catch (error) {
       console.error('Erreur lors de l\'envoi du message :', error);
@@ -128,11 +157,41 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`Utilisateur déconnecté : ${socket.id}`);
+    if (socket.user?.identifiant) {
+      onlineUsers.delete(socket.user.identifiant);
+      io.emit('onlineUsers', Array.from(onlineUsers));
+    }
   });
 });
 
+// Configure multer for file storage (for chat file uploads)
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const uploadLocal = multer({ storage: storage });
+
+// Serve uploaded files statically
+app.use('/uploads', express.static('uploads'));
+
+// File upload endpoint for chat
+app.post('/api/upload', uploadLocal.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Aucun fichier sélectionné' });
+  }
+
+  const fileUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+  res.status(200).json({ fileUrl });
+});
+
 // Middlewares Express
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -176,7 +235,7 @@ app.use('/api/auth', authMiddleware);
 
 // Endpoint pour l'historique des messages
 app.get('/messages/:userId1/:userId2', authMiddleware, async (req, res) => {
-  const { userId1, userId2 } = req.params; // userId1 et userId2 sont des Identifiants (ex: "233AFT08946")
+  const { userId1, userId2 } = req.params;
   try {
     const messages = await Message.find({
       $or: [
@@ -351,16 +410,16 @@ mongoose.connection.once('open', () => {
   console.log('GridFS initialisé');
 });
 
-const storage = new GridFsStorage({
+const gridFsStorage = new GridFsStorage({
   url: process.env.MONGO_URI || 'mongodb://localhost/Pi-2025',
   file: (req, file) => ({
     filename: `${Date.now()}-${file.originalname}`,
     bucketName: 'uploads',
   }),
 });
-const upload = multer({ storage });
+const uploadGridFs = multer({ storage: gridFsStorage });
 
-app.post('/register', upload.single('imageFile'), async (req, res) => {
+app.post('/register', uploadGridFs.single('imageFile'), async (req, res) => {
   const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber } = req.body;
   const validRoles = ['student', 'teacher', 'psychiatre'];
   if (!validRoles.includes(Role)) return res.status(400).send('Rôle invalide');
@@ -507,13 +566,59 @@ app.closeAll = async () => {
   try {
     await mongoose.connection.close();
     console.log('Connexion Mongoose fermée');
-    if (storage.client) await storage.client.close();
-    else if (storage.db) await storage.db.close();
+    if (gridFsStorage.client) await gridFsStorage.client.close();
+    else if (gridFsStorage.db) await gridFsStorage.db.close();
     console.log('GridFsStorage fermé');
   } catch (err) {
     console.error('Erreur lors du cleanup:', err);
   }
 };
+
+// In server.js
+app.get('/last-messages/:userId', authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const conversations = await Message.aggregate([
+      {
+        $match: {
+          $or: [{ sender: userId }, { receiver: userId }],
+        },
+      },
+      {
+        $sort: { timestamp: -1 },
+      },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ['$sender', userId] },
+              '$receiver',
+              '$sender',
+            ],
+          },
+          lastMessage: { $first: '$message' },
+          timestamp: { $first: '$timestamp' },
+        },
+      },
+    ]);
+
+    const lastMessages = await Promise.all(
+      conversations.map(async (conv) => {
+        const otherUser = await User.findOne({ Identifiant: conv._id }, 'Name Email Identifiant');
+        return {
+          user: otherUser,
+          lastMessage: conv.lastMessage,
+          timestamp: conv.timestamp,
+        };
+      })
+    );
+
+    res.json(lastMessages);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des derniers messages :', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des derniers messages' });
+  }
+});
 
 // Démarrage du serveur
 const PORT = process.env.PORT || 5000;

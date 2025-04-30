@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import { Grid } from "react-feather";
 import { Link } from "react-router-dom";
 import CustomizerContext from "../../Helper/Customizer";
-import cubaimg from "../../assets/images/logo/logo.png";
+import cubaimg from "../../assets/images/logo/logo2.png";
 import { Image } from "../../AbstractElements";
 const SidebarLogo = () => {
   const { togglSidebar, setTogglSidebar } = useContext(CustomizerContext)
@@ -10,7 +10,7 @@ const SidebarLogo = () => {
   return (
 <>
       <Link to={`${process.env.PUBLIC_URL}/dashboard/default`}>
-      <Image attrImage={{ className: "img-fluid for-light", src: cubaimg, alt: "" }} />
+      <Image attrImage={{ className: "img-fluid for-light", src: cubaimg, alt: "",style: { width: "90px", height: "auto" },}} />
       </Link>
       <div className="back-btn" onClick={() => setTogglSidebar(!togglSidebar)}>
         <Grid />

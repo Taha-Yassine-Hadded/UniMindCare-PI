@@ -17,10 +17,8 @@ const ChatModal = ({ receiverUser, onClose }) => {
   const currentUser = storedUser ? JSON.parse(storedUser) : {};
 
   useEffect(() => {
-    console.log('ChatModal - Token:', token);
-    console.log('ChatModal - Current User:', currentUser);
     if (!token || !currentUser.Identifiant) {
-      setError('Utilisateur non authentifié ou données invalides. Redirection vers la connexion...');
+      setError('Utilisateur non authentifié. Redirection vers la connexion...');
       setTimeout(() => navigate('/login'), 2000);
       return;
     }
@@ -34,21 +32,15 @@ const ChatModal = ({ receiverUser, onClose }) => {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      console.log('ChatModal - Connecté à Socket.IO avec ID:', newSocket.id);
       newSocket.emit('join', currentUser.Identifiant);
     });
 
     newSocket.on('connect_error', (err) => {
-      console.error('ChatModal - Erreur connexion Socket.IO:', err.message);
       setError('Erreur de connexion au serveur de messagerie');
     });
 
     const fetchMessages = async () => {
       try {
-        console.log('ChatModal - Fetching messages pour:', {
-          sender: currentUser.Identifiant,
-          receiver: receiverUser.Identifiant,
-        });
         const response = await axios.get(
           `http://localhost:5000/messages/${currentUser.Identifiant}/${receiverUser.Identifiant}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -57,14 +49,12 @@ const ChatModal = ({ receiverUser, onClose }) => {
         setLoading(false);
       } catch (error) {
         setError(error.response?.data?.message || 'Erreur lors du chargement des messages');
-        console.error('ChatModal - Erreur fetchMessages:', error);
         setLoading(false);
       }
     };
     fetchMessages();
 
     newSocket.on('receiveMessage', (message) => {
-      console.log('ChatModal - Message reçu:', message);
       setMessages((prev) => {
         if (!prev.some((m) => m._id === message._id)) {
           return [...prev, message];
@@ -88,7 +78,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
     if (!token || !currentUser.Identifiant) {
-      setError('Utilisateur non authentifié ou données invalides. Redirection vers la connexion...');
+      setError('Utilisateur non authentifié. Redirection vers la connexion...');
       setTimeout(() => navigate('/login'), 2000);
       return;
     }
@@ -97,14 +87,11 @@ const ChatModal = ({ receiverUser, onClose }) => {
       receiver: receiverUser.Identifiant,
       message: newMessage,
     };
-    console.log('ChatModal - Envoi du message:', messageData);
     socket.emit('sendMessage', messageData, (response) => {
       if (response?.error) {
         setError(response.error);
-        console.error('ChatModal - Erreur réponse Socket.IO:', response.error);
       } else {
         setNewMessage('');
-        console.log('ChatModal - Message envoyé avec succès');
       }
     });
   };
@@ -126,7 +113,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
       backgroundColor: 'white',
       borderRadius: '8px',
       width: '90%',
-      maxWidth: '500px',
+      maxWidth: '600px',
       height: '80vh',
       display: 'flex',
       flexDirection: 'column',
@@ -137,6 +124,18 @@ const ChatModal = ({ receiverUser, onClose }) => {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
+      background: '#fff',
+    },
+    headerContent: {
+      display: 'flex',
+      alignItems: 'center',
+    },
+    avatar: {
+      width: '40px',
+      height: '40px',
+      borderRadius: '50%',
+      background: '#ccc',
+      marginRight: '10px',
     },
     closeButton: {
       border: 'none',
@@ -148,35 +147,41 @@ const ChatModal = ({ receiverUser, onClose }) => {
       flex: 1,
       overflow: 'auto',
       padding: '15px',
+      background: '#f5f5f5', // Light gray background to match screenshot
     },
     message: {
       margin: '10px 0',
       padding: '10px',
-      borderRadius: '8px',
+      borderRadius: '15px',
       maxWidth: '70%',
+      position: 'relative',
     },
     sentMessage: {
-      backgroundColor: '#0084ff',
+      backgroundColor: '#34c759', // Green color for sent messages
       color: 'white',
       marginLeft: 'auto',
     },
     receivedMessage: {
-      backgroundColor: '#e9ecef',
+      backgroundColor: '#e5e5ea', // Gray color for received messages
       color: 'black',
       marginRight: 'auto',
     },
     messageContent: {
       margin: 0,
+      wordBreak: 'break-word',
     },
     messageTime: {
-      fontSize: '0.8em',
+      fontSize: '0.7em',
       opacity: 0.7,
+      marginTop: '5px',
+      textAlign: 'right',
     },
     inputContainer: {
       padding: '15px',
       borderTop: '1px solid #eee',
       display: 'flex',
       gap: '10px',
+      background: '#fff',
     },
     input: {
       flex: 1,
@@ -187,7 +192,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
     },
     sendButton: {
       padding: '10px 20px',
-      backgroundColor: '#0084ff',
+      backgroundColor: '#34c759', // Green button to match "END CALL" button style
       color: 'white',
       border: 'none',
       borderRadius: '20px',
@@ -218,12 +223,37 @@ const ChatModal = ({ receiverUser, onClose }) => {
     <div style={styles.modal}>
       <div style={styles.modalContent}>
         <div style={styles.modalHeader}>
-          <h3>Chat avec {receiverUser.Name}</h3>
-          <button onClick={onClose} style={styles.closeButton}>×</button>
+          <div style={styles.headerContent}>
+            <div style={styles.avatar} />
+            <div>
+              <h3 style={{ margin: 0 }}>{receiverUser.Name}</h3>
+              <p style={{ margin: 0, fontSize: '0.9em', color: '#666' }}>
+                May 5, 5:30 PM {/* Static timestamp to match screenshot */}
+              </p>
+            </div>
+          </div>
+          <div>
+            {/* Icons for additional actions (e.g., search, attach, audio, video) */}
+            <button style={{ border: 'none', background: 'none', cursor: 'pointer', marginRight: '10px' }}>
+              🔍
+            </button>
+            <button style={{ border: 'none', background: 'none', cursor: 'pointer', marginRight: '10px' }}>
+              📎
+            </button>
+            <button style={{ border: 'none', background: 'none', cursor: 'pointer', marginRight: '10px' }}>
+              🎙️
+            </button>
+            <button style={{ border: 'none', background: 'none', cursor: 'pointer', marginRight: '10px' }}>
+              📹
+            </button>
+            <button onClick={onClose} style={styles.closeButton}>×</button>
+          </div>
         </div>
         <div style={styles.messagesContainer}>
           {loading ? (
             <p>Chargement des messages...</p>
+          ) : messages.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#666' }}>Aucun message pour l'instant</p>
           ) : (
             messages.map((msg, index) => (
               <div
@@ -237,7 +267,10 @@ const ChatModal = ({ receiverUser, onClose }) => {
               >
                 <p style={styles.messageContent}>{msg.message}</p>
                 <span style={styles.messageTime}>
-                  {new Date(msg.timestamp).toLocaleTimeString()}
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
                 </span>
               </div>
             ))
@@ -250,7 +283,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Tapez votre message..."
+            placeholder="Aa"
             style={styles.input}
           />
           <button onClick={handleSendMessage} style={styles.sendButton}>

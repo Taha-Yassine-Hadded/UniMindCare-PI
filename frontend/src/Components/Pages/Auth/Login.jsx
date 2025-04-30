@@ -213,6 +213,8 @@ const LoginSample = () => {
                     src={require('../../../assets/images/logo/logo2.png')}
                     alt="Logo"
                     className="img-fluid"
+                    style={{ width: '150px', height: 'auto' }} // Taille réduite
+
                   />
                 </Link>
               </div>

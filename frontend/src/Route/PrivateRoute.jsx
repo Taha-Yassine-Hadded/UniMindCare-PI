@@ -7,6 +7,7 @@ const PrivateRoute = () => {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+  const faceIdToken = localStorage.getItem("faceIdToken");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -18,12 +19,12 @@ const PrivateRoute = () => {
       }
 
       try {
-        console.log("PrivateRoute - Token utilisé:", token); // Ajout ici
+        console.log("PrivateRoute - Token utilisé:", token);
         const response = await axios.get("http://localhost:5000/api/users/me", {
           headers: {
             Authorization: `Bearer ${token}`,
-            'X-Auth-FaceID': 'true' // Nouvel header
-            },
+            'x-auth-faceid': faceIdToken || 'true', // Use faceIdToken if available, fallback to 'true'
+          },
         });
         const data = response.data;
         // Assurez-vous que les champs sont uniformes
@@ -40,10 +41,13 @@ const PrivateRoute = () => {
         setUserData(normalizedData);
         localStorage.setItem('user', JSON.stringify(normalizedData));
         console.log("PrivateRoute - Données utilisateur:", normalizedData);
+        setLoading(false);
       } catch (error) {
+        console.error('PrivateRoute - Échec de l\'authentification:', error.message);
+        localStorage.removeItem('token');
+        localStorage.removeItem('faceIdToken');
         setAuthenticated(false);
-        console.error("PrivateRoute - Échec de l'authentification:", error.response?.data || error.message);
-      } finally {
+        setUserData(null);
         setLoading(false);
       }
     };
