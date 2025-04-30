@@ -18,6 +18,7 @@ const appointementRoutes = require('./routes/appointmentRoutes');
 const caseRoutes = require('./routes/caseRoutes');
 const availabilityRoutes = require('./routes/availabilityRoutes');
 const notificationsRoutes = require('./routes/notifications');
+const notesRoutes = require('./routes/notesRoutes');
 
 const User = require('./Models/Users');
 const nodemailer = require('nodemailer');
@@ -894,6 +895,7 @@ app.use('/api/appointments', appointementRoutes);
 app.use('/api/cases', caseRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/notes', notesRoutes.router);
 
 
 
