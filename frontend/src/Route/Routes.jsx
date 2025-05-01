@@ -123,6 +123,7 @@ import Statistics from "../Components/Statistics";
 import StatisticsEtudiant from "../Components/StudentStats";
 import UserList from "../Components/userList"; 
 import ChatModal from "../Components/ChatModal";
+import EvaluationHistoryContain from "../Components/Evaluation/EvaluationHistoryContain"; // Ajoute cet import
 export const routes = [
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
@@ -146,7 +147,7 @@ export const routes = [
 
   { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard  /> }, 
    { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
-
+   { path: `${process.env.PUBLIC_URL}/evaluation-history`, Component: <EvaluationHistoryContain /> },
 
   // dashboard
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
