@@ -4,6 +4,7 @@ import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import io from 'socket.io-client';
 import './CaseManagement.css';
+import { useNavigate } from 'react-router-dom';
 
 // Initialize Socket.IO client
 const socket = io('http://localhost:5000', {
@@ -18,8 +19,8 @@ socket.on('connect', () => {
 socket.on('connect_error', (error) => {
   console.error('WebSocket connection error:', error);
 });
-
 const CaseManagement = ({ psychologistId }) => {
+  const navigate = useNavigate();
   const [pendingCases, setPendingCases] = useState([]);
   const [inProgressCases, setInProgressCases] = useState([]);
   const [archivedCases, setArchivedCases] = useState([]);
@@ -515,6 +516,9 @@ const CaseManagement = ({ psychologistId }) => {
                         <Dropdown.Item onClick={() => handleResolveCase(c._id)}>
                           Mark as Resolved
                         </Dropdown.Item>
+                        <Dropdown.Item onClick={() => navigate(`${process.env.PUBLIC_URL}/session-notes/${c._id}`)}>
+  Manage Session Notes
+</Dropdown.Item>
                       </Dropdown.Menu>
                     </Dropdown>
                   </td>

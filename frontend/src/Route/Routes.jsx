@@ -139,7 +139,8 @@ import CaseManagement from "../Components/AppointementModule/CaseManagement";
 import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import AppointmentCalendar from "../Components/AppointementModule/AppointmentCalendar";
 import QuestionnaireHistory from "../Components/EmergencyClaim/QuestionnaireHistory";
-
+import SessionNoteManagement from "../Components/AppointementModule/SessionNoteManagement";
+import SessionNotesPage from "../Components/AppointementModule/SessionNotesPage";
 export const routes = [
 
   //Psychologist Training Dashboard
@@ -339,5 +340,6 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
   {path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagementPage />},
   { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
+  { path: `${process.env.PUBLIC_URL}/session-notes/:caseId`, Component: <SessionNotesPage /> },
 
 ];
