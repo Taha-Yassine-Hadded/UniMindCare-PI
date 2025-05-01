@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { Card, Table, Badge, Button, Modal, Spinner } from 'react-bootstrap';
+import { Card, Table, Badge, Button, Modal, Spinner, ButtonGroup } from 'react-bootstrap';
 import { format } from 'date-fns';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import NoteViewer from './NoteViewer';
 import NoteEditor from './NoteEditor';
 
-const NotesList = ({ notes, onNoteUpdated, onNoteDeleted }) => {
+const NotesList = ({ notes, token, onNoteUpdated, onNoteDeleted }) => {
   const [selectedNote, setSelectedNote] = useState(null);
   const [viewMode, setViewMode] = useState('view'); // 'view' or 'edit'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState(null);
   const [loading, setLoading] = useState(false);
   
+  // Handlers inchangés
   const handleViewNote = (note) => {
     setSelectedNote(note);
     setViewMode('view');
@@ -43,7 +44,15 @@ const NotesList = ({ notes, onNoteUpdated, onNoteDeleted }) => {
     
     setLoading(true);
     try {
-      await axios.delete(`http://localhost:5000/api/notes/${noteToDelete._id}`);
+      // Ajouter l'authentification avec token
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      await axios.delete(`http://localhost:5000/api/notes/${noteToDelete._id}`, config);
       setShowDeleteModal(false);
       setNoteToDelete(null);
       
@@ -56,7 +65,9 @@ const NotesList = ({ notes, onNoteUpdated, onNoteDeleted }) => {
       toast.success('Note deleted successfully');
     } catch (err) {
       console.error('Error deleting note:', err);
-      toast.error('Failed to delete note');
+      toast.error(err.response?.status === 401 
+                 ? 'Authentication error. Please login again.' 
+                 : 'Failed to delete note');
     } finally {
       setLoading(false);
     }
@@ -125,29 +136,27 @@ const NotesList = ({ notes, onNoteUpdated, onNoteDeleted }) => {
                   <td>{getTemplateBadge(note.templateType)}</td>
                   <td>{getStatusBadge(note.status)}</td>
                   <td>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      className="me-2"
-                      onClick={() => handleViewNote(note)}
-                    >
-                      View
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      className="me-2"
-                      onClick={() => handleEditNote(note)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => confirmDelete(note)}
-                    >
-                      Delete
-                    </Button>
+                    {/* Utilisation de ButtonGroup pour aligner les boutons horizontalement */}
+                    <ButtonGroup size="sm">
+                      <Button
+                        variant="outline-primary"
+                        onClick={() => handleViewNote(note)}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        onClick={() => handleEditNote(note)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline-danger"
+                        onClick={() => confirmDelete(note)}
+                      >
+                        Delete
+                      </Button>
+                    </ButtonGroup>
                   </td>
                 </tr>
               ))}
@@ -159,6 +168,7 @@ const NotesList = ({ notes, onNoteUpdated, onNoteDeleted }) => {
       {selectedNote && viewMode === 'view' && (
         <NoteViewer
           note={selectedNote}
+          token={token}
           onClose={handleCloseNote}
           onEdit={() => setViewMode('edit')}
         />
@@ -167,6 +177,7 @@ const NotesList = ({ notes, onNoteUpdated, onNoteDeleted }) => {
       {selectedNote && viewMode === 'edit' && (
         <NoteEditor
           noteId={selectedNote._id}
+          token={token}
           onNoteUpdated={handleNoteUpdated}
           onCancel={handleCloseNote}
           mode="edit"

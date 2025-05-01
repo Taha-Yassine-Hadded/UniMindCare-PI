@@ -7,6 +7,7 @@ const NoteEditor = ({
   caseId,
   studentId,
   suggestedTemplate,
+  token,  // Ajout du token
   onNoteCreated,
   onNoteUpdated,
   onCancel,
@@ -31,11 +32,19 @@ const NoteEditor = ({
   });
   const [validationErrors, setValidationErrors] = useState([]);
   
+  // Configuration des requêtes avec token
+  const getConfig = () => ({
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
   // Fetch all available templates on component mount
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const { data } = await axios.get('http://localhost:5000/api/notes/templates');
+        const { data } = await axios.get('http://localhost:5000/api/notes/templates', getConfig());
         setTemplates(data.all);
         setLoading(false);
       } catch (err) {
@@ -46,7 +55,7 @@ const NoteEditor = ({
     };
     
     fetchTemplates();
-  }, []);
+  }, [token]);
   
   // If editing, fetch the existing note data
   useEffect(() => {
@@ -54,7 +63,7 @@ const NoteEditor = ({
       const fetchNote = async () => {
         try {
           setLoading(true);
-          const { data } = await axios.get(`http://localhost:5000/api/notes/${noteId}`);
+          const { data } = await axios.get(`http://localhost:5000/api/notes/${noteId}`, getConfig());
           setFormData({
             title: data.title || '',
             objectives: data.objectives || '',
@@ -77,13 +86,13 @@ const NoteEditor = ({
       
       fetchNote();
     }
-  }, [noteId, mode]);
+  }, [noteId, mode, token]);
   
   // Fetch template structure when template type changes
   useEffect(() => {
     const fetchTemplateStructure = async () => {
       try {
-        const { data } = await axios.get(`http://localhost:5000/api/notes/templates/type/${selectedTemplateType}`);
+        const { data } = await axios.get(`http://localhost:5000/api/notes/templates/type/${selectedTemplateType}`, getConfig());
         setTemplateStructure(data.structure);
       } catch (err) {
         console.error(`Error fetching template structure for ${selectedTemplateType}:`, err);
@@ -94,7 +103,7 @@ const NoteEditor = ({
     if (selectedTemplateType) {
       fetchTemplateStructure();
     }
-  }, [selectedTemplateType]);
+  }, [selectedTemplateType, token]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -160,6 +169,8 @@ const NoteEditor = ({
     setSaving(true);
     
     try {
+      const config = getConfig();
+      
       if (mode === 'create') {
         // Create new note
         await axios.post('http://localhost:5000/api/notes', {
@@ -167,12 +178,12 @@ const NoteEditor = ({
           caseId,
           studentId,
           templateType: selectedTemplateType
-        });
+        }, config);
         
         onNoteCreated && onNoteCreated();
       } else {
         // Update existing note
-        await axios.put(`http://localhost:5000/api/notes/${noteId}`, updatedFormData);
+        await axios.put(`http://localhost:5000/api/notes/${noteId}`, updatedFormData, config);
         onNoteUpdated && onNoteUpdated();
       }
     } catch (err) {
