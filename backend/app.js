@@ -155,6 +155,30 @@ io.on('connection', (socket) => {
     }
   });
 
+
+  socket.on('startVideoCall', ({ to, from }) => {
+    io.to(to).emit('startVideoCall', { from });
+  });
+
+  socket.on('offer', ({ offer, to, from }) => {
+    io.to(to).emit('offer', { offer, from });
+  });
+
+  socket.on('answer', ({ answer, to, from }) => {
+    io.to(to).emit('answer', { answer, from });
+  });
+
+  socket.on('ice-candidate', ({ candidate, to, from }) => {
+    io.to(to).emit('ice-candidate', { candidate, from });
+  });
+
+  socket.on('endCall', ({ to }) => {
+    if (to) {
+      io.to(to).emit('endCall');
+    }
+  });
+
+
   socket.on('disconnect', () => {
     console.log(`Utilisateur déconnecté : ${socket.id}`);
     if (socket.user?.identifiant) {

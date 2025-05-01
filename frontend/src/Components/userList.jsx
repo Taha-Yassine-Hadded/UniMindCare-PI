@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import { FiSearch, FiPaperclip, FiMic, FiMicOff, FiVideo, FiSend } from 'react-icons/fi';
+import { FiSearch, FiPaperclip, FiMic, FiMicOff, FiVideo, FiSend, FiX } from 'react-icons/fi';
 
 const UserList = () => {
   const navigate = useNavigate();
@@ -11,15 +11,23 @@ const UserList = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMessageQuery, setSearchMessageQuery] = useState('');
+  const [filteredMessages, setFilteredMessages] = useState([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [socket, setSocket] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
+  const [isVideoCallActive, setIsVideoCallActive] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
   const mediaRecorderRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const peerConnectionRef = useRef(null);
 
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
@@ -55,6 +63,53 @@ const UserList = () => {
       });
     });
 
+    socketInstance.on('startVideoCall', ({ from }) => {
+      if (selectedUser && selectedUser.Identifiant === from) {
+        setIncomingCall({ from });
+      }
+    });
+
+    socketInstance.on('offer', async ({ offer, from }) => {
+      if (!peerConnectionRef.current) {
+        createPeerConnection();
+      }
+      try {
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await peerConnectionRef.current.createAnswer();
+        await peerConnectionRef.current.setLocalDescription(answer);
+        socketInstance.emit('answer', {
+          answer,
+          to: from,
+          from: currentUser.Identifiant,
+        });
+        setIsVideoCallActive(true);
+      } catch (error) {
+        setError('Erreur lors de la gestion de l’offre');
+      }
+    });
+
+    socketInstance.on('answer', async ({ answer }) => {
+      try {
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (error) {
+        setError('Erreur lors de la gestion de la réponse');
+      }
+    });
+
+    socketInstance.on('ice-candidate', async ({ candidate }) => {
+      try {
+        if (candidate && peerConnectionRef.current) {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      } catch (error) {
+        setError('Erreur lors de la gestion du candidat ICE');
+      }
+    });
+
+    socketInstance.on('endCall', () => {
+      endCall();
+    });
+
     const fetchUsers = async () => {
       try {
         if (!token) {
@@ -79,6 +134,11 @@ const UserList = () => {
       socketInstance.off('connect_error');
       socketInstance.off('receiveMessage');
       socketInstance.off('connect');
+      socketInstance.off('startVideoCall');
+      socketInstance.off('offer');
+      socketInstance.off('answer');
+      socketInstance.off('ice-candidate');
+      socketInstance.off('endCall');
       socketInstance.disconnect();
     };
   }, [token, navigate, currentUser.Identifiant]);
@@ -93,6 +153,7 @@ const UserList = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setMessages(response.data);
+        setFilteredMessages(response.data); // Initialize filtered messages with all messages
       } catch (error) {
         setError(error.response?.data?.message || 'Erreur lors du chargement des messages');
       }
@@ -102,7 +163,128 @@ const UserList = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, filteredMessages]);
+
+  useEffect(() => {
+    if (!searchMessageQuery.trim()) {
+      setFilteredMessages(messages);
+      return;
+    }
+
+    const query = searchMessageQuery.toLowerCase();
+    const filtered = messages.filter((msg) =>
+      msg.type === 'text' && msg.message.toLowerCase().includes(query)
+    );
+    setFilteredMessages(filtered);
+  }, [searchMessageQuery, messages]);
+
+  const createPeerConnection = () => {
+    const peerConnection = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    });
+    peerConnectionRef.current = peerConnection;
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate && socket) {
+        socket.emit('ice-candidate', {
+          candidate: event.candidate,
+          to: selectedUser?.Identifiant,
+          from: currentUser.Identifiant,
+        });
+      }
+    };
+
+    peerConnection.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    peerConnection.oniceconnectionstatechange = () => {
+      if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'closed') {
+        endCall();
+      }
+    };
+
+    return peerConnection;
+  };
+
+  const startVideoCall = async () => {
+    if (!selectedUser || !onlineUsers.includes(selectedUser.Identifiant)) {
+      setError('L’utilisateur n’est pas en ligne');
+      return;
+    }
+    if (!socket) {
+      setError('Connexion au serveur non établie');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      const peerConnection = createPeerConnection();
+      stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+
+      socket.emit('startVideoCall', {
+        to: selectedUser.Identifiant,
+        from: currentUser.Identifiant,
+      });
+
+      socket.emit('offer', {
+        offer,
+        to: selectedUser.Identifiant,
+        from: currentUser.Identifiant,
+      });
+
+      setIsVideoCallActive(true);
+    } catch (error) {
+      setError('Erreur lors du démarrage de l’appel vidéo');
+    }
+  };
+
+  const acceptCall = async () => {
+    if (!incomingCall || !selectedUser || !socket) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      const peerConnection = createPeerConnection();
+      stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+
+      setIncomingCall(null);
+      setIsVideoCallActive(true);
+    } catch (error) {
+      setError('Erreur lors de l’acceptation de l’appel');
+    }
+  };
+
+  const endCall = () => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    if (localVideoRef.current && localVideoRef.current.srcObject) {
+      localVideoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      localVideoRef.current.srcObject = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    setIsVideoCallActive(false);
+    setIncomingCall(null);
+    if (socket && selectedUser) {
+      socket.emit('endCall', { to: selectedUser.Identifiant });
+    }
+  };
 
   const openChat = (user) => {
     if (!user.Identifiant) return;
@@ -112,6 +294,9 @@ const UserList = () => {
       Email: user.Email,
     });
     setMessages([]);
+    setFilteredMessages([]);
+    setSearchMessageQuery('');
+    setIsSearchActive(false);
   };
 
   const handleSendMessage = () => {
@@ -127,7 +312,7 @@ const UserList = () => {
       message: newMessage,
       type: 'text',
     };
-    socket.emit('sendMessage', messageData, (response) => {
+    socket?.emit('sendMessage', messageData, (response) => {
       if (response?.error) {
         setError(response.error);
       } else {
@@ -161,7 +346,7 @@ const UserList = () => {
         fileName: fileName,
         type: 'file',
       };
-      socket.emit('sendMessage', messageData, (response) => {
+      socket?.emit('sendMessage', messageData, (response) => {
         if (response?.error) {
           setError(response.error);
         }
@@ -219,7 +404,7 @@ const UserList = () => {
             fileName: fileName,
             type: 'audio',
           };
-          socket.emit('sendMessage', messageData, (response) => {
+          socket?.emit('sendMessage', messageData, (response) => {
             if (response?.error) {
               setError(response.error);
             }
@@ -237,6 +422,14 @@ const UserList = () => {
       stopRecording();
     } else {
       startRecording();
+    }
+  };
+
+  const toggleSearch = () => {
+    setIsSearchActive((prev) => !prev);
+    if (isSearchActive) {
+      setSearchMessageQuery('');
+      setFilteredMessages(messages);
     }
   };
 
@@ -376,7 +569,7 @@ const UserList = () => {
               background: '#ffffff',
               boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                 <div style={{
                   width: '40px',
                   height: '40px',
@@ -398,35 +591,72 @@ const UserList = () => {
                     }} />
                   )}
                 </div>
-                <div>
-                  <h3 style={{
-                    margin: 0,
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    color: '#212529',
-                  }}>
-                    {selectedUser.Name}
-                  </h3>
-                  <p style={{
-                    margin: '2px 0 0',
-                    fontSize: '12px',
-                    color: '#6c757d',
-                  }}>
-                    {onlineUsers.includes(selectedUser.Identifiant) ? 'En ligne' : 'Hors ligne'}
-                  </p>
+                <div style={{ flex: 1 }}>
+                  {isSearchActive ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input
+                        type="text"
+                        value={searchMessageQuery}
+                        onChange={(e) => setSearchMessageQuery(e.target.value)}
+                        placeholder="Rechercher dans la conversation..."
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '20px',
+                          border: '1px solid #e8ecef',
+                          outline: 'none',
+                          fontSize: '14px',
+                          background: '#f8f9fa',
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={toggleSearch}
+                        style={{
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          color: '#dc3545',
+                          fontSize: '18px',
+                        }}
+                      >
+                        <FiX />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 style={{
+                        margin: 0,
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        color: '#212529',
+                      }}>
+                        {selectedUser.Name}
+                      </h3>
+                      <p style={{
+                        margin: '2px 0 0',
+                        fontSize: '12px',
+                        color: '#6c757d',
+                      }}>
+                        {onlineUsers.includes(selectedUser.Identifiant) ? 'En ligne' : 'Hors ligne'}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  color: '#6c757d',
-                  fontSize: '18px',
-                  transition: 'color 0.2s ease',
-                }}
+                <button
+                  onClick={toggleSearch}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    color: isSearchActive ? '#007bff' : '#6c757d',
+                    fontSize: '18px',
+                    transition: 'color 0.2s ease',
+                  }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = '#007bff')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#6c757d')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = isSearchActive ? '#007bff' : '#6c757d')}
                 >
                   <FiSearch />
                 </button>
@@ -466,14 +696,16 @@ const UserList = () => {
                 >
                   {isRecording ? <FiMicOff /> : <FiMic />}
                 </button>
-                <button style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  color: '#6c757d',
-                  fontSize: '18px',
-                  transition: 'color 0.2s ease',
-                }}
+                <button
+                  onClick={startVideoCall}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    color: '#6c757d',
+                    fontSize: '18px',
+                    transition: 'color 0.2s ease',
+                  }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = '#007bff')}
                   onMouseLeave={(e) => (e.currentTarget.style.color = '#6c757d')}
                 >
@@ -489,17 +721,17 @@ const UserList = () => {
               background: '#f8f9fa',
               backgroundImage: 'linear-gradient(to bottom, #f8f9fa, #f1f3f5)',
             }}>
-              {messages.length === 0 ? (
+              {filteredMessages.length === 0 ? (
                 <p style={{
                   textAlign: 'center',
                   color: '#adb5bd',
                   fontSize: '14px',
                   marginTop: '50px',
                 }}>
-                  Aucun message pour l'instant
+                  {searchMessageQuery ? 'Aucun message correspondant' : 'Aucun message pour l\'instant'}
                 </p>
               ) : (
-                messages.map((msg, index) => (
+                filteredMessages.map((msg, index) => (
                   <div
                     key={index}
                     style={{
@@ -673,6 +905,122 @@ const UserList = () => {
           </div>
         )}
       </div>
+
+      {isVideoCallActive && selectedUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '10px',
+            padding: '20px',
+            width: '90%',
+            maxWidth: '800px',
+            position: 'relative',
+          }}>
+            <h3 style={{ margin: '0 0 20px', textAlign: 'center' }}>Appel vidéo avec {selectedUser.Name}</h3>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                style={{
+                  width: '50%',
+                  borderRadius: '8px',
+                  border: '1px solid #e8ecef',
+                  background: '#000',
+                }}
+              />
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                style={{
+                  width: '50%',
+                  borderRadius: '8px',
+                  border: '1px solid #e8ecef',
+                  background: '#000',
+                }}
+              />
+            </div>
+            <button
+              onClick={endCall}
+              style={{
+                display: 'block',
+                margin: '0 auto',
+                padding: '10px 20px',
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Terminer l’appel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {incomingCall && selectedUser && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: '#fff',
+          borderRadius: '10px',
+          padding: '20px',
+          boxShadow: '0 4px 10px rgba(0, 0, 0, 0.2)',
+          zIndex: 1000,
+        }}>
+          <h3 style={{ margin: '0 0 20px', textAlign: 'center' }}>Appel entrant de {selectedUser.Name}</h3>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button
+              onClick={acceptCall}
+              style={{
+                padding: '10px 20px',
+                background: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Accepter
+            </button>
+            <button
+              onClick={() => {
+                if (socket) {
+                  socket.emit('endCall', { to: incomingCall.from });
+                }
+                setIncomingCall(null);
+              }}
+              style={{
+                padding: '10px 20px',
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Refuser
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
