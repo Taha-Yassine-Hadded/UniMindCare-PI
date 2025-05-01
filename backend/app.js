@@ -138,11 +138,17 @@ app.use("/api", feedbackRoutes); // Monter les routes de feedback sous /api
   .connect(process.env.MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));*/
-
-   // Connexion à MongoDB
-   mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
-     .then(() => console.log('Connexion à MongoDB réussie'))
-     .catch(err => console.log('Erreur de connexion à MongoDB: ', err));
+// Connexion à MongoDB
+mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => {
+    console.log('Connexion à MongoDB réussie');
+    
+    // Initialiser les templates par défaut
+    notesRoutes.initializeDefaultTemplates()
+      .then(() => console.log('Templates par défaut initialisés avec succès'))
+      .catch(err => console.error('Erreur lors de l\'initialisation des templates:', err));
+  })
+  .catch(err => console.log('Erreur de connexion à MongoDB: ', err));
 
 
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
