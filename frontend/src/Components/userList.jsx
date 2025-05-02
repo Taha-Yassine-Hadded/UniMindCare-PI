@@ -117,12 +117,13 @@ const UserList = () => {
           setTimeout(() => navigate('/login'), 2000);
           return;
         }
-        const res = await axios.get('http://localhost:5000/api/users/all?role=student', {
+        const res = await axios.get('http://localhost:5000/api/users/all', {
           headers: { Authorization: `Bearer ${token}` },
         });
+        console.log('Utilisateurs récupérés:', res.data); // Debug
         setUsers(res.data);
       } catch (error) {
-        setError(error.response?.data?.message || 'Erreur lors du chargement des étudiants');
+        setError(error.response?.data?.message || 'Erreur lors du chargement des utilisateurs');
       } finally {
         setLoading(false);
       }
@@ -437,7 +438,7 @@ const UserList = () => {
     user.Name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Chargement des étudiants...</div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Chargement des utilisateurs...</div>;
   if (error) return <div style={{ textAlign: 'center', padding: '20px', color: '#e74c3c' }}>{error}</div>;
 
   return (
