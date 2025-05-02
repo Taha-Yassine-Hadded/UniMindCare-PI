@@ -123,7 +123,10 @@ import Statistics from "../Components/Statistics";
 import StatisticsEtudiant from "../Components/StudentStats";
 import UserList from "../Components/userList"; 
 import ChatModal from "../Components/ChatModal";
-import EvaluationHistoryContain from "../Components/Evaluation/EvaluationHistoryContain"; // Ajoute cet import
+import EvaluationHistoryContain from "../Components/Evaluation/EvaluationHistoryContain";
+import EvaluationDetails from '../Components/Evaluation/EvaluationDetails'; 
+import MeetingForm from "../Components/Meeting/MeetingForm"; // Nouveau composant
+
 export const routes = [
     //Weather
     { path: `${process.env.PUBLIC_URL}/dashboard/weather-dashboard`, Component: <WeatherDashboard /> },
@@ -140,6 +143,9 @@ export const routes = [
 
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`, Component: <StatisticsEtudiant /> },
 
+     // Meetings
+     { path: `${process.env.PUBLIC_URL}/meetings`, Component: <MeetingForm /> },
+
 
 
   //Feedback
@@ -148,6 +154,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard  /> }, 
    { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
    { path: `${process.env.PUBLIC_URL}/evaluation-history`, Component: <EvaluationHistoryContain /> },
+   { path: `${process.env.PUBLIC_URL}/evaluations/details/:id`, Component: <EvaluationDetails /> }, 
 
   // dashboard
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },

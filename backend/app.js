@@ -31,6 +31,17 @@ const Message = require('./Models/message');
 const UserVerification = require('./Models/UserVerification');
 const FaceIDUser = require('./faceIDUser');
 
+// Modèle Meeting
+const MeetingSchema = new mongoose.Schema({
+    meetLink: { type: String, required: true },
+    date: { type: Date, required: true },
+    reason: { type: String, required: true },
+    duration: { type: Number, required: true },
+    createdBy: { type: String, required: true }, // Identifiant de l'utilisateur (enseignant)
+    createdAt: { type: Date, default: Date.now },
+});
+const Meeting = mongoose.model('Meeting', MeetingSchema);
+
 // Routes
 const indexRouter = require('./routes/index');
 const usersRoutes = require('./routes/users');
@@ -56,55 +67,68 @@ const { spawn } = require('child_process');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-  cors: {
-    origin: 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
+    cors: {
+        origin: 'http://localhost:3000',
+        methods: ['GET', 'POST'],
+        credentials: true,
+    },
 });
+
 // Configure CORS middleware with explicit options at the top
 const corsOptions = {
-  origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Include OPTIONS for preflight requests
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-faceid'], // Add x-auth-faceid to allowed headers
-  credentials: true,
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-faceid'],
+    credentials: true,
 };
 app.use(cors(corsOptions));
 
-// Explicitly handle CORS preflight requests for /api/upload
+// Explicitly handle CORS preflight requests
 app.options('/api/upload', cors(corsOptions));
-app.options('/api/users/me', cors(corsOptions)); // Add preflight handling for /api/users/me
+app.options('/api/users/me', cors(corsOptions));
+app.options('/api/meeting', cors(corsOptions)); // Ajout pour /api/meeting
+
 // Log requests to verify CORS middleware is applied
 app.use((req, res, next) => {
-  console.log(`Request received: ${req.method} ${req.url}`);
-  next();
+    console.log(`Request received: ${req.method} ${req.url}`);
+    next();
 });
-
-
 
 // Connexion à MongoDB
 mongoose
-  .connect(process.env.MONGO_URI || 'mongodb://localhost/Pi-2025', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log('Connexion à MongoDB réussie'))
-  .catch((err) => console.error('Erreur de connexion à MongoDB:', err));
+    .connect(process.env.MONGO_URI || 'mongodb://localhost/Pi-2025', {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+    })
+    .then(() => console.log('Connexion à MongoDB réussie'))
+    .catch((err) => console.error('Erreur de connexion à MongoDB:', err));
+
+// Configuration Nodemailer
+const transporterHoussine = nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // Utiliser SSL/TLS
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
+});
 
 // Middleware Socket.IO pour authentification
 io.use(async (socket, next) => {
-  try {
-    const token = socket.handshake.auth.token;
-    console.log('Socket.IO - Token reçu:', token);
-    if (!token) return next(new Error('Authentification requise'));
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Socket.IO - Token décodé:', decoded);
-    socket.user = decoded; // decoded contient "identifiant"
-    next();
-  } catch (error) {
-    console.error('Socket.IO - Erreur authentification:', error.message);
-    next(new Error('Token invalide'));
-  }
+    try {
+        const token = socket.handshake.auth.token;
+        console.log('Socket.IO - Token reçu:', token);
+        if (!token) return next(new Error('Authentification requise'));
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Socket.IO - Token décodé:', decoded);
+        socket.user = decoded; // decoded contient "identifiant"
+        next();
+    } catch (error) {
+        console.error('Socket.IO - Erreur authentification:', error.message);
+        next(new Error('Token invalide'));
+    }
 });
 
 // Add a Set to track online users
@@ -112,118 +136,117 @@ const onlineUsers = new Set();
 
 // Gestion des connexions Socket.IO
 io.on('connection', (socket) => {
-  console.log(`Utilisateur connecté : ${socket.id} (Identifiant: ${socket.user?.identifiant || 'inconnu'})`);
+    console.log(`Utilisateur connecté : ${socket.id} (Identifiant: ${socket.user?.identifiant || 'inconnu'})`);
 
-  // Add user to onlineUsers when they connect
-  if (socket.user?.identifiant) {
-    onlineUsers.add(socket.user.identifiant);
-    io.emit('onlineUsers', Array.from(onlineUsers));
-  }
-
-  socket.on('join', (identifiant) => {
-    socket.join(identifiant);
-    console.log(`Utilisateur ${socket.user?.identifiant} a rejoint la salle ${identifiant}`);
-  });
-
-  socket.on('sendMessage', async (messageData, callback) => {
-    try {
-      const senderUser = await User.findOne({ Identifiant: messageData.sender });
-      const receiverUser = await User.findOne({ Identifiant: messageData.receiver });
-      if (!senderUser || !receiverUser) {
-        return callback({ error: 'Utilisateur ou destinataire introuvable' });
-      }
-      if (messageData.sender !== socket.user.identifiant) {
-        return callback({ error: 'Non autorisé' });
-      }
-
-      const newMessage = new Message({
-        sender: senderUser.Identifiant,
-        receiver: receiverUser.Identifiant,
-        message: messageData.message,
-        type: messageData.type || 'text', // Support for file messages
-        fileName: messageData.fileName, // Support for file names
-        timestamp: new Date(),
-      });
-      await newMessage.save();
-
-      io.to(messageData.receiver).emit('receiveMessage', newMessage);
-      io.to(messageData.sender).emit('receiveMessage', newMessage);
-      callback({ success: true });
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi du message :', error);
-      callback({ error: 'Erreur lors de l\'envoi du message' });
-    }
-  });
-
-
-  socket.on('startVideoCall', ({ to, from }) => {
-    io.to(to).emit('startVideoCall', { from });
-  });
-
-  socket.on('offer', ({ offer, to, from }) => {
-    io.to(to).emit('offer', { offer, from });
-  });
-
-  socket.on('answer', ({ answer, to, from }) => {
-    io.to(to).emit('answer', { answer, from });
-  });
-
-  socket.on('ice-candidate', ({ candidate, to, from }) => {
-    io.to(to).emit('ice-candidate', { candidate, from });
-  });
-
-  socket.on('endCall', ({ to }) => {
-    if (to) {
-      io.to(to).emit('endCall');
-    }
-  });
-
-
-  socket.on('disconnect', () => {
-    console.log(`Utilisateur déconnecté : ${socket.id}`);
+    // Add user to onlineUsers when they connect
     if (socket.user?.identifiant) {
-      onlineUsers.delete(socket.user.identifiant);
-      io.emit('onlineUsers', Array.from(onlineUsers));
+        onlineUsers.add(socket.user.identifiant);
+        io.emit('onlineUsers', Array.from(onlineUsers));
     }
-  });
+
+    socket.on('join', (identifiant) => {
+        socket.join(identifiant);
+        console.log(`Utilisateur ${socket.user?.identifiant} a rejoint la salle ${identifiant}`);
+    });
+
+    socket.on('sendMessage', async (messageData, callback) => {
+        try {
+            const senderUser = await User.findOne({ Identifiant: messageData.sender });
+            const receiverUser = await User.findOne({ Identifiant: messageData.receiver });
+            if (!senderUser || !receiverUser) {
+                return callback({ error: 'Utilisateur ou destinataire introuvable' });
+            }
+            if (messageData.sender !== socket.user.identifiant) {
+                return callback({ error: 'Non autorisé' });
+            }
+
+            const newMessage = new Message({
+                sender: senderUser.Identifiant,
+                receiver: receiverUser.Identifiant,
+                message: messageData.message,
+                type: messageData.type || 'text',
+                fileName: messageData.fileName,
+                timestamp: new Date(),
+            });
+            await newMessage.save();
+
+            io.to(messageData.receiver).emit('receiveMessage', newMessage);
+            io.to(messageData.sender).emit('receiveMessage', newMessage);
+            callback({ success: true });
+        } catch (error) {
+            console.error('Erreur lors de l\'envoi du message :', error);
+            callback({ error: 'Erreur lors de l\'envoi du message' });
+        }
+    });
+
+    socket.on('startVideoCall', ({ to, from }) => {
+        io.to(to).emit('startVideoCall', { from });
+    });
+
+    socket.on('offer', ({ offer, to, from }) => {
+        io.to(to).emit('offer', { offer, from });
+    });
+
+    socket.on('answer', ({ answer, to, from }) => {
+        io.to(to).emit('answer', { answer, from });
+    });
+
+    socket.on('ice-candidate', ({ candidate, to, from }) => {
+        io.to(to).emit('ice-candidate', { candidate, from });
+    });
+
+    socket.on('endCall', ({ to }) => {
+        if (to) {
+            io.to(to).emit('endCall');
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`Utilisateur déconnecté : ${socket.id}`);
+        if (socket.user?.identifiant) {
+            onlineUsers.delete(socket.user.identifiant);
+            io.emit('onlineUsers', Array.from(onlineUsers));
+        }
+    });
 });
 
 // Configure multer for file storage (for chat file uploads)
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
+    destination: (req, file, cb) => {
+        cb(null, 'Uploads/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    },
 });
 
-const uploadLocal = multer({ storage: storage ,
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'audio/webm', 'audio/mpeg'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Type de fichier non supporté'), false);
-    }
-  }, });
+const uploadLocal = multer({
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'audio/webm', 'audio/mpeg'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Type de fichier non supporté'), false);
+        }
+    },
+});
 
 // Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));
 
 // File upload endpoint for chat
 app.post('/api/upload', uploadLocal.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'Aucun fichier sélectionné' });
-  }
+    if (!req.file) {
+        return res.status(400).json({ message: 'Aucun fichier sélectionné' });
+    }
 
-  const fileUrl = `http://localhost:5000/uploads/${req.file.filename}`;
-  res.status(200).json({ fileUrl });
+    const fileUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+    res.status(200).json({ fileUrl });
 });
 
 // Middlewares Express
-
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -239,12 +262,12 @@ app.set('views', path.join(__dirname, 'views'));
 // Configuration de la session
 const memoryStore = new session.MemoryStore();
 app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'default_secret',
-    resave: false,
-    saveUninitialized: true,
-    store: memoryStore,
-  })
+    session({
+        secret: process.env.SESSION_SECRET || 'default_secret',
+        resave: false,
+        saveUninitialized: true,
+        store: memoryStore,
+    })
 );
 
 // Initialisation de Passport
@@ -265,171 +288,218 @@ app.use('/api', evaluationRoutes);
 app.use('/api', exitRequestRoutes);
 app.use('/api/auth', authMiddleware);
 
-// Endpoint pour l'historique des messages
-app.get('/messages/:userId1/:userId2', authMiddleware, async (req, res) => {
-  const { userId1, userId2 } = req.params;
+// Route pour planifier une réunion
+app.post('/api/meeting', authMiddleware, async (req, res) => {
+  console.log('Request received: POST /api/meeting');
+  console.log('req.user:', req.user);
+
   try {
-    const messages = await Message.find({
-      $or: [
-        { sender: userId1, receiver: userId2 },
-        { sender: userId2, receiver: userId1 },
-      ],
-    }).sort({ timestamp: 1 });
-    res.json(messages);
+      const user = await User.findOne({ Identifiant: req.user.identifiant });
+      if (!user) {
+          return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      }
+
+      // Vérifier le rôle (gérer à la fois Role et roles)
+      const userRole = req.user.Role || (req.user.roles && req.user.roles.includes('teacher') ? 'teacher' : null);
+      if (!userRole || userRole !== 'teacher') {
+          return res.status(403).json({ message: 'Seuls les enseignants peuvent planifier des réunions' });
+      }
+
+      const { meetLink, date, reason, duration } = req.body;
+
+      // Validation des données
+      if (!meetLink || !date || !reason || !duration) {
+          return res.status(400).json({ message: 'Tous les champs sont requis' });
+      }
+
+      // Créer une nouvelle réunion
+      const meeting = new Meeting({
+          meetLink,
+          date: new Date(date),
+          reason,
+          duration: parseInt(duration),
+          createdBy: req.user.identifiant,
+      });
+
+      await meeting.save();
+      console.log('Réunion enregistrée:', meeting);
+
+      // Récupérer tous les utilisateurs
+      const users = await User.find({}, 'Email');
+
+      // Envoyer un e-mail à tous les utilisateurs
+      const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: users.map((u) => u.Email).join(', '),
+          subject: 'Nouvelle réunion planifiée',
+          text: `Une nouvelle réunion a été planifiée.\n\nRaison: ${reason}\nLien: ${meetLink}\nDate: ${new Date(date).toLocaleString()}\nDurée: ${duration} minutes`,
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log('E-mails envoyés aux utilisateurs');
+
+      res.status(201).json({ message: 'Réunion planifiée avec succès', meeting });
   } catch (error) {
-    console.error('Erreur lors de la récupération des messages :', error);
-    res.status(500).json({ message: 'Erreur lors de la récupération des messages' });
+      console.error('Erreur lors de la planification de la réunion:', error);
+      res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
-// Configuration Nodemailer
-const transporterHoussine = nodemailer.createTransport({
-  service: 'gmail',
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: { rejectUnauthorized: false },
+
+// Endpoint pour l'historique des messages
+app.get('/messages/:userId1/:userId2', authMiddleware, async (req, res) => {
+    const { userId1, userId2 } = req.params;
+    try {
+        const messages = await Message.find({
+            $or: [
+                { sender: userId1, receiver: userId2 },
+                { sender: userId2, receiver: userId1 },
+            ],
+        }).sort({ timestamp: 1 });
+        res.json(messages);
+    } catch (error) {
+        console.error('Erreur lors de la récupération des messages :', error);
+        res.status(500).json({ message: 'Erreur lors de la récupération des messages' });
+    }
 });
 
 // Routes pour la réinitialisation du mot de passe
 app.post('/api/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user) return res.status(404).send('Utilisateur non trouvé');
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
+        if (!user) return res.status(404).send('Utilisateur non trouvé');
 
-    const otp = crypto.randomInt(1000, 9999).toString();
-    const otpExpires = Date.now() + 10 * 60 * 1000;
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    await user.save();
+        const otp = crypto.randomInt(1000, 9999).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000;
+        user.otp = otp;
+        user.otpExpires = otpExpires;
+        await user.save();
 
-    const mailHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
-          .header { background-color: #4a6fdc; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-          .logo { max-width: 150px; margin-bottom: 10px; }
-          .content { padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-          .otp-code { font-size: 32px; font-weight: bold; color: #4a6fdc; text-align: center; padding: 15px; background-color: #f9f9f9; border-radius: 5px; margin: 20px 0; letter-spacing: 5px; }
-          .info-box { background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 3px solid #4a6fdc; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="http://localhost:5000/images/logo2.png" alt="UniMindCare Logo" class="logo">
-          <h1>UniMindCare</h1>
-          <p>Réinitialisation de mot de passe</p>
-        </div>
-        <div class="content">
-          <p>Bonjour${user.Name ? ' ' + user.Name : ''},</p>
-          <p>Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte UniMindCare.</p>
-          <p>Voici votre code de vérification :</p>
-          <div class="otp-code">${otp}</div>
-          <div class="info-box">
-            <p><strong>Important :</strong> Ce code est valable pendant 10 minutes. Si vous n'avez pas demandé de réinitialisation, ignorez cet email.</p>
-          </div>
-          <p>Si vous avez des difficultés, contactez notre support.</p>
-          <p>Cordialement,<br>L'équipe UniMindCare</p>
-        </div>
-        <div class="footer">
-          <p>Message automatique. Ne pas répondre.</p>
-          <p>UniMindCare © 2025 - Tous droits réservés</p>
-        </div>
-      </body>
-      </html>
-    `;
+        const mailHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+                    .header { background-color: #4a6fdc; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+                    .logo { max-width: 150px; margin-bottom: 10px; }
+                    .content { padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; }
+                    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+                    .otp-code { font-size: 32px; font-weight: bold; color: #4a6fdc; text-align: center; padding: 15px; background-color: #f9f9f9; border-radius: 5px; margin: 20px 0; letter-spacing: 5px; }
+                    .info-box { background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 3px solid #4a6fdc; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <img src="http://localhost:5000/images/logo2.png" alt="UniMindCare Logo" class="logo">
+                    <h1>UniMindCare</h1>
+                    <p>Réinitialisation de mot de passe</p>
+                </div>
+                <div class="content">
+                    <p>Bonjour${user.Name ? ' ' + user.Name : ''},</p>
+                    <p>Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte UniMindCare.</p>
+                    <p>Voici votre code de vérification :</p>
+                    <div class="otp-code">${otp}</div>
+                    <div class="info-box">
+                        <p><strong>Important :</strong> Ce code est valable pendant 10 minutes. Si vous n'avez pas demandé de réinitialisation, ignorez cet email.</p>
+                    </div>
+                    <p>Si vous avez des difficultés, contactez notre support.</p>
+                    <p>Cordialement,<br>L'équipe UniMindCare</p>
+                </div>
+                <div class="footer">
+                    <p>Message automatique. Ne pas répondre.</p>
+                    <p>UniMindCare © 2025 - Tous droits réservés</p>
+                </div>
+            </body>
+            </html>
+        `;
 
-    const mailOptions = {
-      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Réinitialisation de mot de passe',
-      html: mailHtml,
-    };
+        const mailOptions = {
+            from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: 'Réinitialisation de mot de passe',
+            html: mailHtml,
+        };
 
-    transporterHoussine.sendMail(mailOptions, (error) => {
-      if (error) {
-        console.error('Erreur email:', error);
-        return res.status(500).send('Erreur lors de l\'envoi de l\'email');
-      }
-      res.status(200).send('OTP envoyé par email');
-    });
-  } catch (error) {
-    console.error('Erreur serveur:', error);
-    res.status(500).send('Erreur serveur');
-  }
+        transporterHoussine.sendMail(mailOptions, (error) => {
+            if (error) {
+                console.error('Erreur email:', error);
+                return res.status(500).send('Erreur lors de l\'envoi de l\'email');
+            }
+            res.status(200).send('OTP envoyé par email');
+        });
+    } catch (error) {
+        console.error('Erreur serveur:', error);
+        res.status(500).send('Erreur serveur');
+    }
 });
 
 app.post('/api/verify-otp', async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).send('OTP invalide ou expiré');
+    try {
+        const { email, otp } = req.body;
+        const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
+        if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
+            return res.status(400).send('OTP invalide ou expiré');
+        }
+        res.status(200).send('OTP valide');
+    } catch (error) {
+        console.error('Erreur vérification OTP:', error);
+        res.status(500).send('Erreur serveur');
     }
-    res.status(200).send('OTP valide');
-  } catch (error) {
-    console.error('Erreur vérification OTP:', error);
-    res.status(500).send('Erreur serveur');
-  }
 });
 
 app.post('/api/reset-password', async (req, res) => {
-  try {
-    const { email, otp, newPassword } = req.body;
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).send('OTP invalide ou expiré');
+    try {
+        const { email, otp, newPassword } = req.body;
+        const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
+        if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
+            return res.status(400).send('OTP invalide ou expiré');
+        }
+        user.Password = await bcrypt.hash(newPassword, 10);
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        await user.save();
+        res.status(200).send('Mot de passe réinitialisé avec succès');
+    } catch (error) {
+        console.error('Erreur réinitialisation mot de passe:', error);
+        res.status(500).send('Erreur serveur');
     }
-    user.Password = await bcrypt.hash(newPassword, 10);
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    await user.save();
-    res.status(200).send('Mot de passe réinitialisé avec succès');
-  } catch (error) {
-    console.error('Erreur réinitialisation mot de passe:', error);
-    res.status(500).send('Erreur serveur');
-  }
 });
 
 // Gestion des données ESP32
 const DataSchema = new mongoose.Schema({
-  temperature: Number,
-  humidity: Number,
-  date: String,
+    temperature: Number,
+    humidity: Number,
+    date: String,
 });
 const Data = mongoose.model('Data', DataSchema);
 
 app.post('/api/ajouter-donnees', async (req, res) => {
-  const { temperature, humidity, date } = req.body;
-  const newData = new Data({ temperature, humidity, date });
-  try {
-    await newData.save();
-    res.status(200).json({ message: 'Données ajoutées avec succès' });
-  } catch (err) {
-    console.error('Erreur ajout données:', err);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
-  }
+    const { temperature, humidity, date } = req.body;
+    const newData = new Data({ temperature, humidity, date });
+    try {
+        await newData.save();
+        res.status(200).json({ message: 'Données ajoutées avec succès' });
+    } catch (err) {
+        console.error('Erreur ajout données:', err);
+        res.status(500).json({ message: 'Erreur interne du serveur' });
+    }
 });
 
 // Enregistrement FaceID
 app.post('/api/registerUserFaceID', async (req, res) => {
-  const { name, identifiant } = req.body;
-  if (!name || !identifiant) {
-    return res.status(400).json({ error: 'Nom et identifiant requis' });
-  }
-  try {
-    const newUser = new FaceIDUser({ name, identifiant });
-    await newUser.save();
-    res.status(200).json({ message: 'Utilisateur enregistré avec succès' });
-  } catch (error) {
-    res.status(500).json({ error: 'Erreur lors de l\'enregistrement' });
-  }
+    const { name, identifiant } = req.body;
+    if (!name || !identifiant) {
+        return res.status(400).json({ error: 'Nom et identifiant requis' });
+    }
+    try {
+        const newUser = new FaceIDUser({ name, identifiant });
+        await newUser.save();
+        res.status(200).json({ message: 'Utilisateur enregistré avec succès' });
+    } catch (error) {
+        res.status(500).json({ error: 'Erreur lors de l\'enregistrement' });
+    }
 });
 
 // Gestion des utilisateurs (inscription et vérification)
@@ -437,145 +507,145 @@ const validateEmail = (email) => /^[a-zA-Z0-9._%+-]+@esprit\.tn$/.test(email);
 
 let gfs;
 mongoose.connection.once('open', () => {
-  gfs = Grid(mongoose.connection.db, mongoose.mongo);
-  gfs.collection('uploads');
-  console.log('GridFS initialisé');
+    gfs = Grid(mongoose.connection.db, mongoose.mongo);
+    gfs.collection('Uploads');
+    console.log('GridFS initialisé');
 });
 
 const gridFsStorage = new GridFsStorage({
-  url: process.env.MONGO_URI || 'mongodb://localhost/Pi-2025',
-  file: (req, file) => ({
-    filename: `${Date.now()}-${file.originalname}`,
-    bucketName: 'uploads',
-  }),
+    url: process.env.MONGO_URI || 'mongodb://localhost/Pi-2025',
+    file: (req, file) => ({
+        filename: `${Date.now()}-${file.originalname}`,
+        bucketName: 'Uploads',
+    }),
 });
 const uploadGridFs = multer({ storage: gridFsStorage });
 
 app.post('/register', uploadGridFs.single('imageFile'), async (req, res) => {
-  const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber } = req.body;
-  const validRoles = ['student', 'teacher', 'psychiatre'];
-  if (!validRoles.includes(Role)) return res.status(400).send('Rôle invalide');
-  if (!validateEmail(Email)) return res.status(400).send('Email doit être @esprit.tn');
+    const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber } = req.body;
+    const validRoles = ['student', 'teacher', 'psychiatre'];
+    if (!validRoles.includes(Role)) return res.status(400).send('Rôle invalide');
+    if (!validateEmail(Email)) return res.status(400).send('Email doit être @esprit.tn');
 
-  const existingUser = await User.findOne({ $or: [{ Identifiant }, { Email }] });
-  if (existingUser) return res.status(400).send('Identifiant ou Email déjà utilisé');
+    const existingUser = await User.findOne({ $or: [{ Identifiant }, { Email }] });
+    if (existingUser) return res.status(400).send('Identifiant ou Email déjà utilisé');
 
-  const hashedPassword = await bcrypt.hash(Password, 10);
-  const imageUrl = req.file ? req.file.filename : '';
+    const hashedPassword = await bcrypt.hash(Password, 10);
+    const imageUrl = req.file ? req.file.filename : '';
 
-  const newUser = new User({
-    Name,
-    Identifiant,
-    Email,
-    Password: hashedPassword,
-    Classe: Role === 'student' ? Classe : '',
-    Role,
-    PhoneNumber,
-    imageUrl,
-    verified: false,
-  });
-
-  try {
-    const savedUser = await newUser.save();
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    const newVerification = new UserVerification({
-      userId: savedUser._id,
-      code: verificationCode,
-      expiresAt,
+    const newUser = new User({
+        Name,
+        Identifiant,
+        Email,
+        Password: hashedPassword,
+        Classe: Role === 'student' ? Classe : '',
+        Role,
+        PhoneNumber,
+        imageUrl,
+        verified: false,
     });
-    await newVerification.save();
 
-    const mailOptions = {
-      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
-      to: savedUser.Email,
-      subject: 'Vérification de votre compte',
-      html: `<p>Votre code de vérification est : ${verificationCode}</p>`,
-    };
-    await transporter.sendMail(mailOptions);
-    res.status(201).send('Utilisateur enregistré. Vérifiez votre email.');
-  } catch (err) {
-    console.error('Erreur enregistrement:', err);
-    res.status(500).send('Erreur lors de l\'enregistrement');
-  }
+    try {
+        const savedUser = await newUser.save();
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+        const newVerification = new UserVerification({
+            userId: savedUser._id,
+            code: verificationCode,
+            expiresAt,
+        });
+        await newVerification.save();
+
+        const mailOptions = {
+            from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
+            to: savedUser.Email,
+            subject: 'Vérification de votre compte',
+            html: `<p>Votre code de vérification est : ${verificationCode}</p>`,
+        };
+        await transporter.sendMail(mailOptions);
+        res.status(201).send('Utilisateur enregistré. Vérifiez votre email.');
+    } catch (err) {
+        console.error('Erreur enregistrement:', err);
+        res.status(500).send('Erreur lors de l\'enregistrement');
+    }
 });
 
 app.post('/verify-email', async (req, res) => {
-  try {
-    const { email, code } = req.body;
-    if (!email || !code) return res.status(400).send('Email et code requis');
+    try {
+        const { email, code } = req.body;
+        if (!email || !code) return res.status(400).send('Email et code requis');
 
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user) return res.status(400).send('Utilisateur non trouvé');
+        const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
+        if (!user) return res.status(400).send('Utilisateur non trouvé');
 
-    const verificationRecord = await UserVerification.findOne({ userId: user._id, code });
-    if (!verificationRecord || verificationRecord.expiresAt < new Date()) {
-      return res.status(400).send('Code invalide ou expiré');
+        const verificationRecord = await UserVerification.findOne({ userId: user._id, code });
+        if (!verificationRecord || verificationRecord.expiresAt < new Date()) {
+            return res.status(400).send('Code invalide ou expiré');
+        }
+
+        await User.findByIdAndUpdate(user._id, { verified: true });
+        await UserVerification.findByIdAndDelete(verificationRecord._id);
+        res.status(200).send('Compte vérifié avec succès');
+    } catch (err) {
+        console.error('Erreur vérification:', err);
+        res.status(500).send('Erreur lors de la vérification');
     }
-
-    await User.findByIdAndUpdate(user._id, { verified: true });
-    await UserVerification.findByIdAndDelete(verificationRecord._id);
-    res.status(200).send('Compte vérifié avec succès');
-  } catch (err) {
-    console.error('Erreur vérification:', err);
-    res.status(500).send('Erreur lors de la vérification');
-  }
 });
 
 app.get('/image/:filename', async (req, res) => {
-  try {
-    const file = await gfs.files.findOne({ filename: req.params.filename });
-    if (!file) return res.status(404).send('Image non trouvée');
-    const readstream = gfs.createReadStream(file.filename);
-    readstream.pipe(res);
-  } catch (err) {
-    res.status(500).send('Erreur lors du chargement de l\'image');
-  }
+    try {
+        const file = await gfs.files.findOne({ filename: req.params.filename });
+        if (!file) return res.status(404).send('Image non trouvée');
+        const readstream = gfs.createReadStream(file.filename);
+        readstream.pipe(res);
+    } catch (err) {
+        res.status(500).send('Erreur lors du chargement de l\'image');
+    }
 });
 
 // Prédictions (Partie Taha)
 const fetchUsers = async () => {
-  const users = await User.find().lean();
-  return users.map((user) => ({
-    ...user,
-    createdAt: user.createdAt.toISOString(),
-  }));
+    const users = await User.find().lean();
+    return users.map((user) => ({
+        ...user,
+        createdAt: user.createdAt.toISOString(),
+    }));
 };
 
 app.get('/predictions', async (req, res) => {
-  try {
-    const users = await fetchUsers();
-    if (!users || users.length === 0) return res.status(404).json({ error: 'Aucune donnée utilisateur trouvée' });
+    try {
+        const users = await fetchUsers();
+        if (!users || users.length === 0) return res.status(404).json({ error: 'Aucune donnée utilisateur trouvée' });
 
-    const pythonProcess = spawn('python', [path.join(__dirname, 'predict.py')]);
-    let output = '';
-    let errorOutput = '';
+        const pythonProcess = spawn('python', [path.join(__dirname, 'predict.py')]);
+        let output = '';
+        let errorOutput = '';
 
-    pythonProcess.stdin.write(JSON.stringify(users));
-    pythonProcess.stdin.end();
+        pythonProcess.stdin.write(JSON.stringify(users));
+        pythonProcess.stdin.end();
 
-    pythonProcess.stdout.on('data', (data) => (output += data.toString()));
-    pythonProcess.stderr.on('data', (data) => (errorOutput += data.toString()));
+        pythonProcess.stdout.on('data', (data) => (output += data.toString()));
+        pythonProcess.stderr.on('data', (data) => (errorOutput += data.toString()));
 
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        try {
-          const predictions = JSON.parse(output);
-          res.json(predictions);
-        } catch (parseError) {
-          console.error('Erreur parsing:', parseError);
-          res.status(500).json({ error: 'Échec parsing prédictions' });
-        }
-      } else {
-        console.error('Erreur script Python:', errorOutput);
-        res.status(500).json({ error: 'Échec script prédiction', details: errorOutput });
-      }
-    });
-  } catch (error) {
-    console.error('Erreur récupération utilisateurs:', error);
-    res.status(500).json({ error: 'Échec récupération données utilisateurs' });
-  }
+        pythonProcess.on('close', (code) => {
+            if (code === 0) {
+                try {
+                    const predictions = JSON.parse(output);
+                    res.json(predictions);
+                } catch (parseError) {
+                    console.error('Erreur parsing:', parseError);
+                    res.status(500).json({ error: 'Échec parsing prédictions' });
+                }
+            } else {
+                console.error('Erreur script Python:', errorOutput);
+                res.status(500).json({ error: 'Échec script prédiction', details: errorOutput });
+            }
+        });
+    } catch (error) {
+        console.error('Erreur récupération utilisateurs:', error);
+        res.status(500).json({ error: 'Échec récupération données utilisateurs' });
+    }
 });
 
 // Initialisation du planificateur
@@ -583,73 +653,73 @@ initScheduler();
 
 // Gestion des erreurs
 app.use((req, res, next) => {
-  next(createError(404));
+    next(createError(404));
 });
 
 app.use((err, req, res, next) => {
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
-  res.status(err.status || 500);
-  res.render('error');
+    res.locals.message = err.message;
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
+    res.status(err.status || 500);
+    res.render('error');
 });
 
 // Cleanup function
 app.closeAll = async () => {
-  try {
-    await mongoose.connection.close();
-    console.log('Connexion Mongoose fermée');
-    if (gridFsStorage.client) await gridFsStorage.client.close();
-    else if (gridFsStorage.db) await gridFsStorage.db.close();
-    console.log('GridFsStorage fermé');
-  } catch (err) {
-    console.error('Erreur lors du cleanup:', err);
-  }
+    try {
+        await mongoose.connection.close();
+        console.log('Connexion Mongoose fermée');
+        if (gridFsStorage.client) await gridFsStorage.client.close();
+        else if (gridFsStorage.db) await gridFsStorage.db.close();
+        console.log('GridFsStorage fermé');
+    } catch (err) {
+        console.error('Erreur lors du cleanup:', err);
+    }
 };
 
-// In server.js
+// Derniers messages
 app.get('/last-messages/:userId', authMiddleware, async (req, res) => {
-  const { userId } = req.params;
-  try {
-    const conversations = await Message.aggregate([
-      {
-        $match: {
-          $or: [{ sender: userId }, { receiver: userId }],
-        },
-      },
-      {
-        $sort: { timestamp: -1 },
-      },
-      {
-        $group: {
-          _id: {
-            $cond: [
-              { $eq: ['$sender', userId] },
-              '$receiver',
-              '$sender',
-            ],
-          },
-          lastMessage: { $first: '$message' },
-          timestamp: { $first: '$timestamp' },
-        },
-      },
-    ]);
+    const { userId } = req.params;
+    try {
+        const conversations = await Message.aggregate([
+            {
+                $match: {
+                    $or: [{ sender: userId }, { receiver: userId }],
+                },
+            },
+            {
+                $sort: { timestamp: -1 },
+            },
+            {
+                $group: {
+                    _id: {
+                        $cond: [
+                            { $eq: ['$sender', userId] },
+                            '$receiver',
+                            '$sender',
+                        ],
+                    },
+                    lastMessage: { $first: '$message' },
+                    timestamp: { $first: '$timestamp' },
+                },
+            },
+        ]);
 
-    const lastMessages = await Promise.all(
-      conversations.map(async (conv) => {
-        const otherUser = await User.findOne({ Identifiant: conv._id }, 'Name Email Identifiant');
-        return {
-          user: otherUser,
-          lastMessage: conv.lastMessage,
-          timestamp: conv.timestamp,
-        };
-      })
-    );
+        const lastMessages = await Promise.all(
+            conversations.map(async (conv) => {
+                const otherUser = await User.findOne({ Identifiant: conv._id }, 'Name Email Identifiant');
+                return {
+                    user: otherUser,
+                    lastMessage: conv.lastMessage,
+                    timestamp: conv.timestamp,
+                };
+            })
+        );
 
-    res.json(lastMessages);
-  } catch (error) {
-    console.error('Erreur lors de la récupération des derniers messages :', error);
-    res.status(500).json({ message: 'Erreur lors de la récupération des derniers messages' });
-  }
+        res.json(lastMessages);
+    } catch (error) {
+        console.error('Erreur lors de la récupération des derniers messages :', error);
+        res.status(500).json({ message: 'Erreur lors de la récupération des derniers messages' });
+    }
 });
 
 // Démarrage du serveur

@@ -10,6 +10,30 @@ function StudentDashboard({ token: propToken }) {
   const [reason, setReason] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [message, setMessage] = useState('');
+  const [queue, setQueue] = useState([]); // État pour la file d'attente
+
+  // Nom de l'utilisateur connecté (à remplacer par la vraie valeur, par exemple depuis le token ou une API)
+  const currentUser = "NOM_UTILISATEUR"; // Remplacez par une récupération dynamique, ex: depuis une API ou le token
+
+  // Récupération de la file d'attente toutes les 5 secondes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch('/queue', {
+        headers: {
+          Authorization: `Bearer ${token}`, // Ajout du token pour authentification
+        },
+      })
+        .then(res => res.json())
+        .then(data => setQueue(data.queue || [])) // Mise à jour de la file
+        .catch(err => console.error("Erreur lors de la récupération de la file:", err));
+    }, 5000);
+
+    // Nettoyage de l'intervalle lors du démontage du composant
+    return () => clearInterval(interval);
+  }, [token]);
+
+  // Calcul de la position de l'utilisateur dans la file
+  const myPosition = queue.findIndex(q => q.student_name === currentUser) + 1;
 
   if (!token) {
     navigate('/login');
@@ -37,6 +61,16 @@ function StudentDashboard({ token: propToken }) {
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>🎓 Tableau de bord étudiant</h2>
+
+      {/* Affichage de la position dans la file */}
+      <div style={styles.queueInfo}>
+        <h3 style={styles.queueTitle}>📋 File d'attente</h3>
+        <p style={styles.queuePosition}>
+          {myPosition > 0
+            ? `Votre position dans la file : ${myPosition}`
+            : "Vous n'êtes pas dans la file d'attente."}
+        </p>
+      </div>
 
       <div style={styles.chatBox}>
         <h3 style={styles.chatTitle}>💬 Conversation de classe</h3>
@@ -83,6 +117,21 @@ const styles = {
     color: '#003f5c',
     textAlign: 'center',
     marginBottom: '20px',
+  },
+  queueInfo: {
+    backgroundColor: '#ffffffcc',
+    border: '1px solid #28a745',
+    borderRadius: '12px',
+    padding: '15px',
+    marginBottom: '20px',
+  },
+  queueTitle: {
+    marginBottom: '10px',
+    color: '#28a745',
+  },
+  queuePosition: {
+    fontSize: '16px',
+    color: '#003f5c',
   },
   chatBox: {
     backgroundColor: '#ffffffcc',
@@ -132,7 +181,7 @@ const styles = {
     borderRadius: '8px',
     color: '#856404',
     border: '1px solid #ffeeba',
-  }
+  },
 };
 
 export default StudentDashboard;
