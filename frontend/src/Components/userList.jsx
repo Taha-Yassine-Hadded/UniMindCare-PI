@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import { FiSearch, FiPaperclip, FiMic, FiMicOff, FiVideo, FiSend, FiX } from 'react-icons/fi';
+import { FiSearch, FiPaperclip, FiMic, FiMicOff, FiVideo, FiSend, FiX, FiSun, FiMoon } from 'react-icons/fi';
 
 const UserList = () => {
   const navigate = useNavigate();
@@ -22,7 +22,8 @@ const UserList = () => {
   const [audioBlob, setAudioBlob] = useState(null);
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [unreadCounts, setUnreadCounts] = useState({}); // État pour les compteurs de messages non lus
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light'); // Thème par défaut : clair, avec persistance
   const mediaRecorderRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -33,6 +34,12 @@ const UserList = () => {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
   const currentUser = storedUser ? JSON.parse(storedUser) : {};
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme); // Sauvegarde du thème dans localStorage
+  };
 
   useEffect(() => {
     const socketInstance = io('http://localhost:5000', {
@@ -56,7 +63,7 @@ const UserList = () => {
     });
 
     socketInstance.on('receiveMessage', (message) => {
-      console.log('Message reçu:', message); // Débogage
+      console.log('Message reçu:', message);
       setMessages((prev) => {
         if (!prev.some((m) => m._id === message._id)) {
           return [...prev, message];
@@ -72,7 +79,7 @@ const UserList = () => {
     });
 
     socketInstance.on('unreadCount', ({ sender, count }) => {
-      console.log(`Nombre de messages non lus de ${sender}: ${count}`); // Débogage
+      console.log(`Nombre de messages non lus de ${sender}: ${count}`);
       setUnreadCounts((prev) => ({
         ...prev,
         [sender]: count,
@@ -170,17 +177,15 @@ const UserList = () => {
           `http://localhost:5000/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log('Messages récupérés:', response.data); // Débogage
+        console.log('Messages récupérés:', response.data);
         setMessages(response.data);
         setFilteredMessages(response.data);
 
-        // Marquer les messages comme lus et rafraîchir
         if (socket) {
           socket.emit('markAsRead', {
             sender: selectedUser.Identifiant,
             receiver: currentUser.Identifiant,
           }, async () => {
-            // Rafraîchir les messages après marquage
             const updatedResponse = await axios.get(
               `http://localhost:5000/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
               { headers: { Authorization: `Bearer ${token}` } }
@@ -472,130 +477,691 @@ const UserList = () => {
     user.Name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Chargement des utilisateurs...</div>;
-  if (error) return <div style={{ textAlign: 'center', padding: '20px', color: '#e74c3c' }}>{error}</div>;
+  if (loading) return <div className={`loading ${theme}`}>Chargement des utilisateurs...</div>;
+  if (error) return <div className={`error ${theme}`}>{error}</div>;
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      background: '#f4f6f9',
-      fontFamily: "'Inter', sans-serif",
-    }}>
-      <div style={{
-        width: '320px',
-        background: '#ffffff',
-        boxShadow: '2px 0 10px rgba(0, 0, 0, 0.05)',
-        padding: '20px',
-        overflowY: 'auto',
-        borderRight: '1px solid #e8ecef',
-      }}>
-        <div style={{
-          position: 'relative',
-          marginBottom: '20px',
-        }}>
-          <FiSearch style={{
-            position: 'absolute',
-            left: '15px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: '#adb5bd',
-            fontSize: '18px',
-          }} />
+    <div className={`chat-container ${theme}`}>
+      <style>
+        {`
+          .chat-container {
+            display: flex;
+            height: 100vh;
+            font-family: "'Inter', sans-serif";
+            transition: background 0.5s ease, color 0.5s ease;
+          }
+          .chat-container.light {
+            background: #f4f6f9;
+          }
+          .chat-container.dark {
+            background: #1e2126;
+          }
+          .loading, .error {
+            text-align: center;
+            padding: 20px;
+          }
+          .loading.light, .error.light {
+            color: #666;
+            background: #f4f6f9;
+          }
+          .loading.dark, .error.dark {
+            color: #b0b8c4;
+            background: #1e2126;
+          }
+          .error.light {
+            color: #e74c3c;
+          }
+          .error.dark {
+            color: #ff6b6b;
+          }
+          .sidebar {
+            width: 320px;
+            padding: 20px;
+            overflow-y: auto;
+            transition: background 0.5s ease, color 0.5s ease;
+          }
+          .sidebar.light {
+            background: #ffffff;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+            border-right: 1px solid #e8ecef;
+          }
+          .sidebar.dark {
+            background: #2c2f36;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            border-right: 1px solid #3a3f47;
+          }
+          .search-container {
+            position: relative;
+            margin-bottom: 20px;
+          }
+          .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            transition: color 0.3s ease;
+          }
+          .search-icon.light {
+            color: #adb5bd;
+          }
+          .search-icon.dark {
+            color: #b0b8c4;
+          }
+          .search-input {
+            width: 100%;
+            padding: 12px 20px 12px 40px;
+            border-radius: 12px;
+            outline: none;
+            font-size: 14px;
+            transition: all 0.3s ease;
+          }
+          .search-input.light {
+            border: 1px solid #e8ecef;
+            background: #f8f9fa;
+          }
+          .search-input.dark {
+            border: 1px solid #3a3f47;
+            background: #3a3f47;
+            color: #e0e0e0;
+          }
+          .search-input:focus.light {
+            border-color: #007bff;
+          }
+          .search-input:focus.dark {
+            border-color: #3498db;
+          }
+          .user-list {
+            list-style: none;
+            padding: 0;
+          }
+          .user-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background 0.2s ease;
+          }
+          .user-item.light:hover {
+            background: #f1f3f5;
+          }
+          .user-item.dark:hover {
+            background: #3a3f47;
+          }
+          .user-item.selected.light {
+            background: #e7f1ff;
+          }
+          .user-item.selected.dark {
+            background: #3a3f47;
+          }
+          .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            margin-right: 12px;
+            transition: background 0.5s ease;
+          }
+          .avatar.light {
+            background: #d1d8e0;
+          }
+          .avatar.dark {
+            background: #4a5059;
+          }
+          .online-indicator {
+            width: 16px;
+            height: 16px;
+            background: #28a745;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          }
+          .user-info {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .user-name {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            transition: color 0.5s ease;
+          }
+          .user-name.light {
+            color: #212529;
+          }
+          .user-name.dark {
+            color: #e0e0e0;
+          }
+          .last-message {
+            margin: 2px 0 0;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color 0.5s ease;
+          }
+          .last-message.light {
+            color: #6c757d;
+          }
+          .last-message.dark {
+            color: #b0b8c4;
+          }
+          .unread-badge {
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+          }
+          .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.5s ease;
+          }
+          .chat-area.light {
+            background: #ffffff;
+          }
+          .chat-area.dark {
+            background: #2c2f36;
+          }
+          .chat-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            transition: background 0.5s ease, border-color 0.5s ease;
+          }
+          .chat-header.light {
+            background: #ffffff;
+            border-bottom-color: #e8ecef;
+          }
+          .chat-header.dark {
+            background: #2c2f36;
+            border-bottom-color: #3a3f47;
+          }
+          .header-content {
+            display: flex;
+            align-items: center;
+            flex: 1;
+          }
+          .header-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 12px;
+            position: relative;
+            transition: background 0.5s ease;
+          }
+          .header-avatar.light {
+            background: #d1d8e0;
+          }
+          .header-avatar.dark {
+            background: #4a5059;
+          }
+          .header-online-indicator {
+            width: 14px;
+            height: 14px;
+            background: #28a745;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            border: 2px solid white;
+          }
+          .header-info {
+            flex: 1;
+          }
+          .search-message-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+          .search-message-input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 20px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
+          }
+          .search-message-input.light {
+            border: 1px solid #e8ecef;
+            background: #f8f9fa;
+            color: #212529;
+          }
+          .search-message-input.dark {
+            border: 1px solid #3a3f47;
+            background: #3a3f47;
+            color: #e0e0e0;
+          }
+          .close-search-button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 18px;
+            transition: color 0.3s ease;
+          }
+          .close-search-button.light {
+            color: #dc3545;
+          }
+          .close-search-button.dark {
+            color: #ff6b6b;
+          }
+          .chat-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            transition: color 0.5s ease;
+          }
+          .chat-title.light {
+            color: #212529;
+          }
+          .chat-title.dark {
+            color: #e0e0e0;
+          }
+          .chat-status {
+            margin: 2px 0 0;
+            font-size: 12px;
+            transition: color 0.5s ease;
+          }
+          .chat-status.light {
+            color: #6c757d;
+          }
+          .chat-status.dark {
+            color: #b0b8c4;
+          }
+          .header-buttons {
+            display: flex;
+            gap: 10px;
+          }
+          .theme-toggle {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 18px;
+            transition: color 0.3s ease;
+          }
+          .theme-toggle.light {
+            color: #6c757d;
+          }
+          .theme-toggle.dark {
+            color: #b0b8c4;
+          }
+          .theme-toggle:hover.light {
+            color: #007bff;
+          }
+          .theme-toggle:hover.dark {
+            color: #3498db;
+          }
+          .header-button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 18px;
+            transition: color 0.2s ease;
+          }
+          .header-button.light {
+            color: #6c757d;
+          }
+          .header-button.dark {
+            color: #b0b8c4;
+          }
+          .header-button:hover.light {
+            color: #007bff;
+          }
+          .header-button:hover.dark {
+            color: #3498db;
+          }
+          .header-button.active.light {
+            color: #007bff;
+          }
+          .header-button.active.dark {
+            color: #3498db;
+          }
+          .header-button.recording.light {
+            color: #dc3545;
+          }
+          .header-button.recording.dark {
+            color: #ff6b6b;
+          }
+          .messages-area {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            background-image: linear-gradient(to bottom, #f8f9fa, #f1f3f5);
+            transition: background 0.5s ease;
+          }
+          .messages-area.light {
+            background-image: linear-gradient(to bottom, #f8f9fa, #f1f3f5);
+          }
+          .messages-area.dark {
+            background-image: linear-gradient(to bottom, #2c2f36, #1e2126);
+          }
+          .no-messages {
+            text-align: center;
+            font-size: 14px;
+            margin-top: 50px;
+            transition: color 0.5s ease;
+          }
+          .no-messages.light {
+            color: #adb5bd;
+          }
+          .no-messages.dark {
+            color: #b0b8c4;
+          }
+          .message {
+            margin: 10px 0;
+            padding: 12px 16px;
+            border-radius: 16px;
+            max-width: 70%;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: transform 0.1s ease, background 0.5s ease, color 0.5s ease;
+          }
+          .message.sent.light {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            margin-left: auto;
+          }
+          .message.sent.dark {
+            background: linear-gradient(135deg, #3498db, #1f6b8a);
+            color: #e0e0e0;
+            margin-left: auto;
+          }
+          .message.received.light {
+            background: #ffffff;
+            color: #212529;
+            margin-right: auto;
+            border: 1px solid #e8ecef;
+          }
+          .message.received.dark {
+            background: #3a3f47;
+            color: #e0e0e0;
+            margin-right: auto;
+            border: 1px solid #4a5059;
+          }
+          .message.unread.light {
+            color: black;
+            font-weight: bold;
+          }
+          .message.unread.dark {
+            color: #e0e0e0;
+            font-weight: bold;
+          }
+          .message-content {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+            word-break: break-word;
+          }
+          .message-time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 5px;
+            display: block;
+          }
+          .message-link {
+            text-decoration: underline;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.5s ease;
+          }
+          .message-link.sent.light {
+            color: #ffffff;
+          }
+          .message-link.sent.dark {
+            color: #e0e0e0;
+          }
+          .message-link.received.light {
+            color: #007bff;
+          }
+          .message-link.received.dark {
+            color: #3498db;
+          }
+          .message-audio {
+            width: 100%;
+            max-width: 250px;
+            margin-bottom: 5px;
+          }
+          .input-area {
+            padding: 15px 20px;
+            border-top: 1px solid;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
+            transition: background 0.5s ease, border-color 0.5s ease;
+          }
+          .input-area.light {
+            background: #ffffff;
+            border-top-color: #e8ecef;
+          }
+          .input-area.dark {
+            background: #2c2f36;
+            border-top-color: #3a3f47;
+          }
+          .message-input {
+            flex: 1;
+            padding: 12px 20px;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
+          }
+          .message-input.light {
+            border: 1px solid #e8ecef;
+            background: #f8f9fa;
+            color: #212529;
+          }
+          .message-input.dark {
+            border: 1px solid #3a3f47;
+            background: #3a3f47;
+            color: #e0e0e0;
+          }
+          .message-input:focus.light {
+            border-color: #007bff;
+          }
+          .message-input:focus.dark {
+            border-color: #3498db;
+          }
+          .send-button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: transform 0.1s ease, background 0.3s ease;
+          }
+          .send-button.light {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+          }
+          .send-button.dark {
+            background: linear-gradient(135deg, #3498db, #1f6b8a);
+            color: #e0e0e0;
+          }
+          .send-button:hover {
+            transform: scale(1.05);
+          }
+          .no-chat-selected {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            transition: background 0.5s ease, color 0.5s ease;
+          }
+          .no-chat-selected.light {
+            background: #f8f9fa;
+            color: #adb5bd;
+          }
+          .no-chat-selected.dark {
+            background: #1e2126;
+            color: #b0b8c4;
+          }
+          .video-call-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+          }
+          .video-call-content {
+            border-radius: 10px;
+            padding: 20px;
+            width: 90%;
+            max-width: 800px;
+            position: relative;
+            transition: background 0.5s ease, color 0.5s ease;
+          }
+          .video-call-content.light {
+            background: #fff;
+            color: #212529;
+          }
+          .video-call-content.dark {
+            background: #2c2f36;
+            color: #e0e0e0;
+          }
+          .video-call-title {
+            margin: 0 0 20px;
+            text-align: center;
+          }
+          .video-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+          }
+          .video {
+            width: 50%;
+            border-radius: 8px;
+            background: #000;
+            transition: border-color 0.5s ease;
+          }
+          .video.light {
+            border: 1px solid #e8ecef;
+          }
+          .video.dark {
+            border: 1px solid #3a3f47;
+          }
+          .end-call-button {
+            display: block;
+            margin: 0 auto;
+            padding: 10px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+          }
+          .incoming-call-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: background 0.5s ease, color 0.5s ease;
+          }
+          .incoming-call-modal.light {
+            background: #fff;
+            color: #212529;
+          }
+          .incoming-call-modal.dark {
+            background: #2c2f36;
+            color: #e0e0e0;
+          }
+          .incoming-call-title {
+            margin: 0 0 20px;
+            text-align: center;
+          }
+          .incoming-call-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+          }
+          .accept-call-button {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+          }
+          .reject-call-button {
+            padding: 10px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+          }
+        `}
+      </style>
+      <div className="sidebar">
+        <div className="search-container">
+          <FiSearch className={`search-icon ${theme}`} />
           <input
             type="text"
             placeholder="Rechercher un contact..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 20px 12px 40px',
-              borderRadius: '12px',
-              border: '1px solid #e8ecef',
-              outline: 'none',
-              fontSize: '14px',
-              background: '#f8f9fa',
-              transition: 'all 0.3s ease',
-            }}
-            onFocus={(e) => (e.target.style.borderColor = '#007bff')}
-            onBlur={(e) => (e.target.style.borderColor = '#e8ecef')}
+            className={`search-input ${theme}`}
           />
         </div>
-        <ul style={{ listStyle: 'none', padding: 0 }}>
+        <ul className="user-list">
           {filteredUsers.map((user) => (
             <li
               key={user._id}
               onClick={() => openChat(user)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '12px',
-                margin: '5px 0',
-                background: selectedUser?.Identifiant === user.Identifiant ? '#e7f1ff' : 'transparent',
-                cursor: 'pointer',
-                borderRadius: '10px',
-                transition: 'background 0.2s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = selectedUser?.Identifiant === user.Identifiant ? '#e7f1ff' : '#f1f3f5')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = selectedUser?.Identifiant === user.Identifiant ? '#e7f1ff' : 'transparent')}
+              className={`user-item ${selectedUser?.Identifiant === user.Identifiant ? 'selected' : ''} ${theme}`}
             >
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: '#d1d8e0',
-                marginRight: '12px',
-                position: 'relative',
-                overflow: 'hidden',
-              }}>
+              <div className={`avatar ${theme}`}>
                 {onlineUsers.includes(user.Identifiant) && (
-                  <span style={{
-                    width: '16px',
-                    height: '16px',
-                    background: '#28a745',
-                    borderRadius: '50%',
-                    position: 'absolute',
-                    bottom: '2px',
-                    right: '2px',
-                    border: '2px solid white',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                  }} />
+                  <span className="online-indicator" />
                 )}
               </div>
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="user-info">
                 <div>
-                  <h4 style={{
-                    margin: 0,
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    color: '#212529',
-                  }}>
+                  <h4 className={`user-name ${theme}`}>
                     {user.Name}
                   </h4>
-                  <p style={{
-                    margin: '2px 0 0',
-                    fontSize: '13px',
-                    color: '#6c757d',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}>
+                  <p className={`last-message ${theme}`}>
                     {user.lastMessage || 'Aucun message récent'}
                   </p>
                 </div>
                 {unreadCounts[user.Identifiant] > 0 && (
-                  <span style={{
-                    background: '#dc3545',
-                    color: 'white',
-                    borderRadius: '50%',
-                    width: '20px',
-                    height: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                  }}>
+                  <span className="unread-badge">
                     {unreadCounts[user.Identifiant]}
                   </span>
                 )}
@@ -605,126 +1171,63 @@ const UserList = () => {
         </ul>
       </div>
 
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        background: '#ffffff',
-      }}>
+      <div className="chat-area">
         {selectedUser ? (
           <>
-            <div style={{
-              padding: '15px 20px',
-              borderBottom: '1px solid #e8ecef',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: '#ffffff',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  background: '#d1d8e0',
-                  marginRight: '12px',
-                  position: 'relative',
-                }}>
+            <div className={`chat-header ${theme}`}>
+              <div className="header-content">
+                <div className={`header-avatar ${theme}`}>
                   {onlineUsers.includes(selectedUser.Identifiant) && (
-                    <span style={{
-                      width: '14px',
-                      height: '14px',
-                      background: '#28a745',
-                      borderRadius: '50%',
-                      position: 'absolute',
-                      bottom: '2px',
-                      right: '2px',
-                      border: '2px solid white',
-                    }} />
+                    <span className="header-online-indicator" />
                   )}
                 </div>
-                <div style={{ flex: 1 }}>
+                <div className="header-info">
                   {isSearchActive ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div className="search-message-container">
                       <input
                         type="text"
                         value={searchMessageQuery}
                         onChange={(e) => setSearchMessageQuery(e.target.value)}
                         placeholder="Rechercher dans la conversation..."
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: '20px',
-                          border: '1px solid #e8ecef',
-                          outline: 'none',
-                          fontSize: '14px',
-                          background: '#f8f9fa',
-                        }}
+                        className={`search-message-input ${theme}`}
                         autoFocus
                       />
                       <button
                         onClick={toggleSearch}
-                        style={{
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
-                          color: '#dc3545',
-                          fontSize: '18px',
-                        }}
+                        className={`close-search-button ${theme}`}
                       >
                         <FiX />
                       </button>
                     </div>
                   ) : (
                     <>
-                      <h3 style={{
-                        margin: 0,
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        color: '#212529',
-                      }}>
+                      <h3 className={`chat-title ${theme}`}>
                         {selectedUser.Name}
                       </h3>
-                      <p style={{
-                        margin: '2px 0 0',
-                        fontSize: '12px',
-                        color: '#6c757d',
-                      }}>
+                      <p className={`chat-status ${theme}`}>
                         {onlineUsers.includes(selectedUser.Identifiant) ? 'En ligne' : 'Hors ligne'}
                       </p>
                     </>
                   )}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="header-buttons">
                 <button
                   onClick={toggleSearch}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    color: isSearchActive ? '#007bff' : '#6c757d',
-                    fontSize: '18px',
-                    transition: 'color 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#007bff')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = isSearchActive ? '#007bff' : '#6c757d')}
+                  className={`header-button ${isSearchActive ? 'active' : ''} ${theme}`}
                 >
                   <FiSearch />
                 </button>
                 <button
+                  onClick={toggleTheme}
+                  className={`theme-toggle ${theme}`}
+                  title={theme === 'light' ? 'Passer au thème sombre' : 'Passer au thème clair'}
+                >
+                  {theme === 'light' ? <FiMoon /> : <FiSun />}
+                </button>
+                <button
                   onClick={() => fileInputRef.current.click()}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    color: '#6c757d',
-                    fontSize: '18px',
-                    transition: 'color 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#007bff')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#6c757d')}
+                  className={`header-button ${theme}`}
                 >
                   <FiPaperclip />
                 </button>
@@ -736,99 +1239,38 @@ const UserList = () => {
                 />
                 <button
                   onClick={handleMicClick}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    color: isRecording ? '#dc3545' : '#6c757d',
-                    fontSize: '18px',
-                    transition: 'color 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = isRecording ? '#dc3545' : '#007bff')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = isRecording ? '#dc3545' : '#6c757d')}
+                  className={`header-button ${isRecording ? 'recording' : ''} ${theme}`}
                 >
                   {isRecording ? <FiMicOff /> : <FiMic />}
                 </button>
                 <button
                   onClick={startVideoCall}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    color: '#6c757d',
-                    fontSize: '18px',
-                    transition: 'color 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#007bff')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#6c757d')}
+                  className={`header-button ${theme}`}
                 >
                   <FiVideo />
                 </button>
               </div>
             </div>
 
-            <div style={{
-              flex: 1,
-              overflow: 'auto',
-              padding: '20px',
-              background: '#f8f9fa',
-              backgroundImage: 'linear-gradient(to bottom, #f8f9fa, #f1f3f5)',
-            }}>
+            <div className={`messages-area ${theme}`}>
               {filteredMessages.length === 0 ? (
-                <p style={{
-                  textAlign: 'center',
-                  color: '#adb5bd',
-                  fontSize: '14px',
-                  marginTop: '50px',
-                }}>
+                <p className={`no-messages ${theme}`}>
                   {searchMessageQuery ? 'Aucun message correspondant' : 'Aucun message pour l\'instant'}
                 </p>
               ) : (
                 filteredMessages.map((msg, index) => {
-                  console.log(`Message ${index}: read = ${msg.read}`); // Débogage
+                  console.log(`Message ${index}: read = ${msg.read}`);
                   return (
                     <div
                       key={index}
-                      style={{
-                        margin: '10px 0',
-                        padding: '12px 16px',
-                        borderRadius: '16px',
-                        maxWidth: '70%',
-                        position: 'relative',
-                        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.05)',
-                        transition: 'transform 0.1s ease',
-                        ...(msg.sender === currentUser.Identifiant
-                          ? {
-                              background: 'linear-gradient(135deg, #007bff, #0056b3)',
-                              color: 'white',
-                              marginLeft: 'auto',
-                            }
-                          : {
-                              background: '#ffffff',
-                              color: msg.read === false ? 'black' : '#212529',
-                              fontWeight: msg.read === false ? 'bold' : 'normal',
-                              marginRight: 'auto',
-                              border: '1px solid #e8ecef',
-                            }),
-                      }}
+                      className={`message ${msg.sender === currentUser.Identifiant ? 'sent' : 'received'} ${msg.read === false && msg.sender !== currentUser.Identifiant ? 'unread' : ''} ${theme}`}
                     >
                       {msg.type === 'text' ? (
                         <>
-                          <p style={{
-                            margin: 0,
-                            fontSize: '14px',
-                            lineHeight: '1.5',
-                            wordBreak: 'break-word',
-                          }}>
+                          <p className="message-content">
                             {msg.message}
                           </p>
-                          <span style={{
-                            fontSize: '11px',
-                            opacity: 0.7,
-                            marginTop: '5px',
-                            display: 'block',
-                            textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
-                          }}>
+                          <span className="message-time" style={{ textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left' }}>
                             {new Date(msg.timestamp).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit',
@@ -841,25 +1283,12 @@ const UserList = () => {
                             href={msg.message}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{
-                              color: msg.sender === currentUser.Identifiant ? '#ffffff' : '#007bff',
-                              textDecoration: 'underline',
-                              fontWeight: 500,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                            }}
+                            className={`message-link ${msg.sender === currentUser.Identifiant ? 'sent' : 'received'} ${theme}`}
                           >
                             <FiPaperclip style={{ fontSize: '14px' }} />
                             {msg.fileName || 'Fichier'}
                           </a>
-                          <span style={{
-                            fontSize: '11px',
-                            opacity: 0.7,
-                            marginTop: '5px',
-                            display: 'block',
-                            textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
-                          }}>
+                          <span className="message-time" style={{ textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left' }}>
                             {new Date(msg.timestamp).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit',
@@ -871,19 +1300,9 @@ const UserList = () => {
                           <audio
                             controls
                             src={msg.message}
-                            style={{
-                              width: '100%',
-                              maxWidth: '250px',
-                              marginBottom: '5px',
-                            }}
+                            className="message-audio"
                           />
-                          <span style={{
-                            fontSize: '11px',
-                            opacity: 0.7,
-                            marginTop: '5px',
-                            display: 'block',
-                            textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
-                          }}>
+                          <span className="message-time" style={{ textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left' }}>
                             {new Date(msg.timestamp).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit',
@@ -898,129 +1317,50 @@ const UserList = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            <div style={{
-              padding: '15px 20px',
-              borderTop: '1px solid #e8ecef',
-              display: 'flex',
-              gap: '10px',
-              background: '#ffffff',
-              boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.03)',
-            }}>
+            <div className={`input-area ${theme}`}>
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Écrire un message..."
-                style={{
-                  flex: 1,
-                  padding: '12px 20px',
-                  borderRadius: '25px',
-                  border: '1px solid #e8ecef',
-                  outline: 'none',
-                  fontSize: '14px',
-                  background: '#f8f9fa',
-                  transition: 'border-color 0.3s ease',
-                }}
-                onFocus={(e) => (e.target.style.borderColor = '#007bff')}
-                onBlur={(e) => (e.target.style.borderColor = '#e8ecef')}
+                className={`message-input ${theme}`}
               />
               <button
                 onClick={handleSendMessage}
-                style={{
-                  padding: '12px 20px',
-                  background: 'linear-gradient(135deg, #007bff, #0056b3)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '25px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  transition: 'transform 0.1s ease, background 0.3s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                className={`send-button ${theme}`}
               >
                 <FiSend /> Envoyer
               </button>
             </div>
           </>
         ) : (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            color: '#adb5bd',
-            fontSize: '16px',
-            background: '#f8f9fa',
-          }}>
+          <div className={`no-chat-selected ${theme}`}>
             Sélectionnez un contact pour commencer une discussion
           </div>
         )}
       </div>
 
       {isVideoCallActive && selectedUser && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(0, 0, 0, 0.8)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000,
-        }}>
-          <div style={{
-            background: '#fff',
-            borderRadius: '10px',
-            padding: '20px',
-            width: '90%',
-            maxWidth: '800px',
-            position: 'relative',
-          }}>
-            <h3 style={{ margin: '0 0 20px', textAlign: 'center' }}>Appel vidéo avec {selectedUser.Name}</h3>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <div className="video-call-modal">
+          <div className={`video-call-content ${theme}`}>
+            <h3 className="video-call-title">Appel vidéo avec {selectedUser.Name}</h3>
+            <div className="video-container">
               <video
                 ref={localVideoRef}
                 autoPlay
                 muted
-                style={{
-                  width: '50%',
-                  borderRadius: '8px',
-                  border: '1px solid #e8ecef',
-                  background: '#000',
-                }}
+                className={`video ${theme}`}
               />
               <video
                 ref={remoteVideoRef}
                 autoPlay
-                style={{
-                  width: '50%',
-                  borderRadius: '8px',
-                  border: '1px solid #e8ecef',
-                  background: '#000',
-                }}
+                className={`video ${theme}`}
               />
             </div>
             <button
               onClick={endCall}
-              style={{
-                display: 'block',
-                margin: '0 auto',
-                padding: '10px 20px',
-                background: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
+              className="end-call-button"
             >
               Terminer l’appel
             </button>
@@ -1029,30 +1369,12 @@ const UserList = () => {
       )}
 
       {incomingCall && selectedUser && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: '#fff',
-          borderRadius: '10px',
-          padding: '20px',
-          boxShadow: '0 4px 10px rgba(0, 0, 0, 0.2)',
-          zIndex: 1000,
-        }}>
-          <h3 style={{ margin: '0 0 20px', textAlign: 'center' }}>Appel entrant de {selectedUser.Name}</h3>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+        <div className={`incoming-call-modal ${theme}`}>
+          <h3 className="incoming-call-title">Appel entrant de {selectedUser.Name}</h3>
+          <div className="incoming-call-buttons">
             <button
               onClick={acceptCall}
-              style={{
-                padding: '10px 20px',
-                background: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
+              className="accept-call-button"
             >
               Accepter
             </button>
@@ -1063,15 +1385,7 @@ const UserList = () => {
                 }
                 setIncomingCall(null);
               }}
-              style={{
-                padding: '10px 20px',
-                background: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
+              className="reject-call-button"
             >
               Refuser
             </button>
