@@ -139,6 +139,8 @@ import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import AppointmentCalendar from "../Components/AppointementModule/AppointmentCalendar";
 import QuestionnaireHistory from "../Components/EmergencyClaim/QuestionnaireHistory";
 import EmotionStatsPage from "../Components/EmergencyClaim/EmotionStatsPage"
+import BlogAdmin from "../Components/Tables/Reactstrap/BasicTable/BlogAdmin";
+import AdminOnly from "../Components/Commons/AdminOnly";
 
 export const routes = [
 
@@ -155,6 +157,8 @@ export const routes = [
 
    //Questionnaire History
    { path: `${process.env.PUBLIC_URL}/emergency-claim/questionnaire-history`, Component: <QuestionnaireHistory /> },
+  { path: `${process.env.PUBLIC_URL}/blog-admin`, Component: <AdminOnly /> }, // Ajout de la route pour BlogAdmin
+
 
 
 

@@ -8,7 +8,10 @@ const commentSchema = new mongoose.Schema({
   anonymousPseudo: { type: String },
   createdAt: { type: Date, default: Date.now },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array of user IDs who liked
-  dislikes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }] // Array of user IDs who disliked
+  dislikes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  isInappropriate: { type: Boolean, default: false }, // Flag for inappropriate content
+  flagReason: { type: String }, // Reason why the comment was flagged
+  flaggedAt: { type: Date } // When the comment was flagged // Array of user IDs who disliked
 });
 
 const postSchema = new mongoose.Schema({
@@ -21,6 +24,13 @@ const postSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   comments: [commentSchema],
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Ajout du tableau de commentaires
+  views: { type: Number, default: 0 }, // Nouveau champ pour les vues
+  tags: [{ type: String }], // Champ pour les tags/catégories (si pertinent pour les sujets)
+  // Add stress detection fields
+  isDistress: { type: Boolean, default: false },
+  distressScore: { type: Number, default: 0 },
+  distressAlerted: { type: Boolean, default: false },
+  distressAlertedAt: { type: Date }
 });
 
 module.exports = mongoose.model('Post', postSchema);

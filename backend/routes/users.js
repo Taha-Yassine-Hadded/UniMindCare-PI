@@ -7,6 +7,10 @@ const bcrypt = require("bcryptjs");
 const { validateToken } = require('../middleware/authentication');
 const multer = require('multer'); // For handling file uploads
 const {bucket} = require('../firebase'); // Firebase Storage bucket
+const Post = require('../Models/Post'); // Import the Post model
+const passport = require('./passportConfig');
+const InappropriateComment = require('../Models/InappropriateComment');
+
 
 // Configure Multer for file uploads
 const storage = multer.memoryStorage(); // Store file in memory before uploading to Firebase
@@ -305,6 +309,183 @@ router.put("/:identifiant", async function(req, res, next) {
   } catch (error) {
     console.error("Error updating user:", error);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
+// Add these routes to your users.js file
+
+// Get all users for admin with inappropriate comment counts
+router.get('/admin', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    // Verify admin access
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Get all users with their inappropriate comment counts
+    const users = await User.find({}, {
+      Name: 1,
+      Email: 1,
+      Role: 1,
+      enabled: 1,
+      inappropriateCommentsCount: 1,
+      lastInappropriateComment: 1
+    }).sort({ inappropriateCommentsCount: -1 });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des utilisateurs:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Get bad comments for a specific user
+// Add this to your imports at the top
+
+// Update the bad comments route
+router.get('/:id/bad-comments', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    // Verify admin access
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Get inappropriate comments from the dedicated collection
+    const inappropriateComments = await InappropriateComment.find({ 
+      author: req.params.id 
+    }).sort({ createdAt: -1 });
+    
+    // Also find flagged comments in posts
+    const posts = await Post.find({ 'comments.author': req.params.id });
+    
+    const flaggedComments = [];
+    posts.forEach(post => {
+      post.comments.forEach(comment => {
+        if (comment.author.toString() === req.params.id && comment.isInappropriate) {
+          flaggedComments.push({
+            _id: comment._id,
+            content: comment.content,
+            createdAt: comment.createdAt,
+            flaggedAt: comment.flaggedAt,
+            flagReason: comment.flagReason,
+            postId: post._id,
+            postTitle: post.title
+          });
+        }
+      });
+    });
+    
+    // Combine both types of inappropriate comments
+    const allBadComments = [
+      ...inappropriateComments.map(comment => ({
+        _id: comment._id,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        postId: comment.postId,
+        postTitle: comment.postTitle,
+        flagReason: comment.reason,
+        type: 'Bloqué'  // This comment was blocked before posting
+      })),
+      ...flaggedComments.map(comment => ({
+        ...comment,
+        type: 'Signalé'  // This comment was flagged after posting
+      }))
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    res.status(200).json(allBadComments);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des commentaires inappropriés:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Toggle user status (enable/disable)
+// Update the toggle user status route to reset counter when enabling a user
+
+router.put('/:id/status', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    // Vérifier si l'utilisateur est admin
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const { enabled } = req.body;
+    if (enabled === undefined) {
+      return res.status(400).json({ message: 'Le statut enabled est requis' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+     // Check if this is a reactivation (was disabled, now being enabled)
+     const isReactivation = !user.enabled && enabled === true;
+
+    user.enabled = enabled;
+    
+    // Reset inappropriate comment counter when re-enabling a user
+    if (enabled === true) {
+      user.inappropriateCommentsCount = 0;
+      user.lastInappropriateComment = null;
+    }
+    
+    await user.save();
+
+     // Send email notification if this is a reactivation after violations
+     if (isReactivation) {
+      try {
+        const mailOptions = {
+          from: `"UniMindCare Administration" <${process.env.EMAIL_USER}>`,
+          to: user.Email,
+          subject: 'Votre compte a été réactivé - AVERTISSEMENT',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+              <h2 style="color: #1976d2;">Votre compte a été réactivé</h2>
+              <p>Cher(e) ${user.Name},</p>
+              <p>Nous vous informons que votre compte UniMindCare a été réactivé par l'administrateur.</p>
+              
+              <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; color: #856404;">
+                <h3 style="margin-top: 0;">⚠️ AVERTISSEMENT IMPORTANT</h3>
+                <p>Votre compte avait été désactivé en raison de <strong>commentaires inappropriés</strong> qui ne respectent pas nos règles communautaires.</p>
+                <p>Nous vous rappelons que tout contenu inapproprié, offensant, ou nuisible n'est pas toléré sur notre plateforme.</p>
+                <p><strong>En cas de récidive :</strong></p>
+                <ul>
+                  <li>Votre compte sera définitivement désactivé</li>
+                  <li>L'administration prendra des mesures disciplinaires supplémentaires</li>
+                </ul>
+              </div>
+               <p>Nous vous invitons à consulter nos <a href="http://localhost:3000/blog" style="color: #1976d2;">règles communautaires</a> pour plus d'informations.</p>
+              <p>Si vous avez des questions, n'hésitez pas à contacter l'administration.</p>
+              
+              <p style="margin-top: 20px;">Cordialement,</p>
+              <p style="font-weight: bold; margin-top: 5px;">L'équipe UniMindCare</p>
+            </div>
+          `
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`Email d'avertissement envoyé à l'utilisateur réactivé: ${user.Email}`);
+      } catch (emailError) {
+        console.error('Erreur lors de l\'envoi de l\'email de réactivation:', emailError);
+        // Continue execution despite email error
+      }
+    }
+
+    res.status(200).json({ 
+      message: `Utilisateur ${enabled ? 'activé' : 'désactivé'} avec succès${enabled ? ' et compteur de commentaires inappropriés réinitialisé' : ''}`,
+      user: {
+        _id: user._id,
+        Name: user.Name,
+        Email: user.Email,
+        enabled: user.enabled,
+        inappropriateCommentsCount: user.inappropriateCommentsCount,
+        Role: user.Role
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du statut:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 

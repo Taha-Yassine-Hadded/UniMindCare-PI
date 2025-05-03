@@ -54,7 +54,7 @@ const BlogComments = ({ postId }) => {
       });
       return;
     }
-
+  
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
       Swal.fire({
@@ -64,14 +64,14 @@ const BlogComments = ({ postId }) => {
       });
       return;
     }
-
+  
     try {
       const response = await axios.post(
         `http://localhost:5000/api/posts/${postId}/comments`,
         { content: newComment, isAnonymous },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setComments(response.data.comments);
+      setComments(response.data.post.comments);
       setNewComment('');
       setIsAnonymous(false);
       Swal.fire({
@@ -79,12 +79,50 @@ const BlogComments = ({ postId }) => {
         title: 'Commentaire ajouté !',
         text: 'Votre commentaire a été publié avec succès.',
       });
+  
+      // Vérifier si un nouveau badge a été attribué
+      if (response.data.newBadge) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Parfait !',
+          text: `Vous êtes maintenant ${response.data.newBadge.name} !`,
+        });
+      }
     } catch (error) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Erreur',
-        text: error.response?.data?.message || 'Une erreur est survenue, veuillez réessayer.',
-      });
+      // Check if the user's account has been disabled due to 3 inappropriate comments
+      if (error.response && error.response.status === 403 && 
+          error.response.data.strikes && error.response.data.strikes >= 3) {
+        // Clear auth tokens
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        
+        // Show SweetAlert before redirecting
+        Swal.fire({
+          icon: 'error',
+          title: 'Compte désactivé',
+          text: 'Votre compte a été désactivé après 3 commentaires inappropriés. Veuillez contacter l\'administrateur.',
+          confirmButtonText: 'OK'
+        }).then((result) => {
+          // Redirect to login page after user clicks OK
+          window.location.href = '/login';
+        });
+      } 
+      // Handle other error cases where content is inappropriate but under 3 strikes
+      else if (error.response && error.response.data.strikes) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Contenu inapproprié',
+          text: `${error.response.data.message} (${error.response.data.strikes}/3 avertissements)`,
+        });
+      }
+      // Handle general errors
+      else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur',
+          text: error.response?.data?.message || 'Une erreur est survenue, veuillez réessayer.',
+        });
+      }
     }
   };
 
@@ -101,7 +139,16 @@ const BlogComments = ({ postId }) => {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setComments(response.data.comments);
+      setComments(response.data.post.comments);
+
+      // Vérifier si un nouveau badge a été attribué
+      if (response.data.newBadge) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Parfait !',
+          text: `Vous êtes maintenant ${response.data.newBadge.name} !`,
+        });
+      }
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Erreur', text: 'Erreur lors du like.' });
     }
@@ -120,7 +167,16 @@ const BlogComments = ({ postId }) => {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setComments(response.data.comments);
+      setComments(response.data.post.comments);
+
+      // Vérifier si un nouveau badge a été attribué
+      if (response.data.newBadge) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Parfait !',
+          text: `Vous êtes maintenant ${response.data.newBadge.name} !`,
+        });
+      }
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Erreur', text: 'Erreur lors du dislike.' });
     }
@@ -186,7 +242,28 @@ const BlogComments = ({ postId }) => {
                   <div className="flex-grow-1">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <H6 attrH6={{ className: 'mt-0' }}>
-                        {item.isAnonymous ? item.anonymousPseudo : item.author?.Name || 'Inconnu'}
+                        {item.isAnonymous ? item.anonymousPseudo :  (item.author?.Name || 
+   (currentUser && item.author?._id === currentUser._id ? currentUser.Name : 'Inconnu'))}
+                        {!item.isAnonymous && item.author?.badges?.length > 0 && (
+                          <span style={{ marginLeft: '10px' }}>
+                            {item.author.badges.map((badge, index) => (
+                              <span
+                                key={index}
+                                style={{
+                                  background: '#f7c948',
+                                  color: '#333',
+                                  padding: '2px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  marginRight: '5px',
+                                }}
+                                title={badge.description}
+                              >
+                                {badge.name}
+                              </span>
+                            ))}
+                          </span>
+                        )}
                       </H6>
                       <small style={{ color: '#888' }}>
                         {new Date(item.createdAt).toLocaleDateString('fr-FR')}
@@ -239,13 +316,13 @@ const BlogComments = ({ postId }) => {
             />
           </FormGroup>
           <FormGroup check>
-  <Input
-    type="checkbox"
-    checked={isAnonymous}
-    onChange={(e) => setIsAnonymous(e.target.checked)} // Fix: Update isAnonymous state
-  />
-  {' '}Publier en tant qu'anonyme
-</FormGroup>
+            <Input
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+            />
+            {' '}Publier en tant qu'anonyme
+          </FormGroup>
           <Button color="primary" type="submit">Publier</Button>
         </Form>
       </CardBody>

@@ -207,7 +207,7 @@ const TotalEarning = () => {
 
   if (isLoading) {
     return (
-      <Card className="mb-4 border-0 shadow-sm" style={{ maxWidth: '1100px', margin: '0 auto', marginTop: '-105px', marginLeft: '40px' }}>
+      <Card className="mb-4 border-0 shadow-sm" style={{ maxWidth: '1100px', margin: '0 auto', marginTop: '-15px', marginLeft: '40px' }}>
         <CardBody className="text-center p-5">
           <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '250px' }}>
             <div className="spinner-grow text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
@@ -226,7 +226,7 @@ const TotalEarning = () => {
         initial="hidden"
         animate="visible"
         variants={cardVariants}
-        style={{ marginTop: '-105px' }}  // Décalage plus prononcé vers le haut
+        style={{ marginTop: '-15px' }}  // Décalage plus prononcé vers le haut
       >
         <Card className="mb-4 border-0 shadow overflow-hidden" style={{ maxWidth: '1100px', margin: '0 auto', marginLeft: '40px' }}>
           <CardHeader className="bg-light border-0">
@@ -259,7 +259,7 @@ const TotalEarning = () => {
       initial="hidden"
       animate="visible"
       variants={cardVariants}
-      style={{ maxWidth: '1100px', margin: '0 auto', marginTop: '-105px', marginLeft: '40px' }}
+      style={{ maxWidth: '1100px', margin: '0 auto', marginTop: '-15px', marginLeft: '40px' }}
     >
       <Card className="mb-4 border-0 shadow-sm overflow-hidden">
         <CardHeader className="bg-gradient-primary text-white border-0">

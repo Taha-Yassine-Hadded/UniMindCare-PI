@@ -63,6 +63,14 @@ export const MENU = [
         type: "link",
         bookmark: true,
       },
+
+      {
+        url: `${process.env.PUBLIC_URL}/blog-admin`,
+        icon: <Server />,
+        title: "BlogAdmin",
+        type: "link",
+        bookmark: true,
+      },
       {
         title: "Widgets",
         icon: <Airplay />,
@@ -198,6 +206,7 @@ export const MENU = [
           },
           
          
+          
         ],
       },
     

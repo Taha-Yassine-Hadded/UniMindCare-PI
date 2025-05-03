@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, FormGroup, Label, Input, InputGroup, InputGr
 import { H6, Image, LI, UL } from '../../AbstractElements';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { FaSearch, FaHeart, FaUser } from 'react-icons/fa';
+import { FaSearch, FaHeart, FaUser, FaTrash } from 'react-icons/fa'; // Add FaTrash for delete icon
 import Swal from 'sweetalert2';
 
 // Importer les 10 images par défaut
@@ -177,6 +177,15 @@ const cardStyles = {
   likeIconHover: {
     color: '#e63946',
   },
+  deleteIcon: {
+    marginRight: '5px',
+    color: '#dc3545',
+    transition: 'color 0.3s ease',
+    cursor: 'pointer',
+  },
+  deleteIconHover: {
+    color: '#c82333',
+  },
   userContainer: {
     display: 'flex',
     alignItems: 'center',
@@ -197,8 +206,9 @@ const BlogDetailContain = () => {
   const [sortOption, setSortOption] = useState('date');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
-  const [hoveredCard, setHoveredCard] = useState(null); // État pour gérer le survol des cartes
-  const [hoveredLike, setHoveredLike] = useState(null); // État pour gérer le survol des icônes de cœur
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [hoveredLike, setHoveredLike] = useState(null);
+  const [hoveredDelete, setHoveredDelete] = useState(null); // État pour gérer le survol des icônes de suppression
 
   // Récupérer l'utilisateur connecté
   useEffect(() => {
@@ -240,6 +250,56 @@ const BlogDetailContain = () => {
     };
     fetchPosts();
   }, []);
+
+  // Fonction pour supprimer une publication
+  const handleDelete = async (postId) => {
+    if (!currentUser) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Non connecté',
+        text: 'Veuillez vous connecter pour supprimer une publication.',
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Êtes-vous sûr ?',
+      text: 'Vous ne pourrez pas récupérer cette publication après suppression.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Oui, supprimer',
+      cancelButtonText: 'Annuler',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await axios.delete(`http://localhost:5000/api/posts/${postId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        // Update the posts list with the updated data from the server
+        setPosts(response.data.posts);
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Publication supprimée !',
+          text: 'Votre publication a été supprimée avec succès.',
+        });
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error.response?.data || error.message);
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur',
+          text: error.response?.data?.message || 'Une erreur est survenue lors de la suppression.',
+        });
+      }
+    }
+  };
 
   const formatDate = (date) => {
     const d = new Date(date);
@@ -351,19 +411,22 @@ const BlogDetailContain = () => {
               console.log('Post dans BlogDetailContain:', post);
               const isHovered = hoveredCard === post._id;
               const isLikeHovered = hoveredLike === post._id;
+              const isDeleteHovered = hoveredDelete === post._id;
+              const isAuthor = currentUser && post.author?._id.toString() === currentUser._id.toString();
+
               return (
                 <Col sm="6" xl="3" className="box-col-6 des-xl-50" key={post._id}>
-                  <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <Card
-                      style={{
-                        ...cardStyles.card,
-                        ...(isHovered ? cardStyles.cardHover : {}),
-                      }}
-                      onMouseEnter={() => setHoveredCard(post._id)}
-                      onMouseLeave={() => setHoveredCard(null)}
-                    >
-                      <div className="blog-box blog-grid">
-                        <div className="blog-wrraper">
+                  <Card
+                    style={{
+                      ...cardStyles.card,
+                      ...(isHovered ? cardStyles.cardHover : {}),
+                    }}
+                    onMouseEnter={() => setHoveredCard(post._id)}
+                    onMouseLeave={() => setHoveredCard(null)}
+                  >
+                    <div className="blog-box blog-grid">
+                      <div className="blog-wrraper">
+                        <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`}>
                           <Image
                             attrImage={{
                               className: 'img-fluid top-radius-blog',
@@ -375,65 +438,82 @@ const BlogDetailContain = () => {
                               alt: post.title || 'Publication',
                             }}
                           />
-                        </div>
-                        <div className="blog-details-second" style={cardStyles.content}>
-                          <div style={cardStyles.dateContainer}>
-                            <div className="blog-post-date" style={cardStyles.date}>
-                              <span className="blg-month">{formatDate(post.createdAt).month}</span>
-                              <span className="blg-date">{formatDate(post.createdAt).day}</span>
-                            </div>
-                            <span className="badge bg-warning text-dark" style={cardStyles.badge}>
-                              {formatDate(post.createdAt).day}
-                            </span>
+                        </Link>
+                      </div>
+                      <div className="blog-details-second" style={cardStyles.content}>
+                        <div style={cardStyles.dateContainer}>
+                          <div className="blog-post-date" style={cardStyles.date}>
+                            <span className="blg-month">{formatDate(post.createdAt).month}</span>
+                            <span className="blg-date">{formatDate(post.createdAt).day}</span>
                           </div>
-                          <H6
-                            attrH6={{
-                              className: 'blog-bottom-details',
-                              style: {
-                                ...cardStyles.title,
-                                ...(isHovered ? cardStyles.titleHover : {}),
-                              },
-                            }}
-                          >
+                          <span className="badge bg-warning text-dark" style={cardStyles.badge}>
+                            {formatDate(post.createdAt).day}
+                          </span>
+                        </div>
+                        <H6
+                          attrH6={{
+                            className: 'blog-bottom-details',
+                            style: {
+                              ...cardStyles.title,
+                              ...(isHovered ? cardStyles.titleHover : {}),
+                            },
+                          }}
+                        >
+                          <Link to={`${process.env.PUBLIC_URL}/blog/${post._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                             {post.title || 'Titre non disponible'}
-                          </H6>
-                          <div
-                            style={cardStyles.body}
-                            dangerouslySetInnerHTML={{ __html: post.content || 'Contenu non disponible' }}
-                          />
-                          <div className="detail-footer" style={cardStyles.footer}>
-                            <ul style={{ display: 'flex', listStyle: 'none', padding: 0, margin: 0 }}>
-                              <li style={{ marginRight: '15px', color: 'black !important', visibility: 'visible', fontSize: '16px' }}>
-                                <div style={cardStyles.userContainer}>
-                                  <FaUser style={cardStyles.userIcon} />
-                                  {(() => {
-                                    const isAnonymousBool = post.isAnonymous === true || post.isAnonymous === 'true';
-                                    console.log('Affichage auteur - Post:', post.title, 'isAnonymous:', post.isAnonymous, 'isAnonymousBool:', isAnonymousBool, 'anonymousPseudo:', post.anonymousPseudo, 'author:', post.author);
-                                    return isAnonymousBool ? (post.anonymousPseudo || 'Anonyme') : (post.author?.Name || 'Inconnu');
-                                  })()}
-                                </div>
-                              </li>
-                              <li style={{ marginRight: '15px' }}>
-                                <i className="fa fa-comments-o"></i> {post.comments?.length || 0}
-                              </li>
+                          </Link>
+                        </H6>
+                        <div
+                          style={cardStyles.body}
+                          dangerouslySetInnerHTML={{ __html: post.content || 'Contenu non disponible' }}
+                        />
+                        <div className="detail-footer" style={cardStyles.footer}>
+                          <ul style={{ display: 'flex', listStyle: 'none', padding: 0, margin: 0, alignItems: 'center' }}>
+                            <li style={{ marginRight: '15px', color: 'black !important', visibility: 'visible', fontSize: '16px' }}>
+                              <div style={cardStyles.userContainer}>
+                                <FaUser style={cardStyles.userIcon} />
+                                {(() => {
+                                  const isAnonymousBool = post.isAnonymous === true || post.isAnonymous === 'true';
+                                  console.log('Affichage auteur - Post:', post.title, 'isAnonymous:', post.isAnonymous, 'isAnonymousBool:', isAnonymousBool, 'anonymousPseudo:', post.anonymousPseudo, 'author:', post.author);
+                                  return isAnonymousBool ? (post.anonymousPseudo || 'Anonyme') : (post.author?.Name || 'Inconnu');
+                                })()}
+                              </div>
+                            </li>
+                            <li style={{ marginRight: '15px' }}>
+                              <i className="fa fa-comments-o"></i> {post.comments?.length || 0}
+                            </li>
+                            <li
+                              onMouseEnter={() => setHoveredLike(post._id)}
+                              onMouseLeave={() => setHoveredLike(null)}
+                            >
+                              <FaHeart
+                                style={{
+                                  ...cardStyles.likeIcon,
+                                  ...(isLikeHovered ? cardStyles.likeIconHover : {}),
+                                }}
+                              />
+                              {post.likes?.length || 0}
+                            </li>
+                            {isAuthor && (
                               <li
-                                onMouseEnter={() => setHoveredLike(post._id)}
-                                onMouseLeave={() => setHoveredLike(null)}
+                                onMouseEnter={() => setHoveredDelete(post._id)}
+                                onMouseLeave={() => setHoveredDelete(null)}
+                                onClick={() => handleDelete(post._id)}
+                                style={{ marginLeft: '10px' }}
                               >
-                                <FaHeart
+                                <FaTrash
                                   style={{
-                                    ...cardStyles.likeIcon,
-                                    ...(isLikeHovered ? cardStyles.likeIconHover : {}),
+                                    ...cardStyles.deleteIcon,
+                                    ...(isDeleteHovered ? cardStyles.deleteIconHover : {}),
                                   }}
                                 />
-                                {post.likes?.length || 0}
                               </li>
-                            </ul>
-                          </div>
+                            )}
+                          </ul>
                         </div>
                       </div>
-                    </Card>
-                  </Link>
+                    </div>
+                  </Card>
                 </Col>
               );
             })
