@@ -52,12 +52,8 @@ router.post(
         return res.status(400).json({ message: 'Contenu inapproprié détecté. Veuillez modifier votre publication.' });
       }
 
-      if (analysis.is_distress) {
-        // Vous pouvez ajouter une logique ici, comme enregistrer un indicateur de détresse
-        console.log('Détresse détectée dans la publication.');
-      }
-
-      const post = new Post({
+       // First create the post object
+       const post = new Post({
         title,
         content,
         author: req.user._id,
@@ -65,16 +61,21 @@ router.post(
         anonymousPseudo: isAnonymous ? generateAnonymousPseudo() : null,
         imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
         tags: tags ? JSON.parse(tags) : [],
-         // Optionnel : enregistrer le score de détresse
+        // Set distress flags if detected
+        isDistress: analysis.is_distress || false,
+        distressScore: analysis.is_distress ? (analysis.distress || 0.85) : 0
       });
+
+    
       await post.save();
 
       // Vérifier les badges après avoir publié
       const { newBadge } = await checkAndAwardBadges(req.user._id);
 
+      
       // Appeler l'API de recommandation (si nécessaire)
       try {
-        await axios.post('http://localhost:5010/api/recommend', {
+        await axios.post('http://127.0.0.1:5010/api/recommend', {
           post_id: post._id.toString(),
         });
         console.log(`Requête de recommandation envoyée pour le post ${post._id}`);
@@ -178,18 +179,56 @@ router.get('/stats', async (req, res) => {
         commentCount: post.comments?.length || 0,
       }));
 
-    // Sujets les plus populaires (basé sur les tags de toutes les publications)
+    // SECTION AMÉLIORÉE: Sujets les plus populaires (basé sur les tags)
     const tagCounts = {};
+    let otherEngagement = 0; // Un seul compteur pour "Autre"
+    let totalEngagement = 0; // Pour calculer les pourcentages correctement
+    
     posts.forEach(post => {
-      const engagement = (post.likes?.length || 0) + (post.comments?.length || 0);
-      (post.tags || []).forEach(tag => {
-        tagCounts[tag] = (tagCounts[tag] || 0) + (engagement > 0 ? engagement : 1);
-      });
+      // Calculer l'engagement pour ce post (minimum 1 pour compter le post lui-même)
+      const engagement = Math.max((post.likes?.length || 0) + (post.comments?.length || 0), 1);
+      totalEngagement += engagement;
+      
+      // Si le post n'a pas de tags ou a un tableau vide
+      if (!post.tags || post.tags.length === 0) {
+        otherEngagement += engagement;
+      } else {
+        // Traiter les tags normalement
+        post.tags.forEach(tag => {
+          // Normaliser le tag pour éviter les duplications (autres/Autre/AUTRE)
+          let normalizedTag;
+          if (tag.toLowerCase() === "autres" || tag.toLowerCase() === "autre") {
+            normalizedTag = "Autre";
+          } else {
+            normalizedTag = tag;
+          }
+          tagCounts[normalizedTag] = (tagCounts[normalizedTag] || 0) + engagement;
+        });
+      }
     });
+    
+    // Ajouter la catégorie "Autre" aux comptages
+    if (otherEngagement > 0) {
+      tagCounts["Autre"] = (tagCounts["Autre"] || 0) + otherEngagement;
+    }
+    
+    // Calculer le total des engagements catégorisés
+    const categorizedEngagement = Object.values(tagCounts).reduce((sum, val) => sum + val, 0);
+    
+    // Vérifier s'il y a des engagements non catégorisés (improbable mais par sécurité)
+    if (categorizedEngagement < totalEngagement) {
+      tagCounts["Non catégorisé"] = totalEngagement - categorizedEngagement;
+    }
+    
+    // Trier par engagement et prendre les 5 plus populaires
     const popularTags = Object.entries(tagCounts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([tag, engagement]) => ({ tag, engagement }));
+      .slice(0, 5)
+      .map(([tag, engagement]) => ({ 
+        tag, 
+        engagement,
+        percentage: Math.round((engagement / totalEngagement) * 100) // Ajouter le pourcentage
+      }));
 
     res.json({
       totalPosts,
@@ -200,6 +239,7 @@ router.get('/stats', async (req, res) => {
       mostEngagingPosts,
       mostCommentedPosts,
       popularTags,
+      totalEngagement // Inclure le total pour référence
     });
   } catch (error) {
     console.error('Erreur lors de la récupération des stats:', error);
@@ -245,6 +285,182 @@ router.get('/admin', passport.authenticate('jwt', { session: false }), async (re
     console.error('Erreur lors de la récupération des posts pour admin:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
+});
+
+// Route to get all posts with detected distress
+// Route to get all posts with detected distress
+router.get('/admin/stress-detected', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    // Verify admin access
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Find all posts where isDistress is true
+    const distressPosts = await Post.find({ isDistress: true })
+      .populate('author', 'Name Email Identifiant Role enabled imageUrl')
+      .sort({ createdAt: -1 });
+    
+    // Add realAuthor field to each post for admin view
+    const postsWithRealAuthor = distressPosts.map(post => {
+      const postObj = post.toObject();
+      // Always include real author info for admin, regardless of anonymity
+      if (post.author) {
+        postObj.realAuthor = {
+          name: post.author.Name,
+          email: post.author.Email,
+          id: post.author._id
+        };
+      }
+      return postObj;
+    });
+
+    res.status(200).json(postsWithRealAuthor);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des publications en détresse:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+
+// Route to alert psychologists about a distress post
+router.post('/admin/alert-psychologists/:postId', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    // Verify admin access
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const post = await Post.findById(req.params.postId)
+      .populate('author', 'Name Email');
+    
+    if (!post) {
+      return res.status(404).json({ message: 'Publication non trouvée' });
+    }
+
+    // Find all psychologists
+    const psychologists = await User.find({ Role: { $in: ['psychiatre'] } });
+    
+    if (psychologists.length === 0) {
+      return res.status(404).json({ message: 'Aucun psychiatre trouvé dans le système' });
+    }
+
+    // Create a list of psychologists for the user email
+    const psychologistList = psychologists.map(psych => 
+      `<li><strong>${psych.Name}</strong> - <a href="mailto:${psych.Email}">${psych.Email}</a></li>`
+    ).join('');
+
+     // Send email to each psychologist
+     for (const psych of psychologists) {
+      const mailOptions = {
+        from: `"UniMindCare Alert" <${process.env.EMAIL_USER}>`,
+        to: psych.Email,
+        subject: '⚠️ ALERTE: Détection de détresse chez un utilisateur',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+            <h2 style="color: #d32f2f;">Alerte de détresse détectée</h2>
+            <p>Cher(e) ${psych.Name},</p>
+            <p>Notre système a détecté des signes potentiels de <strong>détresse psychologique</strong> dans une publication:</p>
+            
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 15px 0;">
+              <p><strong>Auteur:</strong> ${post.isAnonymous ? 'Anonyme' : post.author?.Name || 'Utilisateur inconnu'}</p>
+              <p><strong>Email:</strong> ${post.isAnonymous ? 'Information protégée' : post.author?.Email || 'Non disponible'}</p>
+              <p><strong>Titre:</strong> ${post.title}</p>
+              <p><strong>Extrait du contenu:</strong><br>${post.content.substring(0, 200)}...</p>
+              <p><strong>Date de publication:</strong> ${new Date(post.createdAt).toLocaleString()}</p>
+            </div>
+            
+            <p>Veuillez évaluer cette situation dans les plus brefs délais.</p>
+            <a href="http://localhost:3000/blog/${post._id}" style="background: #1976d2; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">Voir la publication complète</a>
+            
+            <p style="margin-top: 20px;">Cordialement,</p>
+            <p>L'équipe UniMindCare</p>
+          </div>
+            `
+      };
+
+      await transporter.sendMail(mailOptions);
+    }
+
+     // 2. Send email to the post author (even if anonymous, as long as we have their email)
+     if (post.author && post.author.Email) {
+      const userMailOptions = {
+        from: `"UniMindCare Support" <${process.env.EMAIL_USER}>`,
+        to: post.author.Email,
+        subject: 'Prenez soin de votre santé mentale - UniMindCare est là pour vous',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <img src="https://i.imgur.com/YourLogo.png" alt="UniMindCare Logo" style="max-width: 150px;" />
+            </div>
+            
+            <h2 style="color: #1976d2; text-align: center;">Nous sommes là pour vous soutenir</h2>
+            
+            <p>Bonjour ${post.author.Name},</p>
+            
+            <p>Nous avons remarqué dans votre récente publication <strong>"${post.title}"</strong> que vous pourriez traverser une période difficile. Sachez que vous n'êtes pas seul(e), et que demander de l'aide est un signe de force, non de faiblesse.</p>
+            
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+             <h3 style="color: #1976d2; margin-top: 0;">Quelques conseils qui pourraient vous aider:</h3>
+              <ul style="padding-left: 20px; line-height: 1.6;">
+                <li><strong>Parlez-en à quelqu'un</strong> - Un ami, un membre de la famille ou un professionnel.</li>
+                <li><strong>Prenez soin de vous</strong> - Dormez suffisamment, mangez équilibré et essayez de faire de l'exercice.</li>
+                <li><strong>Pratiquez la pleine conscience</strong> - La méditation peut aider à réduire l'anxiété.</li>
+                <li><strong>Limitez la consommation d'informations</strong> - Prenez des pauses des réseaux sociaux et des actualités.</li>
+                <li><strong>Établissez une routine</strong> - Structure et prévisibilité peuvent apporter stabilité et confort.</li>
+              </ul>
+            </div>
+            
+            <p>Nous vous proposons de consulter un de nos psychologues. <strong>Ces consultations sont gratuites</strong> pour les membres de notre plateforme et pourraient vous aider à surmonter cette période difficile.</p>
+            
+            <div style="background-color: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #0d6efd; margin-top: 0;">Nos psychologues disponibles:</h3>
+              <ul style="padding-left: 20px; line-height: 1.6;">
+                ${psychologistList}
+              </ul>
+              <p style="margin-top: 10px; font-style: italic;">N'hésitez pas à les contacter directement par email ou via notre plateforme.</p>
+            </div>
+            
+            
+            <p>Si vous avez besoin d'une aide immédiate, n'hésitez pas à contacter:</p>
+            <ul style="padding-left: 20px; line-height: 1.6;">
+              <li><strong>Numéro d'urgence psychologique:</strong> 0800 32123</li>
+              <li><strong>S.O.S Amitié:</strong> 09 72 39 40 50</li>
+            </ul>
+            
+            <p style="margin-top: 25px; font-style: italic;">Prenez soin de vous,<br>L'équipe UniMindCare</p>
+            
+            <div style="margin-top: 30px; border-top: 1px solid #e0e0e0; padding-top: 15px; font-size: 12px; color: #6c757d; text-align: center;">
+              <p>Cet email a été envoyé automatiquement. Veuillez ne pas y répondre directement.<br>
+              Si vous ne souhaitez plus recevoir ces notifications, vous pouvez modifier vos préférences dans <a href="http://localhost:3000/settings" style="color: #1976d2;">vos paramètres</a>.</p>
+            </div>
+          </div>
+        `
+      };
+      await transporter.sendMail(userMailOptions);
+      console.log(`Email de soutien envoyé à l'utilisateur ${post.author.Email}`);
+    }
+
+    // Mark the post as alerted
+    post.distressAlerted = true;
+    post.distressAlertedAt = new Date();
+    await post.save();
+
+    res.status(200).json({ 
+      message: `Alerte envoyée à ${psychologists.length} psychiatre(s) et à l'utilisateur concerné`,
+      alertedAt: post.distressAlertedAt
+    });
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi des alertes:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Add this near your other API routes
+router.post('/recommend', (req, res) => {
+  console.log('Recommendation requested for post:', req.body.post_id);
+  // In future, implement actual recommendation logic here
+  res.status(200).json({ message: 'Recommendations will be processed later' });
 });
 
 router.get('/:id', async (req, res) => {

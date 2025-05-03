@@ -26,6 +26,11 @@ const postSchema = new mongoose.Schema({
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Ajout du tableau de commentaires
   views: { type: Number, default: 0 }, // Nouveau champ pour les vues
   tags: [{ type: String }], // Champ pour les tags/catégories (si pertinent pour les sujets)
+  // Add stress detection fields
+  isDistress: { type: Boolean, default: false },
+  distressScore: { type: Number, default: 0 },
+  distressAlerted: { type: Boolean, default: false },
+  distressAlertedAt: { type: Date }
 });
 
 module.exports = mongoose.model('Post', postSchema);
