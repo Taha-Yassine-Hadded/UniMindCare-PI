@@ -22,6 +22,7 @@ const UserList = () => {
   const [audioBlob, setAudioBlob] = useState(null);
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
+  const [unreadCounts, setUnreadCounts] = useState({}); // État pour les compteurs de messages non lus
   const mediaRecorderRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -55,12 +56,27 @@ const UserList = () => {
     });
 
     socketInstance.on('receiveMessage', (message) => {
+      console.log('Message reçu:', message); // Débogage
       setMessages((prev) => {
         if (!prev.some((m) => m._id === message._id)) {
           return [...prev, message];
         }
         return prev;
       });
+      setFilteredMessages((prev) => {
+        if (!prev.some((m) => m._id === message._id)) {
+          return [...prev, message];
+        }
+        return prev;
+      });
+    });
+
+    socketInstance.on('unreadCount', ({ sender, count }) => {
+      console.log(`Nombre de messages non lus de ${sender}: ${count}`); // Débogage
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [sender]: count,
+      }));
     });
 
     socketInstance.on('startVideoCall', ({ from }) => {
@@ -120,7 +136,7 @@ const UserList = () => {
         const res = await axios.get('http://localhost:5000/api/users/all', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        console.log('Utilisateurs récupérés:', res.data); // Debug
+        console.log('Utilisateurs récupérés:', res.data);
         setUsers(res.data);
       } catch (error) {
         setError(error.response?.data?.message || 'Erreur lors du chargement des utilisateurs');
@@ -134,6 +150,7 @@ const UserList = () => {
       socketInstance.off('onlineUsers');
       socketInstance.off('connect_error');
       socketInstance.off('receiveMessage');
+      socketInstance.off('unreadCount');
       socketInstance.off('connect');
       socketInstance.off('startVideoCall');
       socketInstance.off('offer');
@@ -153,14 +170,31 @@ const UserList = () => {
           `http://localhost:5000/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        console.log('Messages récupérés:', response.data); // Débogage
         setMessages(response.data);
-        setFilteredMessages(response.data); // Initialize filtered messages with all messages
+        setFilteredMessages(response.data);
+
+        // Marquer les messages comme lus et rafraîchir
+        if (socket) {
+          socket.emit('markAsRead', {
+            sender: selectedUser.Identifiant,
+            receiver: currentUser.Identifiant,
+          }, async () => {
+            // Rafraîchir les messages après marquage
+            const updatedResponse = await axios.get(
+              `http://localhost:5000/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setMessages(updatedResponse.data);
+            setFilteredMessages(updatedResponse.data);
+          });
+        }
       } catch (error) {
         setError(error.response?.data?.message || 'Erreur lors du chargement des messages');
       }
     };
     fetchMessages();
-  }, [selectedUser, currentUser.Identifiant, token]);
+  }, [selectedUser, currentUser.Identifiant, token, socket]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -528,25 +562,43 @@ const UserList = () => {
                   }} />
                 )}
               </div>
-              <div style={{ flex: 1 }}>
-                <h4 style={{
-                  margin: 0,
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  color: '#212529',
-                }}>
-                  {user.Name}
-                </h4>
-                <p style={{
-                  margin: '2px 0 0',
-                  fontSize: '13px',
-                  color: '#6c757d',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}>
-                  {user.lastMessage || 'Aucun message récent'}
-                </p>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{
+                    margin: 0,
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#212529',
+                  }}>
+                    {user.Name}
+                  </h4>
+                  <p style={{
+                    margin: '2px 0 0',
+                    fontSize: '13px',
+                    color: '#6c757d',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}>
+                    {user.lastMessage || 'Aucun message récent'}
+                  </p>
+                </div>
+                {unreadCounts[user.Identifiant] > 0 && (
+                  <span style={{
+                    background: '#dc3545',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                  }}>
+                    {unreadCounts[user.Identifiant]}
+                  </span>
+                )}
               </div>
             </li>
           ))}
@@ -732,112 +784,116 @@ const UserList = () => {
                   {searchMessageQuery ? 'Aucun message correspondant' : 'Aucun message pour l\'instant'}
                 </p>
               ) : (
-                filteredMessages.map((msg, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      margin: '10px 0',
-                      padding: '12px 16px',
-                      borderRadius: '16px',
-                      maxWidth: '70%',
-                      position: 'relative',
-                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.05)',
-                      transition: 'transform 0.1s ease',
-                      ...(msg.sender === currentUser.Identifiant
-                        ? {
-                            background: 'linear-gradient(135deg, #007bff, #0056b3)',
-                            color: 'white',
-                            marginLeft: 'auto',
-                          }
-                        : {
-                            background: '#ffffff',
-                            color: '#212529',
-                            marginRight: 'auto',
-                            border: '1px solid #e8ecef',
-                          }),
-                    }}
-                  >
-                    {msg.type === 'text' ? (
-                      <>
-                        <p style={{
-                          margin: 0,
-                          fontSize: '14px',
-                          lineHeight: '1.5',
-                          wordBreak: 'break-word',
-                        }}>
-                          {msg.message}
-                        </p>
-                        <span style={{
-                          fontSize: '11px',
-                          opacity: 0.7,
-                          marginTop: '5px',
-                          display: 'block',
-                          textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
-                        }}>
-                          {new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </>
-                    ) : msg.type === 'file' ? (
-                      <div>
-                        <a
-                          href={msg.message}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: msg.sender === currentUser.Identifiant ? '#ffffff' : '#007bff',
-                            textDecoration: 'underline',
-                            fontWeight: 500,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                          }}
-                        >
-                          <FiPaperclip style={{ fontSize: '14px' }} />
-                          {msg.fileName || 'Fichier'}
-                        </a>
-                        <span style={{
-                          fontSize: '11px',
-                          opacity: 0.7,
-                          marginTop: '5px',
-                          display: 'block',
-                          textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
-                        }}>
-                          {new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                    ) : msg.type === 'audio' ? (
-                      <div>
-                        <audio
-                          controls
-                          src={msg.message}
-                          style={{
-                            width: '100%',
-                            maxWidth: '250px',
-                            marginBottom: '5px',
-                          }}
-                        />
-                        <span style={{
-                          fontSize: '11px',
-                          opacity: 0.7,
-                          marginTop: '5px',
-                          display: 'block',
-                          textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
-                        }}>
-                          {new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                ))
+                filteredMessages.map((msg, index) => {
+                  console.log(`Message ${index}: read = ${msg.read}`); // Débogage
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        margin: '10px 0',
+                        padding: '12px 16px',
+                        borderRadius: '16px',
+                        maxWidth: '70%',
+                        position: 'relative',
+                        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.05)',
+                        transition: 'transform 0.1s ease',
+                        ...(msg.sender === currentUser.Identifiant
+                          ? {
+                              background: 'linear-gradient(135deg, #007bff, #0056b3)',
+                              color: 'white',
+                              marginLeft: 'auto',
+                            }
+                          : {
+                              background: '#ffffff',
+                              color: msg.read === false ? 'black' : '#212529',
+                              fontWeight: msg.read === false ? 'bold' : 'normal',
+                              marginRight: 'auto',
+                              border: '1px solid #e8ecef',
+                            }),
+                      }}
+                    >
+                      {msg.type === 'text' ? (
+                        <>
+                          <p style={{
+                            margin: 0,
+                            fontSize: '14px',
+                            lineHeight: '1.5',
+                            wordBreak: 'break-word',
+                          }}>
+                            {msg.message}
+                          </p>
+                          <span style={{
+                            fontSize: '11px',
+                            opacity: 0.7,
+                            marginTop: '5px',
+                            display: 'block',
+                            textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
+                          }}>
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </>
+                      ) : msg.type === 'file' ? (
+                        <div>
+                          <a
+                            href={msg.message}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: msg.sender === currentUser.Identifiant ? '#ffffff' : '#007bff',
+                              textDecoration: 'underline',
+                              fontWeight: 500,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                            }}
+                          >
+                            <FiPaperclip style={{ fontSize: '14px' }} />
+                            {msg.fileName || 'Fichier'}
+                          </a>
+                          <span style={{
+                            fontSize: '11px',
+                            opacity: 0.7,
+                            marginTop: '5px',
+                            display: 'block',
+                            textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
+                          }}>
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      ) : msg.type === 'audio' ? (
+                        <div>
+                          <audio
+                            controls
+                            src={msg.message}
+                            style={{
+                              width: '100%',
+                              maxWidth: '250px',
+                              marginBottom: '5px',
+                            }}
+                          />
+                          <span style={{
+                            fontSize: '11px',
+                            opacity: 0.7,
+                            marginTop: '5px',
+                            display: 'block',
+                            textAlign: msg.sender === currentUser.Identifiant ? 'right' : 'left',
+                          }}>
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
               )}
               <div ref={messagesEndRef} />
             </div>
