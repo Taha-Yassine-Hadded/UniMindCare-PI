@@ -580,5 +580,37 @@ router.get('/upcoming-appointments/:studentId', async (req, res) => {
         res.status(500).json({ message: 'Error fetching upcoming appointments', error: error.message });
     }
 });
-
+router.post('/test-send-summary/:psychologistId', async (req, res) => {
+    const { sendTodaysSessionsReminderToPsychologist } = require('../services/appointementReminderService');
+    const User = require('../Models/Users');
+    const Appointment = require('../Models/Appointment');
+    try {
+      const psychologist = await User.findById(req.params.psychologistId);
+      if (!psychologist) return res.status(404).json({ message: 'Psychologist not found' });
+  
+      // Récupère les rendez-vous du jour
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+  
+      const todayAppointments = await Appointment.find({
+        psychologistId: psychologist._id,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: 'confirmed'
+      }).populate('studentId', 'Name Email');
+  
+      const appointmentsForSummary = todayAppointments.map(app => ({
+        ...app.toObject(),
+        appointmentDate: app.date,
+        mode: app.mode || 'En personne',
+        location: app.location || 'Cabinet de consultation'
+      }));
+  
+      const success = await sendTodaysSessionsReminderToPsychologist(psychologist, appointmentsForSummary);
+      res.json({ success });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 module.exports = router;

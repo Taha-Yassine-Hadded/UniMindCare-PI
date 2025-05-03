@@ -378,7 +378,7 @@ const sendTodaySessionsReminders = async () => {
   try {
     // Récupérer tous les psychologues
     const psychologists = await User.find({ 
-      roles: { $in: ['psychiatre', 'psychologue'] },
+      Role: { $in: ['psychiatre', 'psychologue'] },
       verified: true 
     });
     
