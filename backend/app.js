@@ -13,7 +13,7 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const FaceIDUser = require("./faceIDUser");
 const bodyParser = require('body-parser');
-const UserVerification = require('./models/UserVerification'); 
+const UserVerification = require('./Models/UserVerification'); 
 const appointementRoutes = require('./routes/appointmentRoutes');
 const caseRoutes = require('./routes/caseRoutes');
 const availabilityRoutes = require('./routes/availabilityRoutes');
@@ -32,7 +32,7 @@ const { initScheduler } = require('./utils/scheduler');
 const { spawn } = require("child_process");
 const evaluationRoutes = require("./routes/evalution");
 const crisisRoutes = require("./routes/crisisData"); // Nouvelle route
-const weatherRoutes = require("./routes/weather");
+const weatherRoutes = require("./routes/Weather");
 const feedbackRoutes = require("./routes/feedbackRoutes"); // Assurez-vous que le chemin est correct
 // Servir les fichiers statiques depuis le dossier images
 var indexRouter = require('./routes/index');
@@ -40,6 +40,7 @@ var usersRoutes = require('./routes/users');
 const passport = require('./routes/passportConfig'); // Import the configured passport instance
 const usersRouter = require('./routes/usersRouter');
 const exitRequestRoutes = require('./routes/exitRequests'); // Chemin correct vers tes routes
+const emotionStatsRoutes = require('./routes/emotionStats');
 
 const http = require('http'); // Ajout pour WebSocket
 const { Server } = require('socket.io'); // Ajout de Socket.IO
@@ -193,7 +194,7 @@ app.use('/users', usersRouter);
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
-
+app.use('/api/emotion-stats', emotionStatsRoutes);
 
 // Partie emergency
 const emergencyClaimsRouter = require('./routes/emergencyClaims');

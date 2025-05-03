@@ -138,8 +138,11 @@ import CaseManagement from "../Components/AppointementModule/CaseManagement";
 import NotificationsPage from '../Layout/Header/RightHeader/NotificationsPage';
 import AppointmentCalendar from "../Components/AppointementModule/AppointmentCalendar";
 import QuestionnaireHistory from "../Components/EmergencyClaim/QuestionnaireHistory";
+import EmotionStatsPage from "../Components/EmergencyClaim/EmotionStatsPage"
 
 export const routes = [
+
+  { path: `${process.env.PUBLIC_URL}/dashboard/emotion-stats`, Component: <EmotionStatsPage /> },
 
   //Psychologist Training Dashboard
   { path: `${process.env.PUBLIC_URL}/teacher-training/my-programs`, Component: <ProgramList /> },

@@ -140,6 +140,23 @@ router.get('/stats', async (req, res) => {
 });
 
 
+router.get('/by-tags', async (req, res) => {
+  try {
+    const tags = req.query.tags ? req.query.tags.split(',') : [];
+    let posts;
+    if (tags.length > 0) {
+      posts = await Post.find({ tags: { $in: tags } }).populate('author', 'Name');
+    } else {
+      posts = await Post.find().populate('author', 'Name');
+    }
+    res.status(200).json(posts);
+  } catch (error) {
+    console.error('Erreur lors de la récupération par tags:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+
 
 router.get('/:id', async (req, res) => {
   try {

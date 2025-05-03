@@ -3,7 +3,7 @@ import { H4, H5, P } from "../../../../AbstractElements";
 import { Card, CardBody, Col, Row } from "reactstrap";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { Cloud, CloudRain, CloudSnow, CloudLightning, Droplet, Sun, Sunset, Thermometer, Wind, Clock, AlertCircle } from "react-feather";
+import { Cloud, CloudRain, CloudSnow, CloudLightning, Droplet, Sun, Sunset, Thermometer, Wind, Clock, AlertCircle, Shield, Award, User, Heart } from "react-feather";
 import WeatherDashboard from '../../../Weather/WeatherDashboard';
 import { motion, AnimatePresence } from "framer-motion"; // Vous devrez installer framer-motion: npm install framer-motion
 
@@ -86,6 +86,87 @@ const containerVariants = {
       delayChildren: 0.3
     } 
   }
+};
+
+// Composant Badge de rôle 
+const RoleBadge = ({ role }) => {
+  // Fonction pour obtenir le nom complet du rôle
+  const getRoleName = (role) => {
+    const roleMap = {
+      'admin': 'Administrateur',
+      'teacher': 'Enseignant',
+      'psychiatre': 'Psychiatre',
+      'student': 'Étudiant'
+    };
+    
+    return roleMap[role.toLowerCase()] || role;
+  };
+
+  // Fonction pour obtenir l'icône en fonction du rôle
+  const getRoleIcon = (role) => {
+    switch(role.toLowerCase()) {
+      case 'admin':
+        return <Shield size={12} />;
+      case 'teacher':
+        return <Award size={12} />;
+      case 'psychiatre':
+        return <Heart size={12} />;
+      default:
+        return <User size={12} />;
+    }
+  };
+  
+  // Fonction pour obtenir les couleurs en fonction du rôle
+  const getRoleColors = (role) => {
+    const colorMap = {
+      'admin': {
+        bg: '#4338CA',
+        light: '#EEF2FF'
+      },
+      'teacher': {
+        bg: '#0369A1',
+        light: '#E0F2FE'
+      },
+      'psychiatre': {
+        bg: '#15803D',
+        light: '#DCFCE7'
+      },
+      'student': {
+        bg: '#9333EA',
+        light: '#F3E8FF'
+      }
+    };
+    
+    return colorMap[role.toLowerCase()] || { bg: '#6B7280', light: '#F3F4F6' };
+  };
+
+  const colors = getRoleColors(role);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      style={{
+        backgroundColor: colors.light,
+        color: colors.bg,
+        padding: '5px 10px',
+        borderRadius: '20px',
+        fontSize: '11px',
+        fontWeight: '600',
+        display: 'inline-flex',
+        alignItems: 'center',
+        margin: '0 4px 4px 0',
+        boxShadow: `0 2px 5px ${colors.bg}20`,
+        border: `1px solid ${colors.bg}20`,
+      }}
+    >
+      <span style={{ marginRight: '5px' }}>
+        {getRoleIcon(role)}
+      </span>
+      {getRoleName(role)}
+    </motion.div>
+  );
 };
 
 const itemVariants = {
@@ -448,6 +529,12 @@ const Greetingcard = () => {
       padding: '0',
       marginTop: '6px',
       transition: 'color 0.3s ease',
+    },
+    roleContainer: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '4px',
+      marginTop: '8px'
     }
   };
 
@@ -459,6 +546,27 @@ const Greetingcard = () => {
     }
   }, []);
 
+
+  // Récupérer le nom d'utilisateur et les rôles depuis le stockage local
+useEffect(() => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (user) {
+    if (user.Name) {
+      setUsername(user.Name.split(" ")[0]); // Prend seulement le prénom
+    }
+    
+    // Récupération des rôles (gestion des différents formats possibles)
+    if (user.Role) {
+      const roles = Array.isArray(user.Role) ? user.Role : [user.Role];
+      setUserRoles(roles);
+    } else if (user.role) {
+      const roles = Array.isArray(user.role) ? user.role : [user.role];
+      setUserRoles(roles);
+    }
+  }
+}, []);
+
+const [userRoles, setUserRoles] = useState([]);
   // Déterminer AM/PM
   useEffect(() => {
     setMeridiem(curHr >= 12 ? "PM" : "AM");
@@ -553,9 +661,22 @@ const Greetingcard = () => {
                   <h6 style={styles.date} className="text-capitalize">
   {getFormattedDate()} {/* Toujours utiliser la date locale */}
 </h6>
-                    <h4 style={styles.greeting}>
-                      {getGreeting()}, <span style={styles.username}>{username}</span>
-                    </h4>
+<h4 style={styles.greeting}>
+  {getGreeting()}, <span style={styles.username}>{username}</span>
+</h4>
+{/* Affichage des badges de rôle */}
+{userRoles && userRoles.length > 0 && (
+  <motion.div 
+    style={styles.roleContainer}
+    initial={{ opacity: 0, y: 5 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.3, duration: 0.3 }}
+  >
+    {userRoles.map((role, index) => (
+      <RoleBadge key={index} role={role} />
+    ))}
+  </motion.div>
+)}
                   </div>
                 </motion.div>
                 <ClockIcon curHr={curHr} curMi={curMi} meridiem={meridiem} />

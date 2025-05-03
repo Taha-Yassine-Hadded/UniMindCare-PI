@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { Card, CardHeader, CardBody, Col, Alert } from "reactstrap"; // Ajout de CardBody et Alert
+import { Card, CardHeader, CardBody, Col, Alert } from "reactstrap";
 import { H4, P } from "../../../../AbstractElements";
 import axios from "axios";
 import RevenueChartCardBody from "./RevenueChartCardBody";
 import CardInvest from "../CardInvest/CardInvest";
-import { AlertTriangle, Check, Activity, Heart, Info } from "react-feather"; // Ajout de Info
+import { AlertTriangle, Check, Activity, Heart, Info } from "react-feather";
+import EmergencyClaimButton from "../../../EmergencyClaim/EmergencyClaimButton"; // Importation du bouton d'urgence
 
 const Ravanuechart = () => {
   const [healthData, setHealthData] = useState(null);
@@ -302,6 +303,14 @@ const Ravanuechart = () => {
           </div>
         </CardHeader>
         <RevenueChartCardBody healthData={healthData} loading={loading} error={error} animate={animate} />
+        
+        {/* Bouton de réclamation d'urgence */}
+        <div className="px-3 pb-3 mt-1">
+          <EmergencyClaimButton 
+            userIdentifiant={userIdentifiant} 
+            className="btn-emergency-claim w-100" 
+          />
+        </div>
       </Card>
       <style jsx="true">{`
         @keyframes pulse {
@@ -322,6 +331,23 @@ const Ravanuechart = () => {
         .health-status-card:hover {
           transform: translateY(-8px) !important;
           box-shadow: 0 15px 30px rgba(0,0,0,0.12) !important;
+        }
+        
+        /* Style pour le bouton d'urgence */
+        .btn-emergency-claim {
+          animation: glowing 1.5s infinite alternate;
+          box-shadow: 0 0 8px #ff0000;
+          transition: all 0.3s ease;
+        }
+        
+        @keyframes glowing {
+          0% { box-shadow: 0 0 5px #ff3333; }
+          100% { box-shadow: 0 0 15px #ff0000, 0 0 20px #ff6666; }
+        }
+        
+        .btn-emergency-claim:hover {
+          transform: scale(1.05);
+          box-shadow: 0 0 12px #ff0000, 0 0 20px #ff3333;
         }
       `}</style>
       <CardInvest />

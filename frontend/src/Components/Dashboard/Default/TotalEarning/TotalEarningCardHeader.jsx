@@ -11,7 +11,7 @@ const TotalEarningCardHeader = () => {
             {OurTotalEarning}
             <i className="fa fa-circle"> </i>
           </P>
-          <H4>96.564%</H4>
+          <H4>96.4%</H4>
         </div>
       </div>
     </CardHeader>

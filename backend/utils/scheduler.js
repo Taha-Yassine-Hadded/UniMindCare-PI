@@ -4,11 +4,10 @@ const { sendWeatherNotificationsToAllUsers } = require('../services/weatherNotif
 
 // Fonction pour initialiser les tâches planifiées
 const initScheduler = () => {
-  // Configuration du fuseau horaire local correct
   const localTimezone = "Europe/Paris"; 
   
   // 1. Planificateur pour les rappels d'emails hebdomadaires
-  cron.schedule('30 10 * * *', async () => {
+  cron.schedule('01 12 * * *', async () => {
     console.log('Exécution de la tâche planifiée : envoi des rappels de questionnaire');
     try {
       const result = await sendRemindersToAllUsers();
@@ -24,7 +23,7 @@ const initScheduler = () => {
   console.log(`Planificateur initialisé : les rappels seront envoyés à 13h58 (${localTimezone})`);
   
   // 2. Planificateur pour l'envoi des notifications météo
-  cron.schedule('30 10 * * *', async () => {
+  cron.schedule('01 12 * * *', async () => {
     console.log(`Exécution planifiée à ${new Date().toLocaleTimeString()} : envoi des notifications météo quotidiennes`);
     try {
       const result = await sendWeatherNotificationsToAllUsers();
