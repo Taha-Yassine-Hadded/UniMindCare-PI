@@ -396,15 +396,23 @@ const sendTodaySessionsReminders = async () => {
     
     // Pour chaque psychologue, récupérer ses rendez-vous du jour et envoyer un récapitulatif
     for (const psychologist of psychologists) {
-      // Récupérer les rendez-vous du jour pour ce psychologue
+      // CORRECTION : Utiliser 'date' au lieu de 'appointmentDate'
       const todayAppointments = await Appointment.find({
         psychologistId: psychologist._id,
-        appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-        status: { $in: ['confirmed', 'rescheduled'] }
-      }).sort({ appointmentDate: 1 });
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: 'confirmed' // CORRECTION : 'rescheduled' n'est pas dans les enum
+      }).sort({ date: 1 });
+      
+      // Adapter les rendez-vous avant de les envoyer
+      const appointmentsForSummary = todayAppointments.map(app => ({
+        ...app.toObject(),
+        appointmentDate: app.date, // Mapper date vers appointmentDate
+        mode: app.mode || 'En personne',
+        location: app.location || 'Cabinet de consultation'
+      }));
       
       // Envoyer le récapitulatif
-      const success = await sendTodaysSessionsReminderToPsychologist(psychologist, todayAppointments);
+      const success = await sendTodaysSessionsReminderToPsychologist(psychologist, appointmentsForSummary);
       if (success) {
         successCount++;
       } else {
