@@ -1,6 +1,6 @@
 module.exports = {
     testEnvironment: "node",
-    moduleDirectories: ["node_modules", "Models", "routes"],
+    moduleDirectories: ["node_modules", "Models", "models", "routes"],
     moduleFileExtensions: ["js", "json"],
     coveragePathIgnorePatterns: ["/test/"],
     reporters: [
