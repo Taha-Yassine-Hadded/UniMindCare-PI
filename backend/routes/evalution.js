@@ -12,26 +12,10 @@ const logger = (req, res, next) => {
 router.post(
   "/evaluation",
   [
-    // Validation et sanitization
-    body("nomEtudiant")
-      .notEmpty()
-      .withMessage("Le nom de l'étudiant est requis")
-      .trim()
-      .escape(),
-    body("classe")
-      .notEmpty()
-      .withMessage("La classe est requise")
-      .trim()
-      .escape(),
-    body("matiere")
-      .notEmpty()
-      .withMessage("La matière est requise")
-      .trim()
-      .escape(),
-    body("dateEvaluation")
-      .isISO8601()
-      .withMessage("La date est invalide")
-      .toDate(), // Convertit en objet Date
+    body("nomEtudiant").notEmpty().withMessage("Le nom de l'étudiant est requis").trim().escape(),
+    body("classe").notEmpty().withMessage("La classe est requise").trim().escape(),
+    body("matiere").notEmpty().withMessage("La matière est requise").trim().escape(),
+    body("dateEvaluation").isISO8601().withMessage("La date est invalide").toDate(),
     body("reactionCorrection")
       .isIn(["Accepte bien", "Résiste légèrement", "Résiste fortement"])
       .withMessage("Réaction à la correction invalide"),
@@ -47,25 +31,10 @@ router.post(
     body("participationOrale")
       .isIn(["Très active", "Moyenne", "Faible", "Nulle"])
       .withMessage("Participation orale invalide"),
-    body("difficultes")
-      .optional()
-      .isString()
-      .trim()
-      .escape(),
-    body("pointsPositifs")
-      .optional()
-      .isString()
-      .trim()
-      .escape(),
-    body("axesAmelioration")
-      .optional()
-      .isString()
-      .trim()
-      .escape(),
-    body("suiviRecommande")
-      .optional()
-      .isBoolean()
-      .toBoolean(), // Convertit en booléen
+    body("difficultes").optional().isString().trim().escape(),
+    body("pointsPositifs").optional().isString().trim().escape(),
+    body("axesAmelioration").optional().isString().trim().escape(),
+    body("suiviRecommande").optional().isBoolean().toBoolean(),
     body("engagement")
       .optional()
       .isIn([
@@ -78,21 +47,40 @@ router.post(
       .optional()
       .isInt({ min: 1, max: 5 })
       .withMessage("La concentration doit être entre 1 et 5")
-      .toInt(), // Convertit en entier
+      .toInt(),
     body("interaction")
       .optional()
       .isIn(["Positives", "Neutres", "Négatives"]),
   ],
-  logger, // Ajout du middleware de logging
+  logger,
   async (req, res) => {
-    // Vérification des erreurs de validation
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     try {
-      const evaluation = new Evaluation(req.body);
+      const token = req.headers.authorization?.split(" ")[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token manquant" });
+      }
+
+      // Récupérer l'utilisateur connecté
+      const userResponse = await fetch("http://localhost:5000/api/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = await userResponse.json();
+      if (!userResponse.ok || !user.Role.includes("teacher")) {
+        return res.status(403).json({ message: "Accès refusé" });
+      }
+
+      // Ajouter l'ID de l'enseignant à l'évaluation
+      const evaluationData = {
+        ...req.body,
+        createdBy: user._id, // Ajout de l'ID de l'enseignant
+      };
+
+      const evaluation = new Evaluation(evaluationData);
       await evaluation.save();
 
       const formattedEvaluation = {
@@ -105,7 +93,6 @@ router.post(
         evaluation: formattedEvaluation,
       });
     } catch (error) {
-      // Gestion spécifique des erreurs
       if (error.name === "ValidationError") {
         return res.status(400).json({
           message: "Erreur de validation dans la base de données",
@@ -120,25 +107,80 @@ router.post(
     }
   }
 );
-// Nouvelle route pour les statistiques par classe
+
+router.get("/evaluation", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "Token manquant" });
+    }
+
+    // Fetch user details to verify role
+    const userResponse = await fetch("http://localhost:5000/api/users/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const user = await userResponse.json();
+    if (!userResponse.ok || !user.Role.includes("teacher")) {
+      return res.status(403).json({ message: "Accès refusé" });
+    }
+
+    // Fetch evaluations for this teacher only
+    const evaluations = await Evaluation.find({ createdBy: user._id }).lean();
+    const formattedEvaluations = evaluations.map((evaluation) => ({
+      ...evaluation,
+      dateEvaluation: evaluation.dateEvaluation.toISOString().split("T")[0],
+    }));
+
+    res.status(200).json({
+      message: "Évaluations récupérées avec succès",
+      evaluations: formattedEvaluations,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des évaluations:", error);
+    res.status(500).json({
+      message: "Erreur interne du serveur",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
+
+router.get("/evaluation/:id", async (req, res) => {
+  try {
+    const evaluation = await Evaluation.findById(req.params.id).lean();
+    if (!evaluation) {
+      return res.status(404).json({ message: "Évaluation non trouvée" });
+    }
+    res.status(200).json({
+      message: "Évaluation récupérée avec succès",
+      evaluation: {
+        ...evaluation,
+        dateEvaluation: evaluation.dateEvaluation.toISOString().split("T")[0],
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Erreur interne du serveur" });
+  }
+});
+
+// Route pour les statistiques par classe
 router.get("/statistics", async (req, res) => {
   try {
     const stats = await Evaluation.aggregate([
       {
         $group: {
-          _id: "$classe", // Grouper par classe
-          totalEvaluations: { $sum: 1 }, // Nombre total d'évaluations
-          avgConcentration: { $avg: "$concentration" }, // Moyenne de la concentration
-          presenceStats: { $push: "$presence" }, // Collecter les données de présence
-          participationStats: { $push: "$participationOrale" }, // Collecter les données de participation
-          stressStats: { $push: "$gestionStress" }, // Collecter les données de stress
-          engagementStats: { $push: "$engagement" }, // Collecter les données d'engagement
+          _id: "$classe",
+          totalEvaluations: { $sum: 1 },
+          avgConcentration: { $avg: "$concentration" },
+          presenceStats: { $push: "$presence" },
+          participationStats: { $push: "$participationOrale" },
+          stressStats: { $push: "$gestionStress" },
+          engagementStats: { $push: "$engagement" },
         },
       },
       {
         $project: {
           totalEvaluations: 1,
-          avgConcentration: { $round: ["$avgConcentration", 2] }, // Arrondir à 2 décimales
+          avgConcentration: { $round: ["$avgConcentration", 2] },
           presenceDistribution: {
             $arrayToObject: {
               $map: {
@@ -211,7 +253,7 @@ router.get("/statistics", async (req, res) => {
         },
       },
       {
-        $sort: { _id: 1 }, // Trier par nom de classe
+        $sort: { _id: 1 },
       },
     ]);
 
@@ -246,7 +288,7 @@ router.get("/student-stats/:nomEtudiant", async (req, res) => {
 
     const stats = await Evaluation.aggregate([
       {
-        $match: { nomEtudiant: nomEtudiant } // Filtrer par nom de l'étudiant
+        $match: { nomEtudiant: nomEtudiant }
       },
       {
         $group: {
@@ -257,12 +299,12 @@ router.get("/student-stats/:nomEtudiant", async (req, res) => {
           participationStats: { $push: "$participationOrale" },
           stressStats: { $push: "$gestionStress" },
           engagementStats: { $push: "$engagement" },
-          latestEvaluations: { 
-            $push: { 
-              date: "$dateEvaluation", 
+          latestEvaluations: {
+            $push: {
+              date: "$dateEvaluation",
               matiere: "$matiere",
               reactionCorrection: "$reactionCorrection"
-            } 
+            }
           }
         }
       },
@@ -339,7 +381,7 @@ router.get("/student-stats/:nomEtudiant", async (req, res) => {
               }
             }
           },
-          latestEvaluations: { $slice: ["$latestEvaluations", 5] } // 5 dernières évaluations
+          latestEvaluations: { $slice: ["$latestEvaluations", 5] }
         }
       }
     ]);
