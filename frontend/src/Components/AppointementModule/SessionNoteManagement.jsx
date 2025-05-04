@@ -8,6 +8,8 @@ import NotesList from './NotesList';
 import NoteViewer from './NoteViewer';
 import './notesModule.css';
 
+const FLASK_API_URL = "http://localhost:5015/predict";
+
 const SessionNoteManagement = ({ caseId, token, userData }) => {
   const navigate = useNavigate();
   const [caseData, setCaseData] = useState(null);
@@ -17,6 +19,11 @@ const SessionNoteManagement = ({ caseId, token, userData }) => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('notes');
   const [creatingNote, setCreatingNote] = useState(false);
+
+  // Prediction state
+  const [predictionResult, setPredictionResult] = useState(null);
+  const [predicting, setPredicting] = useState(false);
+  const [predictionError, setPredictionError] = useState(null);
 
   useEffect(() => {
     console.log('SessionNoteManagement - Props:', { caseId, token, userData });
@@ -112,6 +119,28 @@ const SessionNoteManagement = ({ caseId, token, userData }) => {
   const handleCancelCreate = () => {
     setCreatingNote(false);
     setActiveTab('notes');
+  };
+
+  // Prediction handler
+  const handlePredictStatus = async () => {
+    setPredicting(true);
+    setPredictionError(null);
+    setPredictionResult(null);
+    try {
+      // Concatène toutes les notes pour la prédiction globale
+      const notesText = notes.map(n => n.content || n.text || "").join("\n\n");
+      const response = await fetch(FLASK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: notesText }),
+      });
+      if (!response.ok) throw new Error("Prediction failed");
+      const data = await response.json();
+      setPredictionResult(data);
+    } catch (err) {
+      setPredictionError("Prediction failed. Make sure the Flask API is running.");
+    }
+    setPredicting(false);
   };
 
   if (loading) {
@@ -258,6 +287,38 @@ const SessionNoteManagement = ({ caseId, token, userData }) => {
               onCancel={handleCancelCreate}
               mode="create"
             />
+          )}
+        </Tab>
+
+        <Tab eventKey="status" title="Status Prediction">
+          <div className="mb-3">
+            <Button variant="primary" onClick={handlePredictStatus} disabled={predicting || notes.length === 0}>
+              {predicting ? "Predicting..." : "Predict Status for All Notes"}
+            </Button>
+          </div>
+          {predictionError && <Alert variant="danger">{predictionError}</Alert>}
+          {predictionResult && (
+            <Card>
+              <Card.Body>
+                <h5>Predicted Status</h5>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  <span style={{
+                    color:
+                      predictionResult.label === "improved"
+                        ? "green"
+                        : predictionResult.label === "worsened"
+                        ? "red"
+                        : "orange"
+                  }}>
+                    {predictionResult.label}
+                  </span>
+                </p>
+              </Card.Body>
+            </Card>
+          )}
+          {!predicting && !predictionResult && (
+            <div>No prediction yet. Click the button above to predict the overall status based on all notes.</div>
           )}
         </Tab>
       </Tabs>
