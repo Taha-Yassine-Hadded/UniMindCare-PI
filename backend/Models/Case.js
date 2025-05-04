@@ -8,9 +8,13 @@ const caseSchema = new Schema({
     priority: { type: String, enum: ['emergency', 'regular'], default: 'regular' },
     notes: { type: String },
     archived: { type: Boolean, default: false },
-  
+    sessionNotes: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SessionNote'
+    }],
     // Link to appointments
     appointments: [{ type: Schema.Types.ObjectId, ref: 'Appointment' }],
   }, { timestamps: true });
 
+ 
 module.exports = mongoose.model('Case', caseSchema);

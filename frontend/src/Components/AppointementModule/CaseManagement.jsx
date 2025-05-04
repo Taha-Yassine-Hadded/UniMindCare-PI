@@ -4,6 +4,7 @@ import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import io from 'socket.io-client';
 import './CaseManagement.css';
+import { useNavigate } from 'react-router-dom';
 
 // Initialize Socket.IO client
 const socket = io('http://localhost:5000', {
@@ -18,8 +19,8 @@ socket.on('connect', () => {
 socket.on('connect_error', (error) => {
   console.error('WebSocket connection error:', error);
 });
-
 const CaseManagement = ({ psychologistId }) => {
+  const navigate = useNavigate();
   const [pendingCases, setPendingCases] = useState([]);
   const [inProgressCases, setInProgressCases] = useState([]);
   const [archivedCases, setArchivedCases] = useState([]);
@@ -263,48 +264,97 @@ const CaseManagement = ({ psychologistId }) => {
       const resAll = await axios.get('http://localhost:5000/api/cases', {
         params: { psychologistId },
       });
-
+  
       // Process each case: split appointments based on status and set casePriority
       const processedCases = resAll.data.map((c) => {
-        const pendingAppointments = c.appointments
-          ? c.appointments.filter((app) => app.status === 'pending')
+        // First filter appointments to only include those for this psychologist
+        const relevantAppointments = c.appointments
+          ? c.appointments.filter(app => {
+              // Check different ways the psychologistId might be stored
+              return (
+                (app.psychologistId === psychologistId) ||
+                (app.psychologistId?._id === psychologistId) ||
+                (typeof app.psychologistId === 'object' && 
+                 app.psychologistId !== null && 
+                 app.psychologistId._id === psychologistId)
+              );
+            })
           : [];
-        const confirmedAppointments = c.appointments
-          ? c.appointments.filter((app) => app.status === 'confirmed')
-          : [];
-        // Determine the case priority by using the latest appointment's priority.
+  
+        // Now split the filtered appointments by status
+        const pendingAppointments = relevantAppointments
+          .filter((app) => app.status === 'pending');
+          
+        const confirmedAppointments = relevantAppointments
+          .filter((app) => app.status === 'confirmed');
+  
+        // Determine the case priority from relevant appointments only
         let casePriority = c.priority; // fallback value
-        if (c.appointments && c.appointments.length > 0) {
-          const sortedApps = [...c.appointments].sort(
+        if (relevantAppointments.length > 0) {
+          const sortedApps = [...relevantAppointments].sort(
             (a, b) => new Date(b.date) - new Date(a.date)
           );
           casePriority = sortedApps[0].priority;
         }
-        return { ...c, pendingAppointments, confirmedAppointments, casePriority };
+        
+        return { 
+          ...c, 
+          pendingAppointments, 
+          confirmedAppointments, 
+          appointments: relevantAppointments, // Replace with filtered appointments
+          casePriority 
+        };
       });
-
+  
+      // Filter to only include cases that have appointments for this psychologist
+      const casesWithAppointments = processedCases.filter(c => 
+        c.appointments.length > 0
+      );
+  
       // For Pending tab: show cases that have at least one pending appointment
-      const pending = processedCases.filter((c) => c.pendingAppointments.length > 0);
-
+      const pending = casesWithAppointments.filter((c) => c.pendingAppointments.length > 0);
+  
       // For In-Progress tab: show cases that have no pending appointments,
       // at least one confirmed appointment, and status is in_progress
-      const inProgress = processedCases.filter(
+      const inProgress = casesWithAppointments.filter(
         (c) =>
           c.pendingAppointments.length === 0 &&
           c.confirmedAppointments.length > 0 &&
           c.status === 'in_progress'
       );
-
-      // Get archived/resolved cases as before
+  
+      // Get archived/resolved cases
       const resArchived = await axios.get('http://localhost:5000/api/cases/archived', {
         params: { psychologistId },
       });
-
+  
+      // Filter archived cases to only include appointments for this psychologist
+      const filteredArchivedCases = resArchived.data.map(c => {
+        const relevantAppointments = c.appointments
+          ? c.appointments.filter(app => {
+              return (
+                (app.psychologistId === psychologistId) ||
+                (app.psychologistId?._id === psychologistId) ||
+                (typeof app.psychologistId === 'object' && 
+                 app.psychologistId !== null && 
+                 app.psychologistId._id === psychologistId)
+              );
+            })
+          : [];
+          
+        return {
+          ...c,
+          appointments: relevantAppointments,
+          casePriority: c.priority
+        };
+      }).filter(c => c.appointments.length > 0); // Only include cases with relevant appointments
+  
       setPendingCases(pending);
       setInProgressCases(inProgress);
-      setArchivedCases(resArchived.data);
+      setArchivedCases(filteredArchivedCases);
       setLoading(false);
     } catch (err) {
+      console.error('Error fetching cases:', err);
       toast.error('Error fetching cases');
       setLoading(false);
     }
@@ -466,6 +516,9 @@ const CaseManagement = ({ psychologistId }) => {
                         <Dropdown.Item onClick={() => handleResolveCase(c._id)}>
                           Mark as Resolved
                         </Dropdown.Item>
+                        <Dropdown.Item onClick={() => navigate(`${process.env.PUBLIC_URL}/session-notes/${c._id}`)}>
+  Manage Session Notes
+</Dropdown.Item>
                       </Dropdown.Menu>
                     </Dropdown>
                   </td>

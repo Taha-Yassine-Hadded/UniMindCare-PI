@@ -29,7 +29,13 @@ const appointmentSchema = new Schema({
         type: String, 
         enum: ['emergency', 'regular'], 
         default: 'regular' // Default to regular if not specified
+    },
+    reminderSent: { 
+        type: Boolean, 
+        default: false 
     }
 }, { timestamps: true });
+
+
 
 module.exports = mongoose.model('Appointment', appointmentSchema);

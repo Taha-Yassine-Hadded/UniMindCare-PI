@@ -141,6 +141,10 @@ import QuestionnaireHistory from "../Components/EmergencyClaim/QuestionnaireHist
 import EmotionStatsPage from "../Components/EmergencyClaim/EmotionStatsPage"
 import BlogAdmin from "../Components/Tables/Reactstrap/BasicTable/BlogAdmin";
 import AdminOnly from "../Components/Commons/AdminOnly";
+import SessionNoteManagement from "../Components/AppointementModule/SessionNoteManagement";
+import SessionNotesPage from "../Components/AppointementModule/SessionNotesPage";
+import CaseManagementPage from "../Components/AppointementModule/CaseManagementPage";
+
 
 export const routes = [
 
@@ -340,10 +344,11 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/ecommerce/Add-product`, Component: <AddProductName /> },
 
 // Appointment Module
-  {path : `${process.env.PUBLIC_URL}/appointment/doctor-list`, Component: <DoctorsList />},
-  { path: `${process.env.PUBLIC_URL}/appointment/student-dashboard`, Component: <StudentDashboard /> },
-  { path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
-  {path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagement />},
-  { path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
+{path : `${process.env.PUBLIC_URL}/appointment/doctor-list`, Component: <DoctorsList />},
+{ path: `${process.env.PUBLIC_URL}/appointment/student-dashboard`, Component: <StudentDashboard /> },
+{ path: `${process.env.PUBLIC_URL}/appointment/psychologist-dashboard`, Component: <PsychologistDashboard /> },
+{path: `${process.env.PUBLIC_URL}/appointment/case-management`, Component: <CaseManagementPage />},
+{ path: `${process.env.PUBLIC_URL}/notifications`, Component: <NotificationsPage /> },
+{ path: `${process.env.PUBLIC_URL}/session-notes/:caseId`, Component: <SessionNotesPage /> },
 
 ];

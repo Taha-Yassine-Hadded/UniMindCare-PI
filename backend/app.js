@@ -18,6 +18,7 @@ const appointementRoutes = require('./routes/appointmentRoutes');
 const caseRoutes = require('./routes/caseRoutes');
 const availabilityRoutes = require('./routes/availabilityRoutes');
 const notificationsRoutes = require('./routes/notifications');
+const notesRoutes = require('./routes/notesRoutes');
 
 const User = require('./Models/Users');
 const nodemailer = require('nodemailer');
@@ -140,9 +141,19 @@ app.use("/api", feedbackRoutes); // Monter les routes de feedback sous /api
   .catch((err) => console.error('MongoDB connection error:', err));*/
 
    // Connexion à MongoDB
-   mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
+   /*mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
      .then(() => console.log('Connexion à MongoDB réussie'))
-     .catch(err => console.log('Erreur de connexion à MongoDB: ', err));
+     .catch(err => console.log('Erreur de connexion à MongoDB: ', err));*/
+     mongoose.connect('mongodb://localhost/Pi-2025', { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => {
+    console.log('Connexion à MongoDB réussie');
+    
+    // Initialiser les templates par défaut
+    notesRoutes.initializeDefaultTemplates()
+      .then(() => console.log('Templates par défaut initialisés avec succès'))
+      .catch(err => console.error('Erreur lors de l\'initialisation des templates:', err));
+  })
+  .catch(err => console.log('Erreur de connexion à MongoDB: ', err));
 
 
 /* ////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -895,6 +906,7 @@ app.use('/api/appointments', appointementRoutes);
 app.use('/api/cases', caseRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/notes', notesRoutes.router);
 
 
 
