@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const request = require('supertest');
 const express = require('express');
-const crisisRoutes = require('../../routes/crisisData');
+const crisisRoutes = require('../routes/crisisData');
 
 let mongod;
 let app;

@@ -19,7 +19,18 @@ const caseRoutes = require('./routes/caseRoutes');
 const availabilityRoutes = require('./routes/availabilityRoutes');
 const notificationsRoutes = require('./routes/notifications');
 const notesRoutes = require('./routes/notesRoutes');
-
+const jwt = require('jsonwebtoken');
+const Message = require('./Models/message');
+// Modèle Meeting
+const MeetingSchema = new mongoose.Schema({
+  meetLink: { type: String, required: true },
+  date: { type: Date, required: true },
+  reason: { type: String, required: true },
+  duration: { type: Number, required: true },
+  createdBy: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+const Meeting = mongoose.model('Meeting', MeetingSchema);
 const User = require('./Models/Users');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');  // Ajouter bcrypt pour le hachage des mots de passe
@@ -42,6 +53,7 @@ const passport = require('./routes/passportConfig'); // Import the configured pa
 const usersRouter = require('./routes/usersRouter');
 const exitRequestRoutes = require('./routes/exitRequests'); // Chemin correct vers tes routes
 const emotionStatsRoutes = require('./routes/emotionStats');
+const authMiddleware = require('./middleware/auth');
 
 const http = require('http'); // Ajout pour WebSocket
 const { Server } = require('socket.io'); // Ajout de Socket.IO
@@ -58,6 +70,27 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
   },
 });
+
+// Configure CORS middleware with explicit options at the top
+const corsOptions = {
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-faceid'],
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+// Explicitly handle CORS preflight requests
+app.options('/api/upload', cors(corsOptions));
+app.options('/api/users/me', cors(corsOptions));
+app.options('/api/meeting', cors(corsOptions));
+
+// Log requests to verify CORS middleware is applied
+app.use((req, res, next) => {
+  console.log(`Request received: ${req.method} ${req.url}`);
+  next();
+});
+
 
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
@@ -81,6 +114,140 @@ app.use((req, res, next) => {
   next();
 });
 
+
+// Middleware Socket.IO pour authentification
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    console.log('Socket.IO - Token reçu:', token);
+    if (!token) return next(new Error('Authentification requise'));
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Socket.IO - Token décodé:', decoded);
+    socket.user = decoded;
+    next();
+  } catch (error) {
+    console.error('Socket.IO - Erreur authentification:', error.message);
+    next(new Error('Token invalide'));
+  }
+});
+
+// Add a Set to track online users
+const onlineUsers = new Set();
+
+// Gestion des connexions Socket.IO
+io.on('connection', (socket) => {
+  console.log(`Utilisateur connecté : ${socket.id} (Identifiant: ${socket.user?.identifiant || 'inconnu'})`);
+
+  // Add user to onlineUsers when they connect
+  if (socket.user?.identifiant) {
+    onlineUsers.add(socket.user.identifiant);
+    io.emit('onlineUsers', Array.from(onlineUsers));
+  }
+
+  socket.on('join', (identifiant) => {
+    socket.join(identifiant);
+    console.log(`Utilisateur ${socket.user?.identifiant} a rejoint la salle ${identifiant}`);
+  });
+
+  socket.on('sendMessage', async (messageData, callback) => {
+    try {
+      const senderUser = await User.findOne({ Identifiant: messageData.sender });
+      const receiverUser = await User.findOne({ Identifiant: messageData.receiver });
+      if (!senderUser || !receiverUser) {
+        return callback({ error: 'Utilisateur ou destinataire introuvable' });
+      }
+      if (messageData.sender !== socket.user.identifiant) {
+        return callback({ error: 'Non autorisé' });
+      }
+
+      const newMessage = new Message({
+        sender: senderUser.Identifiant,
+        receiver: receiverUser.Identifiant,
+        message: messageData.message,
+        type: messageData.type || 'text',
+        fileName: messageData.fileName,
+        timestamp: new Date(),
+        read: false,
+      });
+      await newMessage.save();
+
+      // Calculer le nombre de messages non lus pour le destinataire
+      const unreadCount = await Message.countDocuments({
+        receiver: receiverUser.Identifiant,
+        sender: senderUser.Identifiant,
+        read: false,
+      });
+
+      io.to(messageData.receiver).emit('receiveMessage', newMessage);
+      io.to(messageData.receiver).emit('unreadCount', {
+        sender: senderUser.Identifiant,
+        count: unreadCount,
+      });
+      io.to(messageData.sender).emit('receiveMessage', newMessage);
+      callback({ success: true });
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi du message :', error);
+      callback({ error: 'Erreur lors de l\'envoi du message' });
+    }
+  });
+
+  socket.on('markAsRead', async ({ sender, receiver }) => {
+    try {
+      console.log(`Marquage comme lu - Sender: ${sender}, Receiver: ${receiver}`); // Débogage
+      const result = await Message.updateMany(
+        {
+          $or: [
+            { sender, receiver, read: false },
+            { sender: receiver, receiver: sender, read: false },
+          ],
+        },
+        { $set: { read: true } }
+      );
+      console.log(`Messages marqués comme lus: ${result.modifiedCount}`); // Débogage
+      const unreadCount = await Message.countDocuments({
+        receiver: receiver, // Messages reçus par receiver
+        read: false,
+      });
+      console.log(`Nombre de messages non lus mis à jour pour ${receiver}: ${unreadCount}`); // Débogage
+      io.to(receiver).emit('unreadCount', {
+        sender,
+        count: unreadCount,
+      });
+    } catch (error) {
+      console.error('Erreur lors du marquage des messages comme lus:', error);
+    }
+  });
+
+  socket.on('startVideoCall', ({ to, from }) => {
+    io.to(to).emit('startVideoCall', { from });
+  });
+
+  socket.on('offer', ({ offer, to, from }) => {
+    io.to(to).emit('offer', { offer, from });
+  });
+
+  socket.on('answer', ({ answer, to, from }) => {
+    io.to(to).emit('answer', { answer, from });
+  });
+
+  socket.on('ice-candidate', ({ candidate, to, from }) => {
+    io.to(to).emit('ice-candidate', { candidate, from });
+  });
+
+  socket.on('endCall', ({ to }) => {
+    if (to) {
+      io.to(to).emit('endCall');
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`Utilisateur déconnecté : ${socket.id}`);
+    if (socket.user?.identifiant) {
+      onlineUsers.delete(socket.user.identifiant);
+      io.emit('onlineUsers', Array.from(onlineUsers));
+    }
+  });
+});
 
 // Gestion des connexions WebSocket
 io.on('connection', (socket) => {
@@ -598,6 +765,44 @@ conn.once('open', () => {
   console.log("GridFS initialisé");
 });
 
+// Configure multer for file storage (for chat file uploads)
+const storage1 = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'Uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+
+const uploadLocal = multer({
+  storage1: storage1,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'audio/webm', 'audio/mpeg'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non supporté'), false);
+    }
+  },
+});
+
+// Serve uploaded files statically
+app.use('/uploads', express.static('uploads'));
+
+// File upload endpoint for chat
+app.post('/api/upload', uploadLocal.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Aucun fichier sélectionné' });
+  }
+
+  const fileUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+  res.status(200).json({ fileUrl });
+});
+
+
 const storage = new GridFsStorage({
   url: process.env.MONGO_URI,
   file: (req, file) => {
@@ -608,6 +813,85 @@ const storage = new GridFsStorage({
   }
 });
 const upload = multer({ storage });
+
+
+// Route pour planifier une réunion
+app.post('/api/meeting', authMiddleware, async (req, res) => {
+  console.log('Request received: POST /api/meeting');
+  console.log('req.user:', req.user);
+
+  try {
+    const user = await User.findOne({ Identifiant: req.user.identifiant });
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    const userRole = req.user.Role || (req.user.roles && req.user.roles.includes('teacher') ? 'teacher' : null);
+    if (!userRole || userRole !== 'teacher') {
+      return res.status(403).json({ message: 'Seuls les enseignants peuvent planifier des réunions' });
+    }
+
+    const { meetLink, date, reason, duration } = req.body;
+
+    if (!meetLink || !date || !reason || !duration) {
+      return res.status(400).json({ message: 'Tous les champs sont requis' });
+    }
+
+    const meeting = new Meeting({
+      meetLink,
+      date: new Date(date),
+      reason,
+      duration: parseInt(duration),
+      createdBy: req.user.identifiant,
+    });
+
+    await meeting.save();
+    console.log('Réunion enregistrée:', meeting);
+
+    const users = await User.find({}, 'Email');
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: users.map((u) => u.Email).join(', '),
+      subject: 'Nouvelle réunion planifiée',
+      text: `Une nouvelle réunion a été planifiée.\n\nRaison: ${reason}\nLien: ${meetLink}\nDate: ${new Date(date).toLocaleString()}\nDurée: ${duration} minutes`,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('E-mails envoyés aux utilisateurs');
+
+    res.status(201).json({ message: 'Réunion planifiée avec succès', meeting });
+  } catch (error) {
+    console.error('Erreur lors de la planification de la réunion:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Endpoint pour l'historique des messages
+app.get('/messages/:userId1/:userId2', authMiddleware, async (req, res) => {
+  const { userId1, userId2 } = req.params;
+  try {
+    const messages = await Message.find({
+      $or: [
+        { sender: userId1, receiver: userId2 },
+        { sender: userId2, receiver: userId1 },
+      ],
+    }).sort({ timestamp: 1 });
+
+    // Ajouter une valeur par défaut pour read si absent
+    const messagesWithRead = messages.map((msg) => ({
+      ...msg._doc,
+      read: msg.read !== undefined ? msg.read : false,
+    }));
+
+    console.log('Messages envoyés au client:', messagesWithRead); // Débogage
+    res.json(messagesWithRead);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des messages :', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des messages' });
+  }
+});
+
 
 // Fonction d'enregistrement d'un utilisateur
 app.post('/register', upload.single('imageFile'), async (req, res) => {
@@ -896,6 +1180,53 @@ app.closeAll = async () => {
 
 
 
+
+
+// Derniers messages
+app.get('/last-messages/:userId', authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const conversations = await Message.aggregate([
+      {
+        $match: {
+          $or: [{ sender: userId }, { receiver: userId }],
+        },
+      },
+      {
+        $sort: { timestamp: -1 },
+      },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ['$sender', userId] },
+              '$receiver',
+              '$sender',
+            ],
+          },
+          lastMessage: { $first: '$message' },
+          timestamp: { $first: '$timestamp' },
+        },
+      },
+    ]);
+
+    const lastMessages = await Promise.all(
+      conversations.map(async (conv) => {
+        const otherUser = await User.findOne({ Identifiant: conv._id }, 'Name Email Identifiant');
+        return {
+          user: otherUser,
+          lastMessage: conv.lastMessage,
+          timestamp: conv.timestamp,
+        };
+      })
+    );
+
+    res.json(lastMessages);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des derniers messages :', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des derniers messages' });
+  }
+});
 
 
 

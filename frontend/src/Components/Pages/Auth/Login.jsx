@@ -39,8 +39,12 @@ const LoginSample = () => {
           navigate('/tivo/dashboard/default', { replace: true });
         } else if (userId) {
           const response = await axios.post('http://localhost:5000/users/complete-registration', { userId });
-          const fetchedToken = response.data.token;
-          storage.setItem('token', fetchedToken);
+          const { token, user } = response.data; // Récupérer token et user
+          storage.setItem('token', token);
+          if (user) {
+            storage.setItem('user', JSON.stringify(user)); // Stocker user avec _id
+            console.log('Utilisateur stocké depuis complete-registration:', user);
+          }
           storage.setItem('login', JSON.stringify(true));
           storage.setItem('rememberMe', JSON.stringify(rememberMe));
           navigate('/tivo/dashboard/default', { replace: true });
@@ -82,14 +86,20 @@ const LoginSample = () => {
       }
 
       const response = await axios.post('http://localhost:5000/users/signin', payload);
-      console.log('Réponse du serveur:', response.data);
+      console.log('Réponse complète du serveur:', response.data);
 
       setFailedAttempts(0);
 
-      const token = response.data.token;
+      const { token, user } = response.data; // Récupérer token et user
       if (!token) throw new Error('Aucun token reçu du serveur.');
+      if (!user || !user._id) {
+        console.warn('Données utilisateur incomplètes ou _id manquant:', user);
+      }
+
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem('token', token);
+      storage.setItem('user', JSON.stringify(user)); // Stocker user avec _id
+      console.log('Utilisateur stocké dans storage:', user); // Vérifier que _id est présent
       storage.setItem('login', JSON.stringify(true));
       navigate('/tivo/dashboard/default', { replace: true });
     } catch (err) {
@@ -118,7 +128,6 @@ const LoginSample = () => {
         }
       } else {
         setError(errorMessage);
-       
       }
     } finally {
       setLoading(false);
@@ -128,7 +137,7 @@ const LoginSample = () => {
   const handleFaceIDLogin = async () => {
     setFaceIDLoading(true);
     setError('');
-  
+
     try {
       const response = await fetch('http://localhost:5004/faceid_login', {
         method: 'POST',
@@ -139,26 +148,24 @@ const LoginSample = () => {
         },
         body: JSON.stringify({}),
       });
-  
+
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
-  
+
       const data = await response.json();
       console.log('FaceID Response:', data);
-  
+
       if (data.status === 'success' && data.user) {
         setFailedAttempts(0);
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('login', JSON.stringify(true));
-        storage.setItem('user', JSON.stringify(data.user));
-  
-        // Extraire le token de l'en-tête Authorization ou du corps de la réponse
+        storage.setItem('user', JSON.stringify(data.user)); // Stocker user avec _id
+
         let token = data.token;
         const authHeader = response.headers.get('Authorization');
         
         if (authHeader && authHeader.startsWith('Bearer ')) {
-          // Enlever le préfixe 'Bearer ' de l'en-tête Authorization
           token = authHeader.substring(7);
           console.log('Token extrait de l\'en-tête Authorization:', token);
         } else if (authHeader) {
@@ -167,7 +174,7 @@ const LoginSample = () => {
         } else if (token) {
           console.log('Token extrait du corps de la réponse:', token);
         }
-  
+
         if (!token) throw new Error("Aucun token d'authentification reçu");
         
         storage.setItem('token', token);
@@ -206,6 +213,8 @@ const LoginSample = () => {
                     src={require('../../../assets/images/logo/logo2.png')}
                     alt="Logo"
                     className="img-fluid"
+                    style={{ width: '150px', height: 'auto' }} // Taille réduite
+
                   />
                 </Link>
               </div>

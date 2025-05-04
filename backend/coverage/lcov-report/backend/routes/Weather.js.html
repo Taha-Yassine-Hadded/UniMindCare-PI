@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">81.15% </span>
+                <span class="strong">71.01% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>56/69</span>
+                <span class='fraction'>49/69</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">76.19% </span>
+                <span class="strong">57.14% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>32/42</span>
+                <span class='fraction'>24/42</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">75% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/4</span>
+                <span class='fraction'>2/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">81.15% </span>
+                <span class="strong">71.01% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>56/69</span>
+                <span class='fraction'>49/69</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -337,17 +337,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -366,10 +364,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -506,16 +506,16 @@ router.get('/period', async (req, res) =&gt; {
 });
 &nbsp;
 // Ajouter une nouvelle recommandation météo manuellement (pour les tests)
-router.post('/add', async (req, res) =&gt; {
-  try {
-    const { day, time_slot, temperature, humidity, title, description } = req.body;
+router.post('/add', <span class="fstat-no" title="function not covered" >as</span>ync (req, res) =&gt; {
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const { day, time_slot, temperature, humidity, title, description } = <span class="cstat-no" title="statement not covered" >req.body;</span>
     
-    if (!day || !time_slot || temperature === undefined || humidity === undefined) {
-      return res.status(400).json({ message: "Données incomplètes" });
+<span class="cstat-no" title="statement not covered" >    if (!day || !time_slot || temperature === undefined || humidity === undefined) {</span>
+<span class="cstat-no" title="statement not covered" >      return res.status(400).json({ message: "Données incomplètes" });</span>
     }
     
     // Créer un nouvel objet de recommandation météo
-    const newWeatherRecommendation = {
+    const newWeatherRecommendation = <span class="cstat-no" title="statement not covered" >{</span>
       day,
       time_slot,
       mesures: {
@@ -525,8 +525,8 @@ router.post('/add', async (req, res) =&gt; {
       recommandation: {
         id: Math.floor(Math.random() * 100),
         type: "advice",
-        title: title || <span class="branch-1 cbranch-no" title="branch not covered" >"Recommandation météo",</span>
-        description: description || <span class="branch-1 cbranch-no" title="branch not covered" >"Profitez de cette météo!",</span>
+        title: title || "Recommandation météo",
+        description: description || "Profitez de cette météo!",
         url: "",
         stats: {
           temperature: parseFloat(temperature),
@@ -536,10 +536,10 @@ router.post('/add', async (req, res) =&gt; {
     };
     
     // Insérer la nouvelle recommandation dans la collection
-    const result = await mongoose.connection.db.collection('recommandations_weather')
+    const result = <span class="cstat-no" title="statement not covered" >await mongoose.connection.db.collection('recommandations_weather')</span>
       .insertOne(newWeatherRecommendation);
     
-    res.status(201).json({ 
+<span class="cstat-no" title="statement not covered" >    res.status(201).json({ </span>
       message: "Recommandation météo ajoutée avec succès", 
       id: result.insertedId 
     });
@@ -580,7 +580,7 @@ module.exports = router;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-05-01T19:29:13.514Z
+                at 2025-05-04T15:49:15.038Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

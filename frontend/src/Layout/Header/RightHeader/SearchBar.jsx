@@ -15,6 +15,11 @@ const SearchBar = () => {
   const [searchResult, setSearchResult] = useState([]);
   const { setIsClose } = useContext(CustomContext);
 
+    const searchInputStyle = {
+    width: '300px', // Augmenter cette valeur selon vos besoins
+    minWidth: '250px',
+    transition: 'width 0.3s ease'
+  };
   const escFunction = useCallback((event) => {
     if (event.keyCode === 27) { setSearchValue(""); setSearchResult([]); setIsClose(false);}}, []);
   useEffect(() => {

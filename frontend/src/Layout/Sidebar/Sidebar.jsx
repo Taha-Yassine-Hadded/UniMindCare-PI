@@ -46,31 +46,62 @@ const Sidebar = () => {
     if (!role) return menuItems;
     
     return menuItems.map(menuBox => {
-      // Create a copy of the menu box
+      // Copie profonde de la boîte de menu
       const newMenuBox = { ...menuBox };
       
-      // If this menu box has menus, process them
+      // Si cette menuBox a un menu, filtrer les éléments
       if (newMenuBox.menu && newMenuBox.menu.length > 0) {
-        // Process each top-level menu item
-        newMenuBox.menu = newMenuBox.menu.map(menuItem => {
-          // Create a copy of the menu item 
-          const newMenuItem = { ...menuItem };
+        // Filtre les éléments de premier niveau
+        newMenuBox.menu = newMenuBox.menu.filter(topItem => {
+          // Vérifier si l'élément a une restriction de rôle
+          if (topItem.userRole) {
+            // Si userRole est un tableau
+            if (Array.isArray(topItem.userRole)) {
+              return topItem.userRole.includes(role);
+            }
+            // Si userRole est une chaîne
+            return topItem.userRole === role;
+          }
+          // Pas de restriction, conserver l'élément
+          return true;
+        }).map(topItem => {
+          // Créer une copie de l'élément de top-niveau
+          const newTopItem = { ...topItem };
           
-          // If this menu item has a submenu, process it
-          if (newMenuItem.menu && newMenuItem.menu.length > 0) {
-            // Filter submenu items based on userRole
-            newMenuItem.menu = newMenuItem.menu.filter(subMenuItem => {
-              // Check if this item has a userRole restriction
-              if (subMenuItem.userRole) {
-                // Keep only if the role matches
-                return subMenuItem.userRole === role;
+          // Si cet élément a un sous-menu, filtrer ses éléments
+          if (newTopItem.menu && newTopItem.menu.length > 0) {
+            // Filtrer les éléments de deuxième niveau
+            newTopItem.menu = newTopItem.menu.filter(secondItem => {
+              if (secondItem.userRole) {
+                if (Array.isArray(secondItem.userRole)) {
+                  return secondItem.userRole.includes(role);
+                }
+                return secondItem.userRole === role;
               }
-              // Keep items without role restrictions
               return true;
+            }).map(secondItem => {
+              // Copier l'élément de deuxième niveau
+              const newSecondItem = { ...secondItem };
+              
+              // Si cet élément a un sous-menu, filtrer ses éléments
+              if (newSecondItem.menu && newSecondItem.menu.length > 0) {
+                // Filtrer les éléments de troisième niveau
+                newSecondItem.menu = newSecondItem.menu.filter(thirdItem => {
+                  if (thirdItem.userRole) {
+                    if (Array.isArray(thirdItem.userRole)) {
+                      return thirdItem.userRole.includes(role);
+                    }
+                    return thirdItem.userRole === role;
+                  }
+                  return true;
+                });
+              }
+              
+              return newSecondItem;
             });
           }
           
-          return newMenuItem;
+          return newTopItem;
         });
       }
       
@@ -85,9 +116,9 @@ const Sidebar = () => {
       const filtered = filterMenuByRole(MENU, userRole);
       setFilteredMenu(filtered);
       
-      // Debug output to see what's being filtered
-      console.log('Original menu structure:', MENU);
-      console.log('Filtered menu structure:', filtered);
+      // Debug pour voir ce qui a été filtré
+      console.log('Original menu structure:', JSON.stringify(MENU, null, 2));
+      console.log('Filtered menu structure:', JSON.stringify(filtered, null, 2));
     } else {
       setFilteredMenu(MENU);
     }

@@ -45,6 +45,7 @@ const evaluationSchema = new mongoose.Schema({
   pointsPositifs: { type: String, required: false },
   axesAmelioration: { type: String, required: false },
   suiviRecommande: { type: Boolean, default: false },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Champ ajouté
 }, { timestamps: true });
 
 module.exports = mongoose.model("Evaluation", evaluationSchema);

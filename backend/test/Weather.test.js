@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const request = require('supertest');
 const express = require('express');
-const weatherRoutes = require('../../routes/Weather');
+const weatherRoutes = require('../routes/Weather');
 
 let mongod;
 let app;

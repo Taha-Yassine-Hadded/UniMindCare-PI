@@ -5,7 +5,7 @@ const User = require('../Models/Users');
 const jwt = require('jsonwebtoken'); // Ajoutez ceci si vous utilisez JWT
 const speakeasy = require('speakeasy'); // Pour générer le secret 2FA
 const qrcode = require('qrcode');     // Pour générer le QR code
-
+const authMiddleware = require('../middleware/auth'); // Importer authMiddleware
 
 router.get('/me', async (req, res) => {
     try {
@@ -18,7 +18,17 @@ router.get('/me', async (req, res) => {
        
 
         if (!user) return res.status(404).json({ message: 'User not found' });
-
+        console.log('Données renvoyées par /me:', {
+            _id: user._id,
+            Name: user.Name,
+            Identifiant: user.Identifiant,
+            Email: user.Email,
+            Classe: user.Classe,
+            Role: user.Role,
+            PhoneNumber: user.PhoneNumber,
+            imageUrl: user.imageUrl,
+            twoFactorEnabled: user.twoFactorEnabled || false,
+          });
         res.json({
             _id: user._id, // Add the _id field (zedha baha bech supprimer al comment walet temchi kenn star hetha zedt)
             Name: user.Name,
@@ -154,5 +164,18 @@ router.get('/:id/badges', async (req, res) => {
       res.status(500).json({ message: 'Erreur serveur' });
     }
   });
+
+
+  router.get("/all", authMiddleware, async (req, res) => {
+    try {
+      const { role } = req.query;
+      const users = await User.find(role ? { Role: role } : {}, "Name Email Identifiant");
+      res.json(users);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des utilisateurs :", error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
 
 module.exports = router;

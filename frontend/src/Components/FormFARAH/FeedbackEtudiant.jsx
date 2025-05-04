@@ -2,7 +2,6 @@ import { Fragment, useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Form, FormGroup, Label, Input, Button } from "reactstrap";
-import Swal from 'sweetalert2'; // Add this import
 
 const AddFeedback = () => {
   const navigate = useNavigate();
@@ -119,14 +118,8 @@ const AddFeedback = () => {
         setServerErrors(errors);
         return;
       }
-      Swal.fire({
-        icon: 'success',
-        title: 'Succès!',
-        text: 'Évaluation ajoutée avec succès',
-        confirmButtonText: 'OK'
-      }).then(() => {
-        navigate(`${process.env.PUBLIC_URL}/dashboard/default`);
-      });
+      alert("Feedback envoyé avec succès");
+      navigate("/feedback/list");
     } catch (error) {
       console.error("Erreur lors de l'enregistrement :", error);
       setServerErrors([{ msg: "Erreur réseau ou réponse inattendue du serveur : " + error.message }]);

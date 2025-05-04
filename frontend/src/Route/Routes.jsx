@@ -145,6 +145,11 @@ import SessionNoteManagement from "../Components/AppointementModule/SessionNoteM
 import SessionNotesPage from "../Components/AppointementModule/SessionNotesPage";
 import CaseManagementPage from "../Components/AppointementModule/CaseManagementPage";
 
+import UserList from "../Components/userList"; 
+import ChatModal from "../Components/ChatModal";
+import EvaluationHistoryContain from "../Components/Evaluation/EvaluationHistoryContain";
+import EvaluationDetails from '../Components/Evaluation/EvaluationDetails'; 
+import MeetingForm from "../Components/Meeting/MeetingForm"; // Nouveau composant
 
 export const routes = [
 
@@ -180,9 +185,23 @@ export const routes = [
 
 
     //statistics
+    
+    { 
+      path: `${process.env.PUBLIC_URL}/chatModal`, 
+      Component: <ChatModal />
+    },    //statistics
+    { 
+      path: `${process.env.PUBLIC_URL}/users/list`, 
+      Component: <UserList /> 
+    },    //statistics
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics`, Component: <Statistics /> },
 
     { path: `${process.env.PUBLIC_URL}/dashboard/statistics-etudiant`, Component: <StatisticsEtudiant /> },
+
+     // Meetings
+     { path: `${process.env.PUBLIC_URL}/meetings`, Component: <MeetingForm /> },
+
+
 
   //Feedback
   { path: `${process.env.PUBLIC_URL}/dashboard/feedback-etudiant`, Component: <Feedback /> },
@@ -191,6 +210,10 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
 
   { path: `${process.env.PUBLIC_URL}/blog/statBlog`, Component: <BlogStats /> },
+  { path: `${process.env.PUBLIC_URL}/student`, Component: <StudentDashboard  /> }, 
+   { path: `${process.env.PUBLIC_URL}/teacher`, Component: <TeacherDashboard /> },
+   { path: `${process.env.PUBLIC_URL}/evaluation-history`, Component: <EvaluationHistoryContain /> },
+   { path: `${process.env.PUBLIC_URL}/evaluations/details/:id`, Component: <EvaluationDetails /> }, 
 
   // dashboard
   { path: `${process.env.PUBLIC_URL}/forms/form-validation`, Component: <FormValidationContain /> },
