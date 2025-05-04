@@ -1,7 +1,7 @@
 require('dotenv').config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const Appointment = require('../Models/Appointment');
-const User = require('../models/User');
+const User = require('../Models/Users');
 const nodemailer = require('nodemailer');
 const moment = require('moment');
 
