@@ -60,5 +60,18 @@
     "mongodb-memory-server": "^10.1.4",
     "mongoose-mock": "^0.4.0",
     "supertest": "^7.1.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "moduleDirectories": ["node_modules", "Models", "routes"],
+    "moduleFileExtensions": ["js", "json"],
+    "coveragePathIgnorePatterns": ["/test/"],
+    "reporters": [
+      "default",
+      ["jest-junit", {
+        "outputDirectory": ".",
+        "outputName": "junit.xml"
+      }]
+    ]
   }
 }
