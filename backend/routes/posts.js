@@ -1,7 +1,7 @@
 // routes/posts.js
 const express = require('express');
 const router = express.Router();
-const Post = require('../Models/Post');
+const Post = require('../models/Post');
 const Notification = require('../Models/Notification');
 const passport = require('../routes/passportConfig');
 const multer = require('multer');

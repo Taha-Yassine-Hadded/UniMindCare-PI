@@ -2,7 +2,7 @@ require('dotenv').config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const express = require('express');
 const router = express.Router();
-const { Response } = require('../Models/Response');
+const { Response } = require('../models/Response');
 const User = require('../Models/Users');
 const Points = require('../Models/Points');
 const jwt = require('jsonwebtoken');
