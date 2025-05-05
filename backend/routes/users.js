@@ -264,50 +264,37 @@ router.put('/:identifiant/upload-profile-picture', upload.single('profilePicture
   }
 });
 
-/* Update user by Identifiant (supports updating password, phone number, etc.) */
-router.put("/:identifiant", async function(req, res, next) {
+router.put("/:identifiant", async (req, res, next) => {
   try {
     const identifiant = req.params.identifiant;
-    const { currentPassword, Password, PhoneNumber } = req.body;
+    const { currentPassword, newPassword } = req.body;
 
-    // Find the user by Identifiant
+    console.log("Request body:", { currentPassword: !!currentPassword, newPassword: !!newPassword });
+
     const user = await User.findOne({ Identifiant: identifiant });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // If updating the password, verify the current password
-    if (Password) {
+    // Only proceed if newPassword is provided
+    if (newPassword) {
       if (!currentPassword) {
         return res.status(400).json({ message: "Current password is required to update the password" });
       }
-
-      // Verify the current password
+      
       const isMatch = await bcrypt.compare(currentPassword, user.Password);
       if (!isMatch) {
         return res.status(401).json({ message: "Current password is incorrect" });
       }
-
-      // Hash the new password
-      const hashedPassword = await bcrypt.hash(Password, 10);
-      user.Password = hashedPassword;
+      
+      user.Password = await bcrypt.hash(newPassword, 10);
+      user.updatedAt = new Date();
+      
+      const updated = await user.save();
+      res.status(200).json(updated);
+    } else {
+      res.status(400).json({ message: "New password is required for password update" });
     }
-
-    // Update other fields if provided
-    if (PhoneNumber) {
-      user.PhoneNumber = PhoneNumber;
-    }
-
-    // Update the updatedAt timestamp
-    user.updatedAt = new Date();
-
-    // Save the updated user
-    const updatedUser = await user.save();
-
-    // Send the updated user as a JSON response
-    res.status(200).json(updatedUser);
-  } catch (error) {
-    console.error("Error updating user:", error);
+  } catch (err) {
+    console.error("Error updating user password:", err);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });

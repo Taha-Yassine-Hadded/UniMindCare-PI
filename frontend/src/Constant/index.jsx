@@ -744,7 +744,7 @@ export const Disabled = "Disabled";
 export const DropdownHeader = "Dropdown Header";
 
 export const BasicAccordion = "Basic Accordion";
-export const CollapsibleGroupItem = "Collapsible Group Item #";
+export const CollapsibleGroupItem = "";
 export const AllCloseAccordion = "All Close Accordion";
 export const ColorAccordion = "Color Accordion";
 export const AccordionWithIconOnTitle = "Accordion With Icon on Title";
