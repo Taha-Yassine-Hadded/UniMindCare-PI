@@ -13,7 +13,8 @@ const trainingProgramSchema = new mongoose.Schema({
   creationDate: {
     type: Date,
     default: Date.now // Automatically set to the current date/time when created
-  }
+  },
+  imgUrl: String
 });
 
 // 2. Training Content (videos, PDFs, quizzes, etc.)

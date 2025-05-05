@@ -5,21 +5,25 @@ import { useNavigate, Link } from 'react-router-dom';
 import ProgramService from '../../Services/TeacherTraining/ProgramService';
 import CommonModal from "../UiKits/Modals/common/modal";
 import NewProgram from "./NewProgram";
+import EditProgram from "./EditProgram";
 import Swal from 'sweetalert2';
-import ContentDistributionChart from './common/ContentDistributionChart'; // Import the chart component
-import QuizPerformanceChart from './common/QuizPerformanceChart'; // Import the chart component
+import ContentDistributionChart from './common/ContentDistributionChart';
+import QuizPerformanceChart from './common/QuizPerformanceChart';
 
 const ProgramList = () => {
   const [modal, setModal] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
-  const [loading, setLoading] = useState(true); // Updated to true initially for role fetching
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('creationDate');
-  const [userRole, setUserRole] = useState(null); // State for user role
+  const [userRole, setUserRole] = useState(null);
 
   const navigate = useNavigate();
   const toggle = () => setModal(!modal);
+  const toggleEditModal = () => setEditModal(!editModal);
   const formRef = useRef(null);
 
   // Fetch user role on component mount
@@ -124,6 +128,13 @@ const ProgramList = () => {
     navigate(`${process.env.PUBLIC_URL}/teacher-training/program-details/${programId}`);
   };
 
+  const handleEdit = (program, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedProgram(program);
+    setEditModal(true);
+  };
+
   const handleDelete = async (programId, e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -177,8 +188,6 @@ const ProgramList = () => {
     );
   }
 
-  // If userRole is not "psychiatre", the redirection has already happened in useEffect
-  // So, we only render the content if userRole is "psychiatre"
   return (
     <Fragment>
       <Breadcrumbs mainTitle="My Programs" parent="Teacher Training" title="My Programs" />
@@ -234,18 +243,28 @@ const ProgramList = () => {
                                   <Image 
                                     attrImage={{ 
                                       className: 'img-fluid top-radius-blog', 
-                                      src: `${require('../../assets/images/default-prog.jpg')}`,
+                                      src: program.imgUrl 
+                                        ? `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${program.imgUrl}` 
+                                        : require('../../assets/images/default-prog.jpg'),
                                       alt: program.title 
-                                    }} 
+                                    }}
                                   />
                                   <div className="product-hover">
-                                    <UL attrUL={{ className: 'simple-list d-flex flex-row' }}>
+                                    <UL attrUL={{ className: 'simple-list d-flex flex-row justify-content-center' }}>
                                       <LI>
                                         <Link 
                                           to={`${process.env.PUBLIC_URL}/teacher-training/program-details/${program._id}`}
                                           onClick={(e) => handleViewDetails(program._id, e)}
                                         >
                                           <i className="icon-eye"></i>
+                                        </Link>
+                                      </LI>
+                                      <LI>
+                                        <Link 
+                                          to="#"
+                                          onClick={(e) => handleEdit(program, e)}
+                                        >
+                                          <i className="icon-pencil"></i>
                                         </Link>
                                       </LI>
                                       <LI>
@@ -295,6 +314,7 @@ const ProgramList = () => {
                     </Row>
                   </div>
 
+                  {/* Add Program Modal */}
                   <CommonModal
                     isOpen={modal}
                     title="Add New Training Program"
@@ -308,6 +328,25 @@ const ProgramList = () => {
                     <NewProgram 
                       onProgramAdded={handleProgramAdded} 
                       toggler={toggle} 
+                      ref={formRef} 
+                    />
+                  </CommonModal>
+
+                  {/* Edit Program Modal */}
+                  <CommonModal
+                    isOpen={editModal}
+                    title="Edit Training Program"
+                    toggler={toggleEditModal}
+                    size="lg"
+                    primaryBtnText="Update"
+                    secondaryBtnText="Cancel"
+                    onPrimaryBtnClick={handleSave}
+                    onSecondaryBtnClick={toggleEditModal}
+                  >
+                    <EditProgram 
+                      program={selectedProgram} 
+                      onProgramUpdated={fetchPrograms} 
+                      toggler={toggleEditModal} 
                       ref={formRef} 
                     />
                   </CommonModal>

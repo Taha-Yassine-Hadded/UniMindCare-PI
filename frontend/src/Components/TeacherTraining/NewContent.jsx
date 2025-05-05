@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
   const [formData, setFormData] = useState({
     title: '',
-    description: '', // Add description field
+    description: '',
     type: 'video',
     contentUrl: '',
     meetingLink: '',
@@ -22,6 +22,29 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
     options: ['', '', '', ''],
     correctAnswer: ''
   });
+
+  // Validation functions
+  const isValidYouTubeUrl = (url) => {
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+    return youtubeRegex.test(url);
+  };
+
+  const isValidGoogleMeetUrl = (url) => {
+    const meetRegex = /^https:\/\/meet\.google\.com\/[a-zA-Z0-9-]+$/;
+    return meetRegex.test(url);
+  };
+
+  const isValidQuiz = (questions) => {
+    if (questions.length < 5) {
+      return { valid: false, message: 'Quiz must contain at least 5 questions.' };
+    }
+    for (const question of questions) {
+      if (!question.options.includes(question.correctAnswer)) {
+        return { valid: false, message: `Correct answer for question "${question.text}" must match one of the options.` };
+      }
+    }
+    return { valid: true };
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -54,14 +77,24 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
   };
 
   const addQuestion = () => {
-    if (currentQuestion.text && currentQuestion.correctAnswer && currentQuestion.options.every(opt => opt)) {
+    if (
+      currentQuestion.text &&
+      currentQuestion.correctAnswer &&
+      currentQuestion.options.every(opt => opt) &&
+      currentQuestion.options.includes(currentQuestion.correctAnswer)
+    ) {
       setFormData(prev => ({
         ...prev,
         questions: [...prev.questions, currentQuestion]
       }));
       setCurrentQuestion({ text: '', options: ['', '', '', ''], correctAnswer: '' });
+      setError('');
     } else {
-      setError('Please fill all question fields');
+      setError(
+        currentQuestion.options.includes(currentQuestion.correctAnswer)
+          ? 'Please fill all question fields.'
+          : 'Correct answer must match one of the options.'
+      );
     }
   };
 
@@ -69,12 +102,38 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
     e.preventDefault();
     setError('');
 
+    // Validate based on content type
+    if (formData.type === 'video') {
+      if (!formData.contentUrl || !isValidYouTubeUrl(formData.contentUrl)) {
+        setError('Please provide a valid YouTube URL (e.g., youtube.com or youtu.be).');
+        return;
+      }
+    } else if (formData.type === 'meet') {
+      if (!formData.meetingLink || !isValidGoogleMeetUrl(formData.meetingLink)) {
+        setError('Please provide a valid Google Meet URL (e.g., https://meet.google.com/xxx-xxxx-xxx).');
+        return;
+      }
+      if (!formData.scheduledDate) {
+        setError('Scheduled date is required for meetings.');
+        return;
+      }
+    } else if (formData.type === 'pdf' && !file) {
+      setError('Please upload a PDF file.');
+      return;
+    } else if (formData.type === 'quiz') {
+      const quizValidation = isValidQuiz(formData.questions);
+      if (!quizValidation.valid) {
+        setError(quizValidation.message);
+        return;
+      }
+    }
+
     try {
       const contentData = new FormData();
       contentData.append('title', formData.title);
-      contentData.append('description', formData.description || ''); // Add this line
+      contentData.append('description', formData.description || '');
       contentData.append('type', formData.type);
-      
+
       if (formData.type === 'video') {
         contentData.append('contentUrl', formData.contentUrl);
       } else if (formData.type === 'meet') {
@@ -92,6 +151,7 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
       // Reset form
       setFormData({
         title: '',
+        description: '',
         type: 'video',
         contentUrl: '',
         meetingLink: '',
@@ -99,6 +159,7 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
         questions: []
       });
       setFile(null);
+      setCurrentQuestion({ text: '', options: ['', '', '', ''], correctAnswer: '' });
 
       // Show success alert, close modal, and refresh
       Swal.fire({
@@ -107,8 +168,8 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
         timer: 3000,
         showConfirmButton: false
       }).then(() => {
-        if (toggler) toggler(); // Close modal
-        if (onContentAdded) onContentAdded(); // Trigger refresh in parent
+        if (toggler) toggler();
+        if (onContentAdded) onContentAdded();
       });
     } catch (err) {
       console.error('Error creating content:', err);
@@ -159,13 +220,14 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
 
       {formData.type === 'video' && (
         <FormGroup>
-          <Label for="contentUrl">Content URL</Label>
+          <Label for="contentUrl">Content URL (YouTube)</Label>
           <Input
             type="url"
             name="contentUrl"
             id="contentUrl"
             value={formData.contentUrl}
             onChange={handleChange}
+            placeholder="e.g., https://www.youtube.com/watch?v=xxxx"
             required
           />
         </FormGroup>
@@ -174,13 +236,14 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
       {formData.type === 'meet' && (
         <>
           <FormGroup>
-            <Label for="meetingLink">Meeting Link</Label>
+            <Label for="meetingLink">Meeting Link (Google Meet)</Label>
             <Input
               type="url"
               name="meetingLink"
               id="meetingLink"
               value={formData.meetingLink}
               onChange={handleChange}
+              placeholder="e.g., https://meet.google.com/xxx-xxxx-xxx"
               required
             />
           </FormGroup>
@@ -244,6 +307,7 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
               name="correctAnswer"
               value={currentQuestion.correctAnswer}
               onChange={handleQuestionChange}
+              placeholder="Must match one of the options"
             />
           </FormGroup>
           <Button color="secondary" onClick={addQuestion} className="mb-3">
@@ -251,7 +315,7 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
           </Button>
           {formData.questions.length > 0 && (
             <div>
-              <h6>Added Questions:</h6>
+              <h6>Added Questions ({formData.questions.length}/5):</h6>
               {formData.questions.map((q, i) => (
                 <p key={i}>{i + 1}. {q.text}</p>
               ))}

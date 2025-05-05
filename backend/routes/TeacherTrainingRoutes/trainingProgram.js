@@ -4,13 +4,53 @@ const { TrainingProgram } = require('../../Models/TeacherTraining/TrainingModels
 const { TrainingContent } = require('../../Models/TeacherTraining/TrainingModels');
 const { validateToken, authorizeRoles } = require('../../middleware/authentication');
 
+
+const multer = require('multer');
+const path = require('path');
+
+// Configure multer for image uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../../uploads/program-images'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'program-' + uniqueSuffix + ext);
+  }
+});
+
+// File filter for images only
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage, 
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024 // 2MB limit
+  }
+});
+
 // Create new program
-router.post('/', validateToken, async (req, res) => {
+router.post('/', validateToken, upload.single('programImage'), async (req, res) => {
   try {
     const program = new TrainingProgram({
       ...req.body,
       psychologistId: req.user.userId
     });
+
+     // Add image URL if file was uploaded
+     if (req.file) {
+      // Store the path relative to your server or as a URL
+      program.imgUrl = `/uploads/program-images/${req.file.filename}`;
+    }
+
     await program.save();
     res.status(201).json(program);
   } catch (error) {
@@ -58,26 +98,42 @@ router.get('/:id', validateToken, async (req, res) => {
   }
 });
 
-// Update program
-router.patch('/:id', validateToken, async (req, res) => {
+// Backend route for updating a program
+router.put('/:id', upload.single('programImage'), async (req, res) => {
   try {
-    const program = await TrainingProgram.findOne({
-      _id: req.params.id,
-      psychologistId: req.user.userId
-    });
+    const { id } = req.params;
+    const { title, description } = req.body;
     
-    if (!program) {
-      return res.status(404).json({ 
-        message: 'Program not found or you don\'t have permission to update it' 
-      });
+    // Get the existing program to check if user is authorized
+    const existingProgram = await TrainingProgram.findById(id);
+    
+    // Check if program exists
+    if (!existingProgram) {
+      return res.status(404).json({ message: 'Program not found' });
     }
-
-    // Update only provided fields
-    Object.assign(program, req.body);
-    await program.save();
-    res.json(program);
+    
+    // Prepare update data
+    const updateData = {
+      title,
+      description
+    };
+    
+    // Add image URL if new file was uploaded
+    if (req.file) {
+      updateData.imgUrl = `/uploads/program-images/${req.file.filename}`;
+    }
+    
+    // Update the program
+    const updatedProgram = await TrainingProgram.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    );
+    
+    res.json(updatedProgram);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Error updating training program:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

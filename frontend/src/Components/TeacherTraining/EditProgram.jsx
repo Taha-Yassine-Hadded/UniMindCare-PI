@@ -1,9 +1,9 @@
-import React, { useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { Form, FormGroup, Label, Input, FormFeedback, Row, Col, Button } from 'reactstrap';
 import ProgramService from '../../Services/TeacherTraining/ProgramService';
 import Swal from 'sweetalert2';
 
-const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
+const EditProgram = forwardRef(({ program, onProgramUpdated, toggler }, ref) => {
   const [formData, setFormData] = useState({
     title: '',
     description: ''
@@ -13,6 +13,23 @@ const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
   const [imageFile, setImageFile] = useState(null);
   const [errors, setErrors] = useState({});
   const [uploading, setUploading] = useState(false);
+
+  // Load program data when component mounts or program changes
+  useEffect(() => {
+    if (program) {
+      setFormData({
+        title: program.title || '',
+        description: program.description || ''
+      });
+      
+      // Set image preview if program has an image
+      if (program.imgUrl) {
+        setImagePreview(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${program.imgUrl}`);
+      } else {
+        setImagePreview(null);
+      }
+    }
+  }, [program]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -81,7 +98,7 @@ const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validate()) {
+    if (!validate() || !program) {
       return;
     }
     
@@ -98,28 +115,28 @@ const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
         programFormData.append('programImage', imageFile);
       }
       
-      // Call service method
-      await ProgramService.createProgram(programFormData);
+      // Call service method to update the program
+      await ProgramService.updateProgram(program._id, programFormData);
       
       Swal.fire({
         icon: 'success',
         title: 'Success!',
-        text: 'Training program created successfully.'
+        text: 'Training program updated successfully.'
       });
       
-      if (onProgramAdded) {
-        onProgramAdded();
+      if (onProgramUpdated) {
+        onProgramUpdated();
       }
       
       if (toggler) {
         toggler();
       }
     } catch (err) {
-      console.error('Error creating program:', err);
+      console.error('Error updating program:', err);
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Failed to create program. Please try again.'
+        text: 'Failed to update program. Please try again.'
       });
     } finally {
       setUploading(false);
@@ -191,6 +208,7 @@ const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
                   className="img-fluid rounded border" 
                   style={{ maxHeight: '200px', objectFit: 'cover' }}
                 />
+                <p className="mt-2 text-muted small">Current image shown. Upload a new one to replace it.</p>
               </div>
             ) : (
               <div className="text-center mt-3 p-3 bg-light rounded">
@@ -205,13 +223,14 @@ const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
         </Col>
       </Row>
       
-      {/* Add submit button for direct form submission */}
+      {/* Submit button */}
       <div className="d-flex justify-content-end mt-4">
         <Button 
           color="secondary" 
           className="me-2" 
           onClick={toggler}
           disabled={uploading}
+          type="button"
         >
           Cancel
         </Button>
@@ -223,10 +242,10 @@ const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
           {uploading ? (
             <>
               <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-              Creating...
+              Updating...
             </>
           ) : (
-            'Create Program'
+            'Update Program'
           )}
         </Button>
       </div>
@@ -234,4 +253,4 @@ const NewProgram = forwardRef(({ onProgramAdded, toggler }, ref) => {
   );
 });
 
-export default NewProgram;
+export default EditProgram;
