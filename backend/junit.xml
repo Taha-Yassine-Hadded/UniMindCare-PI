@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="4" failures="0" errors="0" time="7.671">
-  <testsuite name="Availability Routes" errors="0" failures="0" skipped="0" timestamp="2025-05-04T19:04:52" time="7.471" tests="4">
-    <testcase classname="Availability Routes should add a new availability slot" name="Availability Routes should add a new availability slot" time="0.299">
+<testsuites name="jest tests" tests="4" failures="0" errors="0" time="5.336">
+  <testsuite name="Availability Routes" errors="0" failures="0" skipped="0" timestamp="2025-05-05T17:19:37" time="5.183" tests="4">
+    <testcase classname="Availability Routes should add a new availability slot" name="Availability Routes should add a new availability slot" time="0.177">
     </testcase>
-    <testcase classname="Availability Routes should get availability for a psychologist" name="Availability Routes should get availability for a psychologist" time="0.093">
+    <testcase classname="Availability Routes should get availability for a psychologist" name="Availability Routes should get availability for a psychologist" time="0.04">
     </testcase>
-    <testcase classname="Availability Routes should update an availability slot" name="Availability Routes should update an availability slot" time="0.039">
+    <testcase classname="Availability Routes should update an availability slot" name="Availability Routes should update an availability slot" time="0.037">
     </testcase>
-    <testcase classname="Availability Routes should delete an availability slot" name="Availability Routes should delete an availability slot" time="0.036">
+    <testcase classname="Availability Routes should delete an availability slot" name="Availability Routes should delete an availability slot" time="0.022">
     </testcase>
   </testsuite>
 </testsuites>
