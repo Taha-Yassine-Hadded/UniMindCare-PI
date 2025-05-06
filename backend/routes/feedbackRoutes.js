@@ -121,3 +121,5 @@ router.post(
 );
 
 module.exports = router;
+module.exports.logger = logger;
+module.exports.authenticateToken = authenticateToken;

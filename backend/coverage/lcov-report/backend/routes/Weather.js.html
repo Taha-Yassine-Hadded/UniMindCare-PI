@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">65.21% </span>
+                <span class="strong">71.01% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>45/69</span>
+                <span class='fraction'>49/69</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">47.61% </span>
+                <span class="strong">57.14% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>20/42</span>
+                <span class='fraction'>24/42</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">65.21% </span>
+                <span class="strong">71.01% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>45/69</span>
+                <span class='fraction'>49/69</span>
             </div>
         
             
@@ -269,34 +269,34 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -416,7 +416,7 @@ router.get('/latest', async (req, res) =&gt; {
     
     // Déterminer le créneau horaire actuel (matin ou après-midi)
     const currentHour = new Date().getHours();
-    const currentTimeSlot = currentHour &lt; 12 ? "matin" : <span class="branch-1 cbranch-no" title="branch not covered" >"après-midi";</span>
+    const currentTimeSlot = currentHour &lt; 12 ? <span class="branch-0 cbranch-no" title="branch not covered" >"matin" </span>: "après-midi";
     
     // Utiliser la date d'aujourd'hui par défaut si aucune date n'est spécifiée
     const { timeSlot } = req.query;
@@ -445,19 +445,19 @@ router.get('/latest', async (req, res) =&gt; {
       const latestWeatherData = await mongoose.connection.db.collection('recommandations_weather')
         .findOne({}, { sort: { day: -1, time_slot: 1 } });
       
-      <span class="missing-if-branch" title="else path not taken" >E</span>if (!latestWeatherData) {
+      if (!latestWeatherData) {
         console.log("Aucune donnée météo disponible dans la collection.");
         return res.status(404).json({ message: "Aucune donnée météo disponible" });
       }
       
-<span class="cstat-no" title="statement not covered" >      console.log("Dernière donnée disponible trouvée:", latestWeatherData.day, latestWeatherData.time_slot);</span>
+      console.log("Dernière donnée disponible trouvée:", latestWeatherData.day, latestWeatherData.time_slot);
       
       // Vérifier explicitement que l'URL est présente pour éviter des problèmes d'affichage
-<span class="cstat-no" title="statement not covered" >      if (latestWeatherData.recommandation &amp;&amp; !latestWeatherData.recommandation.url) {</span>
-<span class="cstat-no" title="statement not covered" >        latestWeatherData.recommandation.url = "";</span>
+      <span class="missing-if-branch" title="else path not taken" >E</span>if (latestWeatherData.recommandation &amp;&amp; !latestWeatherData.recommandation.url) {
+        latestWeatherData.recommandation.url = "";
       }
       
-<span class="cstat-no" title="statement not covered" >      return res.json(latestWeatherData);</span>
+      return res.json(latestWeatherData);
     }
     
     // Vérifier explicitement que l'URL est présente pour éviter des problèmes d'affichage
@@ -580,7 +580,7 @@ module.exports = router;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-05-06T09:22:42.929Z
+                at 2025-05-06T22:01:08.228Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

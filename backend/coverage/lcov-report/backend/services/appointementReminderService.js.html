@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">14.11% </span>
+                <span class="strong">13.79% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>12/85</span>
+                <span class='fraction'>12/87</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/30</span>
+                <span class='fraction'>0/34</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">14.11% </span>
+                <span class="strong">13.95% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>12/85</span>
+                <span class='fraction'>12/86</span>
             </div>
         
             
@@ -490,7 +490,16 @@
 <a name='L425'></a><a href='#L425'>425</a>
 <a name='L426'></a><a href='#L426'>426</a>
 <a name='L427'></a><a href='#L427'>427</a>
-<a name='L428'></a><a href='#L428'>428</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -897,6 +906,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -913,6 +930,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -946,11 +964,11 @@ const sendAppointmentReminderToStudent = <span class="fstat-no" title="function 
   // Formater la date et l'heure du rendez-vous
   const appointmentDate = <span class="cstat-no" title="statement not covered" >moment(appointment.appointmentDate).format('dddd, D MMMM YYYY');</span>
   const appointmentTime = <span class="cstat-no" title="statement not covered" >moment(appointment.appointmentDate).format('HH:mm');</span>
-  
+ 
   // Obtenir les informations du psychologue
   const psychologist = <span class="cstat-no" title="statement not covered" >await User.findById(appointment.psychologistId);</span>
   const psychologistName = <span class="cstat-no" title="statement not covered" >psychologist ? psychologist.Name : 'Votre psychologue';</span>
-  
+ 
   // HTML pour l'email de rappel
   const mailHtml = <span class="cstat-no" title="statement not covered" >`</span>
   &lt;!DOCTYPE html&gt;
@@ -1022,12 +1040,12 @@ const sendAppointmentReminderToStudent = <span class="fstat-no" title="function 
       &lt;h1&gt;UniMindCare&lt;/h1&gt;
       &lt;p&gt;Rappel de rendez-vous&lt;/p&gt;
     &lt;/div&gt;
-    
+   
     &lt;div class="content"&gt;
       &lt;p&gt;Bonjour ${student.Name || 'Étudiant(e)'},&lt;/p&gt;
-      
+     
       &lt;p&gt;Nous vous rappelons que vous avez un rendez-vous prévu &lt;strong&gt;demain&lt;/strong&gt; avec votre psychologue.&lt;/p&gt;
-      
+     
       &lt;div class="appointment-details"&gt;
         &lt;h2&gt;📅 Détails du rendez-vous&lt;/h2&gt;
         &lt;p&gt;&lt;strong&gt;Date:&lt;/strong&gt; ${appointmentDate}&lt;/p&gt;
@@ -1037,7 +1055,7 @@ const sendAppointmentReminderToStudent = <span class="fstat-no" title="function 
         ${appointment.location ? `&lt;p&gt;&lt;strong&gt;Lieu:&lt;/strong&gt; ${appointment.location}&lt;/p&gt;` : ''}
         ${appointment.meetingLink ? `&lt;p&gt;&lt;strong&gt;Lien de réunion:&lt;/strong&gt; &lt;a href="${appointment.meetingLink}"&gt;${appointment.meetingLink}&lt;/a&gt;&lt;/p&gt;` : ''}
       &lt;/div&gt;
-      
+     
       &lt;div class="reminder"&gt;
         &lt;h3&gt;Rappels importants&lt;/h3&gt;
         &lt;ul&gt;
@@ -1046,14 +1064,14 @@ const sendAppointmentReminderToStudent = <span class="fstat-no" title="function 
           &lt;li&gt;Préparez vos questions ou préoccupations pour optimiser votre séance.&lt;/li&gt;
         &lt;/ul&gt;
       &lt;/div&gt;
-      
+     
       &lt;div style="text-align: center;"&gt;
         &lt;a href="http://localhost:3000/tivo/dashboard" class="cta-button"&gt;Voir mes rendez-vous&lt;/a&gt;
       &lt;/div&gt;
-      
+     
       &lt;p&gt;Cordialement,&lt;br&gt;L'équipe UniMindCare&lt;/p&gt;
     &lt;/div&gt;
-    
+   
     &lt;div class="footer"&gt;
       &lt;p&gt;Ce message a été généré automatiquement. Merci de ne pas y répondre.&lt;/p&gt;
       &lt;p&gt;UniMindCare © 2025 - Tous droits réservés&lt;/p&gt;
@@ -1061,7 +1079,7 @@ const sendAppointmentReminderToStudent = <span class="fstat-no" title="function 
   &lt;/body&gt;
   &lt;/html&gt;
   `;
-  
+ 
   // Options de l'email
   const mailOptions = <span class="cstat-no" title="statement not covered" >{</span>
     from: `"UniMindCare" &lt;${process.env.EMAIL_USER}&gt;`,
@@ -1069,7 +1087,7 @@ const sendAppointmentReminderToStudent = <span class="fstat-no" title="function 
     subject: '📅 Rappel : Votre rendez-vous de demain',
     html: mailHtml
   };
-  
+ 
   // Envoi de l'email
 <span class="cstat-no" title="statement not covered" >  try {</span>
 <span class="cstat-no" title="statement not covered" >    await transporterEmail.sendMail(mailOptions);</span>
@@ -1087,10 +1105,10 @@ const sendAppointmentReminderToStudent = <span class="fstat-no" title="function 
 const sendTodaysSessionsReminderToPsychologist = <span class="fstat-no" title="function not covered" >as</span>ync (psychologist, appointments) =&gt; {
   // Formater la date du jour
   const todayDate = <span class="cstat-no" title="statement not covered" >moment().format('dddd, D MMMM YYYY');</span>
-  
+ 
   // Générer la liste des rendez-vous
   let appointmentsList = <span class="cstat-no" title="statement not covered" >'';</span>
-  
+ 
 <span class="cstat-no" title="statement not covered" >  if (appointments.length === 0) {</span>
 <span class="cstat-no" title="statement not covered" >    appointmentsList = `&lt;p&gt;Vous n'avez aucun rendez-vous prévu pour aujourd'hui.&lt;/p&gt;`;</span>
   } else {
@@ -1106,12 +1124,12 @@ const sendTodaysSessionsReminderToPsychologist = <span class="fstat-no" title="f
       &lt;/thead&gt;
       &lt;tbody&gt;
     `;
-    
+   
 <span class="cstat-no" title="statement not covered" >    for (const appointment of appointments) {</span>
       const student = <span class="cstat-no" title="statement not covered" >await User.findById(appointment.studentId);</span>
       const studentName = <span class="cstat-no" title="statement not covered" >student ? student.Name : 'Étudiant inconnu';</span>
       const appointmentTime = <span class="cstat-no" title="statement not covered" >moment(appointment.appointmentDate).format('HH:mm');</span>
-      
+     
 <span class="cstat-no" title="statement not covered" >      appointmentsList += `</span>
         &lt;tr&gt;
           &lt;td style="padding: 10px; border: 1px solid #ddd;"&gt;${appointmentTime}&lt;/td&gt;
@@ -1125,13 +1143,13 @@ const sendTodaysSessionsReminderToPsychologist = <span class="fstat-no" title="f
         &lt;/tr&gt;
       `;
     }
-    
+   
 <span class="cstat-no" title="statement not covered" >    appointmentsList += `</span>
       &lt;/tbody&gt;
     &lt;/table&gt;
     `;
   }
-  
+ 
   // HTML pour l'email de rappel
   const mailHtml = <span class="cstat-no" title="statement not covered" >`</span>
   &lt;!DOCTYPE html&gt;
@@ -1192,24 +1210,24 @@ const sendTodaysSessionsReminderToPsychologist = <span class="fstat-no" title="f
       &lt;h1&gt;UniMindCare&lt;/h1&gt;
       &lt;p&gt;Récapitulatif des séances du jour&lt;/p&gt;
     &lt;/div&gt;
-    
+   
     &lt;div class="content"&gt;
       &lt;p&gt;Bonjour ${psychologist.Name || 'Psychologue'},&lt;/p&gt;
-      
+     
       &lt;p&gt;Voici un récapitulatif de vos rendez-vous prévus pour aujourd'hui, ${todayDate}.&lt;/p&gt;
-      
+     
       &lt;div class="session-summary"&gt;
         &lt;h2&gt;📋 Vos rendez-vous d'aujourd'hui&lt;/h2&gt;
         ${appointmentsList}
       &lt;/div&gt;
-      
+     
       &lt;div style="text-align: center;"&gt;
         &lt;a href="http://localhost:3000/tivo/dashboard/psychologist" class="cta-button"&gt;Voir mon planning&lt;/a&gt;
       &lt;/div&gt;
-      
+     
       &lt;p&gt;Bonne journée,&lt;br&gt;L'équipe UniMindCare&lt;/p&gt;
     &lt;/div&gt;
-    
+   
     &lt;div class="footer"&gt;
       &lt;p&gt;Ce message a été généré automatiquement. Merci de ne pas y répondre.&lt;/p&gt;
       &lt;p&gt;UniMindCare © 2025 - Tous droits réservés&lt;/p&gt;
@@ -1217,7 +1235,7 @@ const sendTodaysSessionsReminderToPsychologist = <span class="fstat-no" title="f
   &lt;/body&gt;
   &lt;/html&gt;
   `;
-  
+ 
   // Options de l'email
   const mailOptions = <span class="cstat-no" title="statement not covered" >{</span>
     from: `"UniMindCare" &lt;${process.env.EMAIL_USER}&gt;`,
@@ -1225,7 +1243,7 @@ const sendTodaysSessionsReminderToPsychologist = <span class="fstat-no" title="f
     subject: '📋 UniMindCare : Vos séances du jour',
     html: mailHtml
   };
-  
+ 
   // Envoi de l'email
 <span class="cstat-no" title="statement not covered" >  try {</span>
 <span class="cstat-no" title="statement not covered" >    await transporterEmail.sendMail(mailOptions);</span>
@@ -1244,32 +1262,32 @@ const sendUpcomingAppointmentReminders = <span class="fstat-no" title="function 
 <span class="cstat-no" title="statement not covered" >  try {</span>
     // Date actuelle
     const now = <span class="cstat-no" title="statement not covered" >new Date();</span>
-    
+   
     // Date dans 24 heures
     const in24Hours = <span class="cstat-no" title="statement not covered" >new Date(now);</span>
 <span class="cstat-no" title="statement not covered" >    in24Hours.setHours(in24Hours.getHours() + 24);</span>
-    
+   
     // Trouver tous les rendez-vous qui ont lieu dans les 24 prochaines heures
     const upcomingAppointments = <span class="cstat-no" title="statement not covered" >await Appointment.find({</span>
       appointmentDate: { $gt: now, $lt: in24Hours },
       status: { $in: ['confirmed', 'rescheduled'] }
     });
-    
+   
 <span class="cstat-no" title="statement not covered" >    console.log(`Envoi de rappels pour ${upcomingAppointments.length} rendez-vous à venir dans les 24h`);</span>
-    
+   
     let successCount = <span class="cstat-no" title="statement not covered" >0;</span>
     let failCount = <span class="cstat-no" title="statement not covered" >0;</span>
-    
+   
     // Envoyer des rappels pour chaque rendez-vous
 <span class="cstat-no" title="statement not covered" >    for (const appointment of upcomingAppointments) {</span>
       // Récupérer les informations de l'étudiant
       const student = <span class="cstat-no" title="statement not covered" >await User.findById(appointment.studentId);</span>
-      
+     
 <span class="cstat-no" title="statement not covered" >      if (student) {</span>
         const success = <span class="cstat-no" title="statement not covered" >await sendAppointmentReminderToStudent(appointment, student);</span>
 <span class="cstat-no" title="statement not covered" >        if (success) {</span>
 <span class="cstat-no" title="statement not covered" >          successCount++;</span>
-          
+         
           // Marquer le rendez-vous comme rappelé
 <span class="cstat-no" title="statement not covered" >          appointment.reminderSent = true;</span>
 <span class="cstat-no" title="statement not covered" >          await appointment.save();</span>
@@ -1281,7 +1299,7 @@ const sendUpcomingAppointmentReminders = <span class="fstat-no" title="function 
 <span class="cstat-no" title="statement not covered" >        failCount++;</span>
       }
     }
-    
+   
 <span class="cstat-no" title="statement not covered" >    console.log(`Rappels de rendez-vous envoyés : ${successCount} réussis, ${failCount} échoués`);</span>
 <span class="cstat-no" title="statement not covered" >    return { success: successCount, failed: failCount };</span>
   } catch (error) {
@@ -1296,41 +1314,49 @@ const sendUpcomingAppointmentReminders = <span class="fstat-no" title="function 
 const sendTodaySessionsReminders = <span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {
 <span class="cstat-no" title="statement not covered" >  try {</span>
     // Récupérer tous les psychologues
-    const psychologists = <span class="cstat-no" title="statement not covered" >await User.find({ </span>
+    const psychologists = <span class="cstat-no" title="statement not covered" >await User.find({</span>
       Role: { $in: ['psychiatre', 'psychologue'] },
-      verified: true 
+      verified: true
     });
-    
+   
 <span class="cstat-no" title="statement not covered" >    console.log(`Envoi de récapitulatifs à ${psychologists.length} psychologues`);</span>
-    
+   
     // Date de début et de fin d'aujourd'hui
     const startOfDay = <span class="cstat-no" title="statement not covered" >new Date();</span>
 <span class="cstat-no" title="statement not covered" >    startOfDay.setHours(0, 0, 0, 0);</span>
-    
+   
     const endOfDay = <span class="cstat-no" title="statement not covered" >new Date();</span>
 <span class="cstat-no" title="statement not covered" >    endOfDay.setHours(23, 59, 59, 999);</span>
-    
+   
     let successCount = <span class="cstat-no" title="statement not covered" >0;</span>
     let failCount = <span class="cstat-no" title="statement not covered" >0;</span>
-    
+   
     // Pour chaque psychologue, récupérer ses rendez-vous du jour et envoyer un récapitulatif
 <span class="cstat-no" title="statement not covered" >    for (const psychologist of psychologists) {</span>
-      // Récupérer les rendez-vous du jour pour ce psychologue
+      // CORRECTION : Utiliser 'date' au lieu de 'appointmentDate'
       const todayAppointments = <span class="cstat-no" title="statement not covered" >await Appointment.find({</span>
         psychologistId: psychologist._id,
-        appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-        status: { $in: ['confirmed', 'rescheduled'] }
-      }).sort({ appointmentDate: 1 });
-      
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: 'confirmed' // CORRECTION : 'rescheduled' n'est pas dans les enum
+      }).sort({ date: 1 });
+     
+      // Adapter les rendez-vous avant de les envoyer
+      const appointmentsForSummary = <span class="cstat-no" title="statement not covered" >todayAppointments.map(<span class="fstat-no" title="function not covered" >ap</span>p =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+        ...app.toObject(),
+        appointmentDate: app.date, // Mapper date vers appointmentDate
+        mode: app.mode || 'En personne',
+        location: app.location || 'Cabinet de consultation'
+      }));
+     
       // Envoyer le récapitulatif
-      const success = <span class="cstat-no" title="statement not covered" >await sendTodaysSessionsReminderToPsychologist(psychologist, todayAppointments);</span>
+      const success = <span class="cstat-no" title="statement not covered" >await sendTodaysSessionsReminderToPsychologist(psychologist, appointmentsForSummary);</span>
 <span class="cstat-no" title="statement not covered" >      if (success) {</span>
 <span class="cstat-no" title="statement not covered" >        successCount++;</span>
       } else {
 <span class="cstat-no" title="statement not covered" >        failCount++;</span>
       }
     }
-    
+   
 <span class="cstat-no" title="statement not covered" >    console.log(`Récapitulatifs des séances envoyés : ${successCount} réussis, ${failCount} échoués`);</span>
 <span class="cstat-no" title="statement not covered" >    return { success: successCount, failed: failCount };</span>
   } catch (error) {
@@ -1344,14 +1370,15 @@ module.exports = {
   sendTodaysSessionsReminderToPsychologist,
   sendUpcomingAppointmentReminders,
   sendTodaySessionsReminders
-};</pre></td></tr></table></pre>
+};
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-05-06T09:22:42.929Z
+                at 2025-05-06T22:01:08.228Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
