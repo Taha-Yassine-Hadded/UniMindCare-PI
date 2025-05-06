@@ -1,16 +1,17 @@
 import { CardHeader } from "reactstrap";
 import { H4, P } from "../../../../AbstractElements";
 
-const TotalGrowthCardHeader = () => {
+const TotalGrowthCardHeader = ({ stats }) => {
+  // stats = { total, confirmed, cancelled, pending }
   return (
     <CardHeader className="pb-0">
       <div className="d-flex justify-content-between">
         <div className="flex-grow-1">
           <P attrPara={{ className: "square-after f-w-600 header-text-primary" }}>
-            Our Total Growth
+            Statistiques Rendez-vous
             <i className="fa fa-circle f-10"> </i>
           </P>
-          <H4>96.564%</H4>
+        
         </div>
       </div>
     </CardHeader>
