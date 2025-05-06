@@ -1,32 +1,52 @@
-var express = require("express");
-var router = express.Router();
-const User = require("../Models/Users"); // Import the User model
+const express = require("express");
+const router = express.Router();
+const User = require("../Models/Users");
 const { transporter } = require("../config/emailConfig");
 const loginLink = "http://localhost:3000/tivo/authentication/login-simple";
 const bcrypt = require("bcryptjs");
 const { validateToken } = require('../middleware/authentication');
-const multer = require('multer'); // For handling file uploads
-const {bucket} = require('../firebase'); // Firebase Storage bucket
-const Post = require('../Models/Post'); // Import the Post model
+const multer = require('multer');
+const { bucket } = require('../firebase');
+const Post = require('../Models/Post');
 const passport = require('./passportConfig');
 const InappropriateComment = require('../Models/InappropriateComment');
+const validator = require('validator');
 
-
-// Configure Multer for file uploads
-const storage = multer.memoryStorage(); // Store file in memory before uploading to Firebase
+// Multer config: only JPEG/PNG, 5MB max
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png/;
-    const mimetype = filetypes.test(file.mimetype);
-    if (mimetype) {
-      return cb(null, true);
-    }
+    const allowed = ['image/jpeg', 'image/png'];
+    if (allowed.includes(file.mimetype)) return cb(null, true);
     cb(new Error('Seules les images JPEG et PNG sont autorisées'));
   },
 });
 
+// Helper: Validate email
+function isValidEspritEmail(email) {
+  return typeof email === 'string' && email.endsWith('@esprit.tn') && validator.isEmail(email);
+}
+
+// Helper: Validate password strength
+function isStrongPassword(password) {
+  return typeof password === 'string' && password.length >= 8;
+}
+
+// Helper: Validate phone number
+function isValidPhone(phone) {
+  return typeof phone === 'string' && validator.isMobilePhone(phone, 'any');
+}
+
+// Helper: Validate role
+function isValidRole(role) {
+  const allowed = ['student', 'admin', 'teacher', 'psychologist', 'psychiatre'];
+  if (Array.isArray(role)) return role.every(r => allowed.includes(r));
+  return allowed.includes(role);
+}
+
+// GET /auth/me - Authenticated user info
 router.get('/auth/me', validateToken, async (req, res) => {
   try {
     res.json({ userId: req.user.userId });
@@ -35,317 +55,276 @@ router.get('/auth/me', validateToken, async (req, res) => {
   }
 });
 
-
-/* POST to add a new user */
-router.post("/add", async function (req, res, next) {
+// POST /add - Add new user
+router.post("/add", async (req, res) => {
   try {
-    const {
-      Name,
-      Identifiant,
-      Email,
-      Password,
-      Classe,
-      Role,
-      PhoneNumber,
-      Enabled = true, // Default to true if not provided
-    } = req.body;
+    const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber, Enabled = true } = req.body;
 
-    // Validate required fields
+    // Validate inputs
     if (!Name || !Identifiant || !Email || !Password || !Role || !PhoneNumber) {
-      return res.status(400).json({ message: "All required fields must be provided" });
+      return res.status(400).json({ message: "Tous les champs requis doivent être fournis" });
+    }
+    if (!isValidEspritEmail(Email)) {
+      return res.status(400).json({ message: "L'email doit être une adresse esprit.tn valide" });
+    }
+    if (!isStrongPassword(Password)) {
+      return res.status(400).json({ message: "Le mot de passe doit contenir au moins 8 caractères" });
+    }
+    if (!isValidPhone(PhoneNumber)) {
+      return res.status(400).json({ message: "Numéro de téléphone invalide" });
+    }
+    if (!isValidRole(Role)) {
+      return res.status(400).json({ message: "Rôle invalide" });
+    }
+    if (!validator.isAlphanumeric(Identifiant)) {
+      return res.status(400).json({ message: "Identifiant doit être alphanumérique" });
     }
 
-    // Validate email domain
-    if (!Email.endsWith("@esprit.tn")) {
-      return res.status(400).json({ message: "Email must end with @esprit.tn" });
-    }
-
-    // Check if user already exists
+    // Check existing user
     const existingUser = await User.findOne({ $or: [{ Email }, { Identifiant }] });
     if (existingUser) {
-      return res.status(409).json({ message: "User with this email or identifier already exists" });
+      return res.status(409).json({ message: "Un utilisateur avec cet email ou identifiant existe déjà" });
     }
 
-    // Hash the password
+    // Hash password
     const hashedPassword = await bcrypt.hash(Password, 10);
 
-    // Create new user object
+    // Create user
     const newUser = new User({
       Name,
       Identifiant,
       Email,
       Password: hashedPassword,
-      Classe: Role.includes("student") ? Classe : "", // Only add Classe if Role is student
-      Role: Array.isArray(Role) ? Role : [Role], // Ensure Role is an array
+      Classe: (Array.isArray(Role) ? Role : [Role]).includes("student") ? Classe : "",
+      Role: Array.isArray(Role) ? Role : [Role],
       PhoneNumber,
       imageUrl: "",
-      verified: true, // Assuming new users are verified by default
+      verified: true,
       enabled: Enabled,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
-    // Save the user to the database
     const savedUser = await newUser.save();
-    
-    // Send email notification
+
+    // Send email
     const mailOptions = {
       from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
       to: savedUser.Email,
-      subject: "Account Created",
-      html: `<p>Your account has been created successfully. Follow this link to log in:</p><a href="${loginLink}">UniMindCare SignIn</a>`,
+      subject: "Compte créé",
+      html: `<p>Votre compte a été créé avec succès. Cliquez ici pour vous connecter :</p><a href="${loginLink}">Connexion UniMindCare</a>`,
     };
-
     await transporter.sendMail(mailOptions);
 
-    // Respond with the created user
     res.status(201).json(savedUser);
   } catch (error) {
-    console.error("Error adding user:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Erreur ajout utilisateur:", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 
-/* GET all users listing. */
-router.get("/", async function(req, res, next) {
+// GET / - Get all users (admin)
+router.get("/", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
-    // Fetch all users from the database
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
     const users = await User.find({});
-    
-    // Send the list of users as a JSON response
     res.status(200).json(users);
   } catch (error) {
-    // Handle errors
-    console.error("Error fetching users:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Erreur récupération utilisateurs:", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 
-/* GET users with enabled set to false. */
-router.get("/disabled", async function(req, res, next) {
+// GET /disabled - Get disabled users (admin)
+router.get("/disabled", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
-    // Fetch users where enabled is false
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
     const users = await User.find({ enabled: false });
-    
-    // Send the list of disabled users as a JSON response
     res.status(200).json(users);
   } catch (error) {
-    // Handle errors
-    console.error("Error fetching disabled users:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Erreur récupération utilisateurs désactivés:", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 
-/* Enable a user account by ID. */
-router.put("/enable/:id", async function(req, res, next) {
+// PUT /enable/:id - Enable user (admin)
+router.put("/enable/:id", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
-    const userId = req.params.id; // Get the user ID from the URL parameter
-
-    // Update the user's enabled status to true
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+    if (!validator.isMongoId(req.params.id)) {
+      return res.status(400).json({ message: "ID invalide" });
+    }
     const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: { enabled: true } }, // Set enabled to true
-      { new: true } // Return the updated user
+      req.params.id,
+      { $set: { enabled: true } },
+      { new: true }
     );
-
-    // Check if the user was found and updated
     if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
 
-    // Send the updated user as a JSON response
-    res.status(200).json(updatedUser);
-
-    // Send email notification
+    // Send email
     const mailOptions = {
       from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
       to: updatedUser.Email,
-      subject: "Account enabled",
-      html: `<p>Follow this link to access your account:</p><a href="${loginLink}">UniMindCare SignIn</a>`
+      subject: "Compte activé",
+      html: `<p>Cliquez ici pour accéder à votre compte :</p><a href="${loginLink}">Connexion UniMindCare</a>`,
     };
-
     await transporter.sendMail(mailOptions);
 
+    res.status(200).json(updatedUser);
   } catch (error) {
-    // Handle errors
-    console.error("Error enabling user:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Erreur activation utilisateur:", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 
-/* Disable a user account by ID. */
-router.put("/disable/:id", async function(req, res, next) {
+// PUT /disable/:id - Disable user (admin)
+router.put("/disable/:id", passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
-    const userId = req.params.id; // Get the user ID from the URL parameter
-
-    // Update the user's enabled status to false
+    if (!req.user.Role || !req.user.Role.includes('admin')) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+    if (!validator.isMongoId(req.params.id)) {
+      return res.status(400).json({ message: "ID invalide" });
+    }
     const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: { enabled: false } }, // Set enabled to false
-      { new: true } // Return the updated user
+      req.params.id,
+      { $set: { enabled: false } },
+      { new: true }
     );
-
-    // Check if the user was found and updated
     if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
 
-    // Send the updated user as a JSON response
-    res.status(200).json(updatedUser);
-
-    // Send email notification
+    // Send email
     const mailOptions = {
       from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
       to: updatedUser.Email,
-      subject: "Account disabled",
-      html: "<p>Your account has been disabled by the administration! Contact them for more info...</p>"
+      subject: "Compte désactivé",
+      html: "<p>Votre compte a été désactivé par l'administration. Contactez-les pour plus d'informations.</p>",
     };
-
     await transporter.sendMail(mailOptions);
 
+    res.status(200).json(updatedUser);
   } catch (error) {
-    // Handle errors
-    console.error("Error disabling user:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Erreur désactivation utilisateur:", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 
-/* Upload profile picture and update imageUrl */
-router.put('/:identifiant/upload-profile-picture', upload.single('profilePicture'), async (req, res) => {
+// PUT /:identifiant/upload-profile-picture - Upload profile picture
+router.put('/:identifiant/upload-profile-picture', validateToken, upload.single('profilePicture'), async (req, res) => {
   try {
     const { identifiant } = req.params;
-
-    // Check if a file was uploaded
+    if (!validator.isAlphanumeric(identifiant)) {
+      return res.status(400).json({ message: 'Identifiant invalide' });
+    }
     if (!req.file) {
       return res.status(400).json({ message: 'Aucune image fournie' });
     }
-
-    // Find the user by Identifiant
     const user = await User.findOne({ Identifiant: identifiant });
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
-
-    // Upload the file to Firebase Storage
-    const fileName = `users/${identifiant}/profile/${Date.now()}_${req.file.originalname}`;
+    const fileName = `users/${identifiant}/profile/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9.]/g, '')}`;
     const file = bucket.file(fileName);
-
     const stream = file.createWriteStream({
-      metadata: {
-        contentType: req.file.mimetype,
-      },
+      metadata: { contentType: req.file.mimetype },
     });
 
     stream.on('error', (err) => {
-      console.error('Erreur lors de l\'upload vers Firebase:', err);
-      res.status(500).json({ message: 'Erreur lors de l\'upload de l\'image' });
+      console.error('Erreur upload Firebase:', err);
+      res.status(500).json({ message: 'Erreur upload image' });
     });
-
     stream.on('finish', async () => {
-      // Make the file publicly accessible
       await file.makePublic();
-
-      // Get the public URL
       const imageUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-      console.log('Image URL:', imageUrl);
-
-      // Update the user's imageUrl in the database
       user.imageUrl = imageUrl;
       user.updatedAt = new Date();
       const updatedUser = await user.save();
-
       res.status(200).json(updatedUser);
     });
-
     stream.end(req.file.buffer);
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'image de profil:', error);
+    console.error('Erreur mise à jour image profil:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
-router.put("/:identifiant", async (req, res, next) => {
+// PUT /:identifiant - Update user password
+router.put("/:identifiant", validateToken, async (req, res) => {
   try {
-    const identifiant = req.params.identifiant;
+    const { identifiant } = req.params;
     const { currentPassword, newPassword } = req.body;
-
-    console.log("Request body:", { currentPassword: !!currentPassword, newPassword: !!newPassword });
-
-    const user = await User.findOne({ Identifiant: identifiant });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    // Only proceed if newPassword is provided
-    if (newPassword) {
-      if (!currentPassword) {
-        return res.status(400).json({ message: "Current password is required to update the password" });
-      }
-      
-      const isMatch = await bcrypt.compare(currentPassword, user.Password);
-      if (!isMatch) {
-        return res.status(401).json({ message: "Current password is incorrect" });
-      }
-      
-      user.Password = await bcrypt.hash(newPassword, 10);
-      user.updatedAt = new Date();
-      
-      const updated = await user.save();
-      res.status(200).json(updated);
-    } else {
-      res.status(400).json({ message: "New password is required for password update" });
+    if (!validator.isAlphanumeric(identifiant)) {
+      return res.status(400).json({ message: 'Identifiant invalide' });
     }
-  } catch (err) {
-    console.error("Error updating user password:", err);
-    res.status(500).json({ message: "Internal Server Error" });
+    const user = await User.findOne({ Identifiant: identifiant });
+    if (!user) return res.status(404).json({ message: "Utilisateur non trouvé" });
+
+    if (!newPassword) {
+      return res.status(400).json({ message: "Nouveau mot de passe requis" });
+    }
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Mot de passe actuel requis" });
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.Password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Mot de passe actuel incorrect" });
+    }
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({ message: "Nouveau mot de passe doit contenir au moins 8 caractères" });
+    }
+
+    user.Password = await bcrypt.hash(newPassword, 10);
+    user.updatedAt = new Date();
+    const updated = await user.save();
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error("Erreur mise à jour mot de passe:", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 
-
-// Add these routes to your users.js file
-
-// Get all users for admin with inappropriate comment counts
+// GET /admin - Get users with inappropriate comment counts (admin)
 router.get('/admin', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
-    // Verify admin access
     if (!req.user.Role || !req.user.Role.includes('admin')) {
       return res.status(403).json({ message: 'Accès non autorisé' });
     }
-
-    // Get all users with their inappropriate comment counts
     const users = await User.find({}, {
       Name: 1,
       Email: 1,
       Role: 1,
       enabled: 1,
       inappropriateCommentsCount: 1,
-      lastInappropriateComment: 1
+      lastInappropriateComment: 1,
     }).sort({ inappropriateCommentsCount: -1 });
-
     res.status(200).json(users);
   } catch (error) {
-    console.error('Erreur lors de la récupération des utilisateurs:', error);
+    console.error('Erreur récupération utilisateurs:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
-// Get bad comments for a specific user
-// Add this to your imports at the top
-
-// Update the bad comments route
+// GET /:id/bad-comments - Get bad comments for a user (admin)
 router.get('/:id/bad-comments', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
-    // Verify admin access
     if (!req.user.Role || !req.user.Role.includes('admin')) {
       return res.status(403).json({ message: 'Accès non autorisé' });
     }
-
-    // Get inappropriate comments from the dedicated collection
-    const inappropriateComments = await InappropriateComment.find({ 
-      author: req.params.id 
-    }).sort({ createdAt: -1 });
-    
-    // Also find flagged comments in posts
+    if (!validator.isMongoId(req.params.id)) {
+      return res.status(400).json({ message: 'ID invalide' });
+    }
+    const inappropriateComments = await InappropriateComment.find({ author: req.params.id }).sort({ createdAt: -1 });
     const posts = await Post.find({ 'comments.author': req.params.id });
-    
     const flaggedComments = [];
     posts.forEach(post => {
       post.comments.forEach(comment => {
@@ -357,13 +336,11 @@ router.get('/:id/bad-comments', passport.authenticate('jwt', { session: false })
             flaggedAt: comment.flaggedAt,
             flagReason: comment.flagReason,
             postId: post._id,
-            postTitle: post.title
+            postTitle: post.title,
           });
         }
       });
     });
-    
-    // Combine both types of inappropriate comments
     const allBadComments = [
       ...inappropriateComments.map(comment => ({
         _id: comment._id,
@@ -372,106 +349,92 @@ router.get('/:id/bad-comments', passport.authenticate('jwt', { session: false })
         postId: comment.postId,
         postTitle: comment.postTitle,
         flagReason: comment.reason,
-        type: 'Bloqué'  // This comment was blocked before posting
+        type: 'Bloqué',
       })),
       ...flaggedComments.map(comment => ({
         ...comment,
-        type: 'Signalé'  // This comment was flagged after posting
-      }))
-    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
+        type: 'Signalé',
+      })),
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Synchronous
     res.status(200).json(allBadComments);
   } catch (error) {
-    console.error('Erreur lors de la récupération des commentaires inappropriés:', error);
+    console.error('Erreur récupération commentaires inappropriés:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
-// Toggle user status (enable/disable)
-// Update the toggle user status route to reset counter when enabling a user
-
+// PUT /:id/status - Toggle user status (admin)
 router.put('/:id/status', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
-    // Vérifier si l'utilisateur est admin
     if (!req.user.Role || !req.user.Role.includes('admin')) {
       return res.status(403).json({ message: 'Accès non autorisé' });
     }
-
+    if (!validator.isMongoId(req.params.id)) {
+      return res.status(400).json({ message: 'ID invalide' });
+    }
     const { enabled } = req.body;
     if (enabled === undefined) {
-      return res.status(400).json({ message: 'Le statut enabled est requis' });
+      return res.status(400).json({ message: 'Statut enabled requis' });
     }
-
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
-     // Check if this is a reactivation (was disabled, now being enabled)
-     const isReactivation = !user.enabled && enabled === true;
-
-    user.enabled = enabled;
-    
-    // Reset inappropriate comment counter when re-enabling a user
+    const isReactivation = !user.enabled && enabled === true; // Synchronous
+    user.enabled = enabled; // Synchronous
     if (enabled === true) {
       user.inappropriateCommentsCount = 0;
       user.lastInappropriateComment = null;
     }
-    
     await user.save();
 
-     // Send email notification if this is a reactivation after violations
-     if (isReactivation) {
+    if (isReactivation) {
       try {
         const mailOptions = {
           from: `"UniMindCare Administration" <${process.env.EMAIL_USER}>`,
           to: user.Email,
-          subject: 'Votre compte a été réactivé - AVERTISSEMENT',
+          subject: 'Compte réactivé - AVERTISSEMENT',
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-              <h2 style="color: #1976d2;">Votre compte a été réactivé</h2>
+              <h2 style="color: #1976d2;">Compte réactivé</h2>
               <p>Cher(e) ${user.Name},</p>
-              <p>Nous vous informons que votre compte UniMindCare a été réactivé par l'administrateur.</p>
-              
+              <p>Votre compte UniMindCare a été réactivé par l'administrateur.</p>
               <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; color: #856404;">
-                <h3 style="margin-top: 0;">⚠️ AVERTISSEMENT IMPORTANT</h3>
-                <p>Votre compte avait été désactivé en raison de <strong>commentaires inappropriés</strong> qui ne respectent pas nos règles communautaires.</p>
-                <p>Nous vous rappelons que tout contenu inapproprié, offensant, ou nuisible n'est pas toléré sur notre plateforme.</p>
+                <h3 style="margin-top: 0;">⚠️ AVERTISSEMENT</h3>
+                <p>Votre compte a été désactivé pour des commentaires inappropriés.</p>
+                <p>Tout contenu offensant ou nuisible est interdit.</p>
                 <p><strong>En cas de récidive :</strong></p>
                 <ul>
-                  <li>Votre compte sera définitivement désactivé</li>
-                  <li>L'administration prendra des mesures disciplinaires supplémentaires</li>
+                  <li>Compte définitivement désactivé</li>
+                  <li>Mesures disciplinaires supplémentaires</li>
                 </ul>
               </div>
-               <p>Nous vous invitons à consulter nos <a href="http://localhost:3000/blog" style="color: #1976d2;">règles communautaires</a> pour plus d'informations.</p>
-              <p>Si vous avez des questions, n'hésitez pas à contacter l'administration.</p>
-              
-              <p style="margin-top: 20px;">Cordialement,</p>
-              <p style="font-weight: bold; margin-top: 5px;">L'équipe UniMindCare</p>
+              <p>Consultez nos <a href="http://localhost:3000/blog" style="color: #1976d2;">règles communautaires</a>.</p>
+              <p>Contactez l'administration pour toute question.</p>
+              <p style="margin-top: 20px;">Cordialement,<br>L'équipe UniMindCare</p>
             </div>
-          `
+          `,
         };
         await transporter.sendMail(mailOptions);
-        console.log(`Email d'avertissement envoyé à l'utilisateur réactivé: ${user.Email}`);
       } catch (emailError) {
-        console.error('Erreur lors de l\'envoi de l\'email de réactivation:', emailError);
-        // Continue execution despite email error
+        console.error('Erreur envoi email réactivation:', emailError);
       }
     }
 
-    res.status(200).json({ 
-      message: `Utilisateur ${enabled ? 'activé' : 'désactivé'} avec succès${enabled ? ' et compteur de commentaires inappropriés réinitialisé' : ''}`,
+    res.status(200).json({
+      message: `Utilisateur ${enabled ? 'activé' : 'désactivé'} avec succès${enabled ? ' et compteur réinitialisé' : ''}`,
       user: {
         _id: user._id,
         Name: user.Name,
         Email: user.Email,
         enabled: user.enabled,
         inappropriateCommentsCount: user.inappropriateCommentsCount,
-        Role: user.Role
-      }
+        Role: user.Role,
+      },
     });
   } catch (error) {
-    console.error('Erreur lors de la mise à jour du statut:', error);
+    console.error('Erreur mise à jour statut:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
