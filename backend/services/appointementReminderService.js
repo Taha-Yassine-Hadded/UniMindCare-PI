@@ -27,11 +27,11 @@ const sendAppointmentReminderToStudent = async (appointment, student) => {
   // Formater la date et l'heure du rendez-vous
   const appointmentDate = moment(appointment.appointmentDate).format('dddd, D MMMM YYYY');
   const appointmentTime = moment(appointment.appointmentDate).format('HH:mm');
-  
+ 
   // Obtenir les informations du psychologue
   const psychologist = await User.findById(appointment.psychologistId);
   const psychologistName = psychologist ? psychologist.Name : 'Votre psychologue';
-  
+ 
   // HTML pour l'email de rappel
   const mailHtml = `
   <!DOCTYPE html>
@@ -103,12 +103,12 @@ const sendAppointmentReminderToStudent = async (appointment, student) => {
       <h1>UniMindCare</h1>
       <p>Rappel de rendez-vous</p>
     </div>
-    
+   
     <div class="content">
       <p>Bonjour ${student.Name || 'Étudiant(e)'},</p>
-      
+     
       <p>Nous vous rappelons que vous avez un rendez-vous prévu <strong>demain</strong> avec votre psychologue.</p>
-      
+     
       <div class="appointment-details">
         <h2>📅 Détails du rendez-vous</h2>
         <p><strong>Date:</strong> ${appointmentDate}</p>
@@ -118,7 +118,7 @@ const sendAppointmentReminderToStudent = async (appointment, student) => {
         ${appointment.location ? `<p><strong>Lieu:</strong> ${appointment.location}</p>` : ''}
         ${appointment.meetingLink ? `<p><strong>Lien de réunion:</strong> <a href="${appointment.meetingLink}">${appointment.meetingLink}</a></p>` : ''}
       </div>
-      
+     
       <div class="reminder">
         <h3>Rappels importants</h3>
         <ul>
@@ -127,14 +127,14 @@ const sendAppointmentReminderToStudent = async (appointment, student) => {
           <li>Préparez vos questions ou préoccupations pour optimiser votre séance.</li>
         </ul>
       </div>
-      
+     
       <div style="text-align: center;">
         <a href="http://localhost:3000/tivo/dashboard" class="cta-button">Voir mes rendez-vous</a>
       </div>
-      
+     
       <p>Cordialement,<br>L'équipe UniMindCare</p>
     </div>
-    
+   
     <div class="footer">
       <p>Ce message a été généré automatiquement. Merci de ne pas y répondre.</p>
       <p>UniMindCare © 2025 - Tous droits réservés</p>
@@ -142,7 +142,7 @@ const sendAppointmentReminderToStudent = async (appointment, student) => {
   </body>
   </html>
   `;
-  
+ 
   // Options de l'email
   const mailOptions = {
     from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
@@ -150,7 +150,7 @@ const sendAppointmentReminderToStudent = async (appointment, student) => {
     subject: '📅 Rappel : Votre rendez-vous de demain',
     html: mailHtml
   };
-  
+ 
   // Envoi de l'email
   try {
     await transporterEmail.sendMail(mailOptions);
@@ -168,10 +168,10 @@ const sendAppointmentReminderToStudent = async (appointment, student) => {
 const sendTodaysSessionsReminderToPsychologist = async (psychologist, appointments) => {
   // Formater la date du jour
   const todayDate = moment().format('dddd, D MMMM YYYY');
-  
+ 
   // Générer la liste des rendez-vous
   let appointmentsList = '';
-  
+ 
   if (appointments.length === 0) {
     appointmentsList = `<p>Vous n'avez aucun rendez-vous prévu pour aujourd'hui.</p>`;
   } else {
@@ -187,12 +187,12 @@ const sendTodaysSessionsReminderToPsychologist = async (psychologist, appointmen
       </thead>
       <tbody>
     `;
-    
+   
     for (const appointment of appointments) {
       const student = await User.findById(appointment.studentId);
       const studentName = student ? student.Name : 'Étudiant inconnu';
       const appointmentTime = moment(appointment.appointmentDate).format('HH:mm');
-      
+     
       appointmentsList += `
         <tr>
           <td style="padding: 10px; border: 1px solid #ddd;">${appointmentTime}</td>
@@ -206,13 +206,13 @@ const sendTodaysSessionsReminderToPsychologist = async (psychologist, appointmen
         </tr>
       `;
     }
-    
+   
     appointmentsList += `
       </tbody>
     </table>
     `;
   }
-  
+ 
   // HTML pour l'email de rappel
   const mailHtml = `
   <!DOCTYPE html>
@@ -273,24 +273,24 @@ const sendTodaysSessionsReminderToPsychologist = async (psychologist, appointmen
       <h1>UniMindCare</h1>
       <p>Récapitulatif des séances du jour</p>
     </div>
-    
+   
     <div class="content">
       <p>Bonjour ${psychologist.Name || 'Psychologue'},</p>
-      
+     
       <p>Voici un récapitulatif de vos rendez-vous prévus pour aujourd'hui, ${todayDate}.</p>
-      
+     
       <div class="session-summary">
         <h2>📋 Vos rendez-vous d'aujourd'hui</h2>
         ${appointmentsList}
       </div>
-      
+     
       <div style="text-align: center;">
         <a href="http://localhost:3000/tivo/dashboard/psychologist" class="cta-button">Voir mon planning</a>
       </div>
-      
+     
       <p>Bonne journée,<br>L'équipe UniMindCare</p>
     </div>
-    
+   
     <div class="footer">
       <p>Ce message a été généré automatiquement. Merci de ne pas y répondre.</p>
       <p>UniMindCare © 2025 - Tous droits réservés</p>
@@ -298,7 +298,7 @@ const sendTodaysSessionsReminderToPsychologist = async (psychologist, appointmen
   </body>
   </html>
   `;
-  
+ 
   // Options de l'email
   const mailOptions = {
     from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
@@ -306,7 +306,7 @@ const sendTodaysSessionsReminderToPsychologist = async (psychologist, appointmen
     subject: '📋 UniMindCare : Vos séances du jour',
     html: mailHtml
   };
-  
+ 
   // Envoi de l'email
   try {
     await transporterEmail.sendMail(mailOptions);
@@ -325,32 +325,32 @@ const sendUpcomingAppointmentReminders = async () => {
   try {
     // Date actuelle
     const now = new Date();
-    
+   
     // Date dans 24 heures
     const in24Hours = new Date(now);
     in24Hours.setHours(in24Hours.getHours() + 24);
-    
+   
     // Trouver tous les rendez-vous qui ont lieu dans les 24 prochaines heures
     const upcomingAppointments = await Appointment.find({
       appointmentDate: { $gt: now, $lt: in24Hours },
       status: { $in: ['confirmed', 'rescheduled'] }
     });
-    
+   
     console.log(`Envoi de rappels pour ${upcomingAppointments.length} rendez-vous à venir dans les 24h`);
-    
+   
     let successCount = 0;
     let failCount = 0;
-    
+   
     // Envoyer des rappels pour chaque rendez-vous
     for (const appointment of upcomingAppointments) {
       // Récupérer les informations de l'étudiant
       const student = await User.findById(appointment.studentId);
-      
+     
       if (student) {
         const success = await sendAppointmentReminderToStudent(appointment, student);
         if (success) {
           successCount++;
-          
+         
           // Marquer le rendez-vous comme rappelé
           appointment.reminderSent = true;
           await appointment.save();
@@ -362,7 +362,7 @@ const sendUpcomingAppointmentReminders = async () => {
         failCount++;
       }
     }
-    
+   
     console.log(`Rappels de rendez-vous envoyés : ${successCount} réussis, ${failCount} échoués`);
     return { success: successCount, failed: failCount };
   } catch (error) {
@@ -377,41 +377,49 @@ const sendUpcomingAppointmentReminders = async () => {
 const sendTodaySessionsReminders = async () => {
   try {
     // Récupérer tous les psychologues
-    const psychologists = await User.find({ 
+    const psychologists = await User.find({
       Role: { $in: ['psychiatre', 'psychologue'] },
-      verified: true 
+      verified: true
     });
-    
+   
     console.log(`Envoi de récapitulatifs à ${psychologists.length} psychologues`);
-    
+   
     // Date de début et de fin d'aujourd'hui
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    
+   
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
-    
+   
     let successCount = 0;
     let failCount = 0;
-    
+   
     // Pour chaque psychologue, récupérer ses rendez-vous du jour et envoyer un récapitulatif
     for (const psychologist of psychologists) {
-      // Récupérer les rendez-vous du jour pour ce psychologue
+      // CORRECTION : Utiliser 'date' au lieu de 'appointmentDate'
       const todayAppointments = await Appointment.find({
         psychologistId: psychologist._id,
-        appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-        status: { $in: ['confirmed', 'rescheduled'] }
-      }).sort({ appointmentDate: 1 });
-      
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: 'confirmed' // CORRECTION : 'rescheduled' n'est pas dans les enum
+      }).sort({ date: 1 });
+     
+      // Adapter les rendez-vous avant de les envoyer
+      const appointmentsForSummary = todayAppointments.map(app => ({
+        ...app.toObject(),
+        appointmentDate: app.date, // Mapper date vers appointmentDate
+        mode: app.mode || 'En personne',
+        location: app.location || 'Cabinet de consultation'
+      }));
+     
       // Envoyer le récapitulatif
-      const success = await sendTodaysSessionsReminderToPsychologist(psychologist, todayAppointments);
+      const success = await sendTodaysSessionsReminderToPsychologist(psychologist, appointmentsForSummary);
       if (success) {
         successCount++;
       } else {
         failCount++;
       }
     }
-    
+   
     console.log(`Récapitulatifs des séances envoyés : ${successCount} réussis, ${failCount} échoués`);
     return { success: successCount, failed: failCount };
   } catch (error) {

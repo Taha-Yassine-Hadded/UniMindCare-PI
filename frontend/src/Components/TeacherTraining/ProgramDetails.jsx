@@ -142,7 +142,7 @@ const ProgramDetails = () => {
       
       if (type === 'video') {
         endpoint = 'recommend';
-        port = '8000';
+        port = '8002';
       } else if (type === 'article') {
         endpoint = 'recommend-articles';
         port = '8001';

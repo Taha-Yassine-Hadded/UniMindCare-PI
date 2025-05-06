@@ -613,4 +613,51 @@ router.post('/test-send-summary/:psychologistId', async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   });
+
+
+  router.get('/stats/:psychologistId', async (req, res) => {
+    try {
+      const { psychologistId } = req.params;
+      const { start, end } = req.query;
+  
+      if (!mongoose.Types.ObjectId.isValid(psychologistId)) {
+        return res.status(400).json({ message: 'Invalid psychologistId format' });
+      }
+  
+      const startDate = start ? new Date(start) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end) : new Date();
+  
+      // Correction ici :
+      const match = {
+        psychologistId: new mongoose.Types.ObjectId(psychologistId),
+        date: { $gte: startDate, $lte: endDate }
+      };
+  
+      const stats = await Appointment.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+  
+      const total = await Appointment.countDocuments(match);
+  
+      const result = {
+        total,
+        confirmed: 0,
+        cancelled: 0,
+        pending: 0
+      };
+      stats.forEach(s => {
+        result[s._id] = s.count;
+      });
+  
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching stats', error: error.message });
+    }
+  });
 module.exports = router;

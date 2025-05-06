@@ -80,7 +80,7 @@ router.post(
       console.log("Appel à l'API Flask...");
       let flaskResponse;
       try {
-        flaskResponse = await axios.post("http://127.0.0.1:5001/exit-request", {
+        flaskResponse = await axios.post("http://127.0.0.1:5020/exit-request", {
           student_name: student.Name,
           reason: reason
         });
@@ -181,7 +181,7 @@ router.post("/approve-next", authenticateTeacher, async (req, res) => {
     // Appeler l'API Flask pour approuver la prochaine demande
     let flaskResponse;
     try {
-      flaskResponse = await axios.post("http://localhost:5001/approve-next");
+      flaskResponse = await axios.post("http://localhost:5020/approve-next");
     } catch (error) {
       console.error("Erreur lors de l'appel à l'API Flask (approve-next):", error.message);
       return res.status(500).json({ message: "Erreur lors de l'appel à l'API Python" });
