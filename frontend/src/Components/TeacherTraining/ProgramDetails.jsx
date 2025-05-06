@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useRef } from 'react';
-import { Container, Row, Col, Card, CardBody, Spinner } from 'reactstrap';
+import { Container, Row, Col, Card, CardBody, Spinner, UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'reactstrap';
 import { Breadcrumbs, Btn, H6, P } from '../../AbstractElements';
 import { useParams } from 'react-router-dom';
 import ContentService from '../../Services/TeacherTraining/ContentService';
@@ -21,7 +21,9 @@ const ProgramDetails = () => {
   // States for content suggestion feature
   const [suggestModal, setSuggestModal] = useState(false);
   const [videoRecommendations, setVideoRecommendations] = useState([]);
+  const [articleRecommendations, setArticleRecommendations] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [recommendationType, setRecommendationType] = useState('video'); // 'video' or 'article'
 
   const toggle = () => setModal(!modal);
   const toggleSuggestModal = () => setSuggestModal(!suggestModal);
@@ -128,13 +130,25 @@ const ProgramDetails = () => {
     }
   };
 
-  // Function to handle content suggestions
-  const handleSuggestContent = async () => {
+  // Function to suggest content based on selected type
+  const handleSuggestContent = async (type) => {
+    setRecommendationType(type);
     setLoadingRecommendations(true);
     setSuggestModal(true);
     
     try {
-      const response = await fetch('http://localhost:8000/recommend', {
+      let endpoint = '';
+      let port = '';
+      
+      if (type === 'video') {
+        endpoint = 'recommend';
+        port = '8000';
+      } else if (type === 'article') {
+        endpoint = 'recommend-articles';
+        port = '8001';
+      }
+      
+      const response = await fetch(`http://localhost:${port}/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,21 +165,32 @@ const ProgramDetails = () => {
       }
       
       const data = await response.json();
-      setVideoRecommendations(data.recommendations);
+      
+      if (type === 'video') {
+        setVideoRecommendations(data.recommendations);
+        setArticleRecommendations([]);
+      } else {
+        setArticleRecommendations(data.recommendations);
+        setVideoRecommendations([]);
+      }
     } catch (error) {
-      console.error('Error fetching video recommendations:', error);
+      console.error(`Error fetching ${type} recommendations:`, error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Failed to get video recommendations. Please ensure the recommendation service is running.',
+        text: `Failed to get ${type} recommendations. Please ensure the recommendation service is running.`,
       });
-      setVideoRecommendations([]);
+      if (type === 'video') {
+        setVideoRecommendations([]);
+      } else {
+        setArticleRecommendations([]);
+      }
     } finally {
       setLoadingRecommendations(false);
     }
   };
 
-  // NEW FUNCTION: Handle adding video as content
+  // Handle adding video as content
   const handleAddVideoAsContent = async (video) => {
     try {
       const contentData = new FormData();
@@ -208,6 +233,53 @@ const ProgramDetails = () => {
       });
     }
   };
+  
+  // Handle adding article as content
+  const handleAddArticleAsContent = async (article) => {
+    try {
+      const contentData = new FormData();
+      contentData.append('title', article.title);
+      contentData.append('description', article.snippet || '');
+      contentData.append('type', 'article'); // Change from 'link' to 'article'
+      contentData.append('contentUrl', article.url);
+      
+      // Show loading indicator
+      Swal.fire({
+        title: 'Adding content...',
+        text: 'Please wait while we add this article to your program',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+      
+      // Call the ContentService to add the content
+      const newContent = await ContentService.createContent(id, contentData);
+      
+      // Show success message
+      Swal.fire({
+        icon: 'success',
+        title: 'Article Added!',
+        text: 'The article has been added to your program content.',
+        timer: 2500,
+        showConfirmButton: false
+      });
+      
+      // Close the modal after adding
+      toggleSuggestModal();
+      
+      // Refresh content list
+      fetchProgramContents();
+      
+    } catch (error) {
+      console.error('Error adding article as content:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to add article as content. Please try again.',
+      });
+    }
+  };
 
   // Extract YouTube video ID from URL
   const extractYoutubeId = (url) => {
@@ -234,15 +306,21 @@ const ProgramDetails = () => {
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <h4>{programTitle}</h4>
                   <div>
-                    <Btn 
-                      attrBtn={{ 
-                        color: "info", 
-                        className: "me-2",
-                        onClick: handleSuggestContent 
-                      }}
-                    >
-                      <i className="fa fa-lightbulb-o me-1"></i> Suggest Content
-                    </Btn>
+                    {/* Updated to use dropdown for different recommendation types */}
+                    <UncontrolledDropdown className="me-2 d-inline-block">
+                      <DropdownToggle color="info" caret>
+                        <i className="fa fa-lightbulb-o me-1"></i> Suggest Content
+                      </DropdownToggle>
+                      <DropdownMenu end>
+                        <DropdownItem header>Choose Content Type</DropdownItem>
+                        <DropdownItem onClick={() => handleSuggestContent('video')}>
+                          <i className="fa fa-video-camera me-2"></i> Suggest Videos
+                        </DropdownItem>
+                        <DropdownItem onClick={() => handleSuggestContent('article')}>
+                          <i className="fa fa-newspaper-o me-2"></i> Suggest Articles
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </UncontrolledDropdown>
                     <Btn attrBtn={{ color: "success", onClick: toggle }}>
                       <i className="fa fa-plus"></i> Add Content
                     </Btn>
@@ -285,7 +363,7 @@ const ProgramDetails = () => {
                   />
                 </CommonModal>
 
-                {/* Video Suggestions Modal */}
+                {/* Content Suggestions Modal */}
                 <CommonModal
                   isOpen={suggestModal}
                   title={null} 
@@ -306,8 +384,8 @@ const ProgramDetails = () => {
                         }}
                       >
                         <h4 className="modal-title">
-                          <i className="fa fa-lightbulb-o me-2"></i>
-                          Smart Content Recommendations
+                          <i className={`fa ${recommendationType === 'video' ? 'fa-video-camera' : 'fa-newspaper-o'} me-2`}></i>
+                          Smart {recommendationType === 'video' ? 'Video' : 'Article'} Recommendations
                         </h4>
                         <p className="mb-0 mt-1 text-white-50">
                           For program: <strong>{programTitle}</strong>
@@ -328,221 +406,360 @@ const ProgramDetails = () => {
                             }}
                           />
                         </div>
-                        <p className="mt-4 lead">Analyzing program content and finding relevant videos...</p>
+                        <p className="mt-4 lead">Analyzing program content and finding relevant {recommendationType}s...</p>
                         <p className="text-muted">Our AI is searching for the best educational content that matches your program</p>
                       </div>
-                    ) : videoRecommendations.length > 0 ? (
-                      <div>
-                        <div className="alert alert-info mb-4" role="alert">
-                          <div className="d-flex">
-                            <div className="me-3">
-                              <i className="fa fa-info-circle fa-2x"></i>
-                            </div>
-                            <div>
-                              <h6 className="alert-heading">Personalized Recommendations</h6>
-                              <p className="mb-0">
-                                Based on your program's title and description, we've found these educational videos that might enhance your teaching materials.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Results counter and match quality indicator */}
-                        <div className="d-flex justify-content-between align-items-center mb-4">
+                    ) : (
+                      <>
+                        {/* VIDEO RECOMMENDATIONS */}
+                        {recommendationType === 'video' && videoRecommendations.length > 0 ? (
                           <div>
-                            <span className="badge bg-primary rounded-pill">
-                              {videoRecommendations.length} videos found
-                            </span>
-                          </div>
-                          <div className="text-muted small">
-                            <i className="fa fa-filter me-1"></i> Showing best matches first
-                          </div>
-                        </div>
+                            <div className="alert alert-info mb-4" role="alert">
+                              <div className="d-flex">
+                                <div className="me-3">
+                                  <i className="fa fa-info-circle fa-2x"></i>
+                                </div>
+                                <div>
+                                  <h6 className="alert-heading">Personalized Video Recommendations</h6>
+                                  <p className="mb-0">
+                                    Based on your program's title and description, we've found these educational videos that might enhance your teaching materials.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Results counter and match quality indicator */}
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                              <div>
+                                <span className="badge bg-primary rounded-pill">
+                                  {videoRecommendations.length} videos found
+                                </span>
+                              </div>
+                              <div className="text-muted small">
+                                <i className="fa fa-filter me-1"></i> Showing best matches first
+                              </div>
+                            </div>
 
-                        {/* Recommendations cards with improved styling */}
-                        <div className="recommendation-list">
-                          {videoRecommendations.map((video, index) => (
-                            <Card 
-                              key={index} 
-                              className="mb-4 recommendation-card border-0 shadow-sm hover-effect"
-                              style={{
-                                transition: "transform 0.3s ease, box-shadow 0.3s ease",
-                                borderRadius: "8px",
-                                overflow: "hidden"
-                              }}
-                            >
-                              <CardBody className="p-0">
-                                <Row className="g-0">
-                                  <Col md="5" className="position-relative">
-                                    {/* Video thumbnail with overlay play button */}
-                                    <div 
-                                      className="video-thumbnail h-100 position-relative" 
-                                      style={{
-                                        background: "#f8f9fa",
-                                        minHeight: "220px"
-                                      }}
-                                    >
-                                      {video.video_url && extractYoutubeId(video.video_url) ? (
-                                        <>
-                                          <div className="ratio ratio-16x9 h-100">
-                                            <img 
-                                              src={`https://img.youtube.com/vi/${extractYoutubeId(video.video_url)}/maxresdefault.jpg`}
-                                              alt={video.video_title}
-                                              className="img-fluid"
-                                              style={{objectFit: "cover"}}
-                                            />
-                                          </div>
+                            {/* Video recommendations cards */}
+                            <div className="recommendation-list">
+                              {videoRecommendations.map((video, index) => (
+                                <Card 
+                                  key={index} 
+                                  className="mb-4 recommendation-card border-0 shadow-sm hover-effect"
+                                  style={{
+                                    transition: "transform 0.3s ease, box-shadow 0.3s ease",
+                                    borderRadius: "8px",
+                                    overflow: "hidden"
+                                  }}
+                                >
+                                  {/* Video card content - same as before */}
+                                  <CardBody className="p-0">
+                                    <Row className="g-0">
+                                      <Col md="5" className="position-relative">
+                                        {/* Video thumbnail with overlay play button */}
+                                        <div 
+                                          className="video-thumbnail h-100 position-relative" 
+                                          style={{
+                                            background: "#f8f9fa",
+                                            minHeight: "220px"
+                                          }}
+                                        >
+                                          {video.video_url && extractYoutubeId(video.video_url) ? (
+                                            <>
+                                              <div className="ratio ratio-16x9 h-100">
+                                                <img 
+                                                  src={`https://img.youtube.com/vi/${extractYoutubeId(video.video_url)}/maxresdefault.jpg`}
+                                                  alt={video.video_title}
+                                                  className="img-fluid"
+                                                  style={{objectFit: "cover"}}
+                                                />
+                                              </div>
+                                              <div 
+                                                className="play-overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                                                onClick={() => window.open(video.video_url, '_blank', 'noopener,noreferrer')}
+                                                style={{
+                                                  backgroundColor: "rgba(0,0,0,0.3)",
+                                                  cursor: "pointer",
+                                                  transition: "all 0.3s ease"
+                                                }}
+                                              >
+                                                <div className="play-button">
+                                                  <i 
+                                                    className="fa fa-play-circle-o" 
+                                                    style={{
+                                                      fontSize: "3.5rem", 
+                                                      color: "white",
+                                                      textShadow: "0 2px 10px rgba(0,0,0,0.5)"
+                                                    }}
+                                                  ></i>
+                                                </div>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            <div className="h-100 bg-light text-center d-flex align-items-center justify-content-center">
+                                              <i className="fa fa-video-camera fa-3x text-secondary"></i>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Match score badge */}
                                           <div 
-                                            className="play-overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-                                            onClick={() => window.open(video.video_url, '_blank', 'noopener,noreferrer')}
+                                            className="match-score position-absolute top-0 end-0 m-2"
                                             style={{
-                                              backgroundColor: "rgba(0,0,0,0.3)",
-                                              cursor: "pointer",
-                                              transition: "all 0.3s ease"
+                                              backgroundColor: getScoreColor(video.similarity_score),
+                                              color: "white",
+                                              padding: "4px 10px",
+                                              borderRadius: "4px",
+                                              fontWeight: "bold",
+                                              fontSize: "0.9rem"
                                             }}
                                           >
-                                            <div className="play-button">
-                                              <i 
-                                                className="fa fa-play-circle-o" 
-                                                style={{
-                                                  fontSize: "3.5rem", 
-                                                  color: "white",
-                                                  textShadow: "0 2px 10px rgba(0,0,0,0.5)"
-                                                }}
-                                              ></i>
-                                            </div>
+                                            {(video.similarity_score * 100).toFixed(0)}% Match
                                           </div>
-                                        </>
-                                      ) : (
-                                        <div className="h-100 bg-light text-center d-flex align-items-center justify-content-center">
-                                          <i className="fa fa-video-camera fa-3x text-secondary"></i>
                                         </div>
-                                      )}
-                                      
-                                      {/* Match score badge */}
-                                      <div 
-                                        className="match-score position-absolute top-0 end-0 m-2"
-                                        style={{
-                                          backgroundColor: getScoreColor(video.similarity_score),
-                                          color: "white",
-                                          padding: "4px 10px",
-                                          borderRadius: "4px",
-                                          fontWeight: "bold",
-                                          fontSize: "0.9rem"
-                                        }}
-                                      >
-                                        {(video.similarity_score * 100).toFixed(0)}% Match
-                                      </div>
-                                    </div>
-                                  </Col>
-                                  <Col md="7">
-                                    <div className="p-4">
-                                      <h5 className="video-title fw-bold mb-2">{video.video_title}</h5>
-                                      
-                                      <div className="video-meta mb-2 text-muted d-flex align-items-center">
-                                        <i className="fa fa-tag me-1"></i>
-                                        <span className="small">
-                                          {video.program_title || "Educational Content"}
-                                        </span>
-                                      </div>
-                                      
-                                      <P className="video-description mb-3">
-                                        {video.video_description}
-                                      </P>
-                                      
-                                      {/* Keywords tags with improved styling */}
-                                      {video.keywords && (
-                                        <div className="keywords-container mb-3">
-                                          {video.keywords.split(',').map((keyword, i) => (
-                                            <span 
-                                              key={i} 
-                                              className="keyword-tag me-1 mb-1"
-                                              style={{
-                                                display: "inline-block",
-                                                background: "rgba(94, 80, 249, 0.1)",
-                                                color: "#5e50f9",
-                                                padding: "3px 10px",
-                                                borderRadius: "50px",
-                                                fontSize: "0.8rem"
+                                      </Col>
+                                      <Col md="7">
+                                        <div className="p-4">
+                                          <h5 className="video-title fw-bold mb-2">{video.video_title}</h5>
+                                          
+                                          <div className="video-meta mb-2 text-muted d-flex align-items-center">
+                                            <i className="fa fa-tag me-1"></i>
+                                            <span className="small">
+                                              {video.program_title || "Educational Content"}
+                                            </span>
+                                          </div>
+                                          
+                                          <P className="video-description mb-3">
+                                            {video.video_description}
+                                          </P>
+                                          
+                                          {/* Keywords tags with improved styling */}
+                                          {video.keywords && (
+                                            <div className="keywords-container mb-3">
+                                              {video.keywords.split(',').map((keyword, i) => (
+                                                <span 
+                                                  key={i} 
+                                                  className="keyword-tag me-1 mb-1"
+                                                  style={{
+                                                    display: "inline-block",
+                                                    background: "rgba(94, 80, 249, 0.1)",
+                                                    color: "#5e50f9",
+                                                    padding: "3px 10px",
+                                                    borderRadius: "50px",
+                                                    fontSize: "0.8rem"
+                                                  }}
+                                                >
+                                                  {keyword.trim()}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                          
+                                          {/* Action buttons */}
+                                          <div className="d-flex justify-content-end mt-3">
+                                            <Btn 
+                                              attrBtn={{ 
+                                                color: "outline-primary", 
+                                                size: "sm",
+                                                className: "me-2",
+                                                onClick: () => {
+                                                  navigator.clipboard.writeText(video.video_url);
+                                                  Swal.fire({
+                                                    icon: 'success',
+                                                    title: 'URL Copied!',
+                                                    text: 'Video URL copied to clipboard',
+                                                    toast: true,
+                                                    position: 'bottom-end',
+                                                    showConfirmButton: false,
+                                                    timer: 3000
+                                                  });
+                                                }
                                               }}
                                             >
-                                              {keyword.trim()}
-                                            </span>
-                                          ))}
+                                              <i className="fa fa-copy me-1"></i> Copy URL
+                                            </Btn>
+                                            <Btn 
+                                              attrBtn={{ 
+                                                color: "success", 
+                                                size: "sm",
+                                                className: "me-2 add-content-btn",
+                                                onClick: () => handleAddVideoAsContent(video)
+                                              }}
+                                            >
+                                              <i className="fa fa-plus-circle me-1"></i> Add as Content
+                                            </Btn>
+                                            <Btn 
+                                              attrBtn={{ 
+                                                color: "primary", 
+                                                size: "sm", 
+                                                onClick: () => window.open(video.video_url, '_blank', 'noopener,noreferrer')
+                                              }}
+                                            >
+                                              <i className="fa fa-external-link me-1"></i> Watch Video
+                                            </Btn>
+                                          </div>
                                         </div>
-                                      )}
-                                      
-                                      {/* Action buttons - UPDATED WITH ADD AS CONTENT BUTTON */}
-                                      <div className="d-flex justify-content-end mt-3">
-                                        <Btn 
-                                          attrBtn={{ 
-                                            color: "outline-primary", 
-                                            size: "sm",
-                                            className: "me-2",
-                                            onClick: () => {
-                                              // Copy video URL to clipboard
-                                              navigator.clipboard.writeText(video.video_url);
-                                              Swal.fire({
-                                                icon: 'success',
-                                                title: 'URL Copied!',
-                                                text: 'Video URL copied to clipboard',
-                                                toast: true,
-                                                position: 'bottom-end',
-                                                showConfirmButton: false,
-                                                timer: 3000
-                                              });
-                                            }
-                                          }}
-                                        >
-                                          <i className="fa fa-copy me-1"></i> Copy URL
-                                        </Btn>
-                                        <Btn 
-                                          attrBtn={{ 
-                                            color: "success", 
-                                            size: "sm",
-                                            className: "me-2 add-content-btn",
-                                            onClick: () => handleAddVideoAsContent(video)
-                                          }}
-                                        >
-                                          <i className="fa fa-plus-circle me-1"></i> Add as Content
-                                        </Btn>
-                                        <Btn 
-                                          attrBtn={{ 
-                                            color: "primary", 
-                                            size: "sm", 
-                                            onClick: () => window.open(video.video_url, '_blank', 'noopener,noreferrer')
-                                          }}
-                                        >
-                                          <i className="fa fa-external-link me-1"></i> Watch Video
-                                        </Btn>
-                                      </div>
-                                    </div>
-                                  </Col>
-                                </Row>
-                              </CardBody>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center my-5 py-4">
-                        <div className="empty-state mb-3">
-                          <i className="fa fa-search fa-3x text-info mb-3" style={{opacity: 0.7}}></i>
-                        </div>
-                        <h5 className="text-muted mb-3">No relevant video recommendations found</h5>
-                        <p className="text-muted col-md-8 mx-auto">
-                          Our system couldn't find strong matches for this program. Try updating the program description with more specific keywords related to your teaching goals.
-                        </p>
-                        <Btn 
-                          attrBtn={{ 
-                            color: "outline-primary", 
-                            className: "mt-2",
-                            onClick: toggleSuggestModal
-                          }}
-                        >
-                          Close
-                        </Btn>
-                      </div>
+                                      </Col>
+                                    </Row>
+                                  </CardBody>
+                                </Card>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* ARTICLE RECOMMENDATIONS */}
+                        {recommendationType === 'article' && articleRecommendations.length > 0 ? (
+                          <div>
+                            <div className="alert alert-info mb-4" role="alert">
+                              <div className="d-flex">
+                                <div className="me-3">
+                                  <i className="fa fa-info-circle fa-2x"></i>
+                                </div>
+                                <div>
+                                  <h6 className="alert-heading">Personalized Article Recommendations</h6>
+                                  <p className="mb-0">
+                                    Based on your program's title and description, we've found these educational articles that might enhance your teaching materials.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Results counter and match quality indicator */}
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                              <div>
+                                <span className="badge bg-primary rounded-pill">
+                                  {articleRecommendations.length} articles found
+                                </span>
+                              </div>
+                              <div className="text-muted small">
+                                <i className="fa fa-filter me-1"></i> Showing best matches first
+                              </div>
+                            </div>
+
+                            {/* Article recommendations cards */}
+                            <div className="recommendation-list">
+                              {articleRecommendations.map((article, index) => (
+                                <Card 
+                                  key={index} 
+                                  className="mb-4 recommendation-card border-0 shadow-sm hover-effect"
+                                  style={{
+                                    transition: "transform 0.3s ease, box-shadow 0.3s ease",
+                                    borderRadius: "8px",
+                                    overflow: "hidden"
+                                  }}
+                                >
+                                  <CardBody className="p-0">
+                                    <Row className="g-0">
+                                      <Col md="3" className="position-relative bg-light d-flex align-items-center justify-content-center">
+                                        <div className="p-4 text-center">
+                                          <i className="fa fa-file-text-o fa-4x text-primary mb-3"></i>
+                                          <div 
+                                            className="match-score"
+                                            style={{
+                                              backgroundColor: getScoreColor(article.similarity_score),
+                                              color: "white",
+                                              padding: "8px 15px",
+                                              borderRadius: "50px",
+                                              fontWeight: "bold",
+                                              display: "inline-block"
+                                            }}
+                                          >
+                                            {(article.similarity_score * 100).toFixed(0)}% Match
+                                          </div>
+                                        </div>
+                                      </Col>
+                                      <Col md="9">
+                                        <div className="p-4">
+                                          <h5 className="article-title fw-bold mb-2">{article.title}</h5>
+                                          
+                                          <div className="article-meta mb-3 text-muted d-flex align-items-center">
+                                            <i className="fa fa-globe me-1"></i>
+                                            <span className="small me-3">
+                                              {article.source || "Unknown Source"}
+                                            </span>
+                                          </div>
+                                          
+                                          <P className="article-description mb-3">
+                                            {article.snippet}
+                                          </P>
+                                          
+                                          {/* Action buttons for articles */}
+                                          <div className="d-flex justify-content-end mt-3">
+                                            <Btn 
+                                              attrBtn={{ 
+                                                color: "outline-primary", 
+                                                size: "sm",
+                                                className: "me-2",
+                                                onClick: () => {
+                                                  navigator.clipboard.writeText(article.url);
+                                                  Swal.fire({
+                                                    icon: 'success',
+                                                    title: 'URL Copied!',
+                                                    text: 'Article URL copied to clipboard',
+                                                    toast: true,
+                                                    position: 'bottom-end',
+                                                    showConfirmButton: false,
+                                                    timer: 3000
+                                                  });
+                                                }
+                                              }}
+                                            >
+                                              <i className="fa fa-copy me-1"></i> Copy URL
+                                            </Btn>
+                                            <Btn 
+                                              attrBtn={{ 
+                                                color: "success", 
+                                                size: "sm",
+                                                className: "me-2 add-content-btn",
+                                                onClick: () => handleAddArticleAsContent(article)
+                                              }}
+                                            >
+                                              <i className="fa fa-plus-circle me-1"></i> Add as Content
+                                            </Btn>
+                                            <Btn 
+                                              attrBtn={{ 
+                                                color: "primary", 
+                                                size: "sm", 
+                                                onClick: () => window.open(article.url, '_blank', 'noopener,noreferrer')
+                                              }}
+                                            >
+                                              <i className="fa fa-external-link me-1"></i> Read Article
+                                            </Btn>
+                                          </div>
+                                        </div>
+                                      </Col>
+                                    </Row>
+                                  </CardBody>
+                                </Card>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* No results */}
+                        {((recommendationType === 'video' && videoRecommendations.length === 0) || 
+                         (recommendationType === 'article' && articleRecommendations.length === 0)) && 
+                         !loadingRecommendations ? (
+                          <div className="text-center my-5 py-4">
+                            <div className="empty-state mb-3">
+                              <i className="fa fa-search fa-3x text-info mb-3" style={{opacity: 0.7}}></i>
+                            </div>
+                            <h5 className="text-muted mb-3">No relevant {recommendationType} recommendations found</h5>
+                            <p className="text-muted col-md-8 mx-auto">
+                              Our system couldn't find strong matches for this program. Try updating the program description with more specific keywords related to your teaching goals.
+                            </p>
+                            <Btn 
+                              attrBtn={{ 
+                                color: "outline-primary", 
+                                className: "mt-2",
+                                onClick: toggleSuggestModal
+                              }}
+                            >
+                              Close
+                            </Btn>
+                          </div>
+                        ) : null}
+                      </>
                     )}
                   </div>
                 </CommonModal>

@@ -37,11 +37,22 @@ router.post(
         trainingProgramId: req.params.trainingProgramId
       };
 
+      // Add description field if provided
+      if (req.body.description) {
+        contentData.description = req.body.description;
+      }
+
       switch (req.body.type) {
         case 'video':
           contentData.contentUrl = req.body.contentUrl;
           if (!contentData.contentUrl) {
             return res.status(400).json({ message: 'Content URL is required for video' });
+          }
+          break;
+        case 'article':
+          contentData.contentUrl = req.body.contentUrl;
+          if (!contentData.contentUrl) {
+            return res.status(400).json({ message: 'Content URL is required for article' });
           }
           break;
         case 'meet':
@@ -84,7 +95,7 @@ router.post(
           }
           break;
         default:
-          return res.status(400).json({ message: 'Invalid content type' });
+          return res.status(400).json({ message: `Invalid content type: ${req.body.type}` });
       }
 
       const content = new TrainingContent(contentData);

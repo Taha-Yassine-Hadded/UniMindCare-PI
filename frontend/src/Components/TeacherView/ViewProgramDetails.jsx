@@ -412,6 +412,16 @@ const ViewProgramDetails = () => {
                           <i className="icofont icofont-video-alt" style={activeTab === '2' ? { color: 'white' } : { color: '#333' }}></i> Videos
                         </NavLink>
                       </NavItem>
+                      {/* Add the new Articles tab */}
+                      <NavItem>
+                        <NavLink
+                          className={activeTab === '5' ? 'active bg-primary text-white' : ''}
+                          onClick={() => setActiveTab('5')}
+                          style={activeTab === '5' ? { color: 'white' } : { color: '#333' }}
+                        >
+                          <i className="icofont icofont-newspaper" style={activeTab === '5' ? { color: 'white' } : { color: '#333' }}></i> Articles
+                        </NavLink>
+                      </NavItem>
                       <NavItem>
                         <NavLink
                           className={activeTab === '3' ? 'active bg-primary text-white' : ''}
@@ -478,6 +488,42 @@ const ViewProgramDetails = () => {
                           </div>
                         ) : (
                           <p className="mt-3">No videos found.</p>
+                        )}
+                      </TabPane>
+
+                      {/* New Articles Tab */}
+                      <TabPane tabId="5">
+                        {getContentByType('article').length > 0 ? (
+                          <div className="mt-3">
+                            {getContentByType('article').map((content) =>
+                              renderContentItem(
+                                content,
+                                <div>
+                                  {content.description && (
+                                    <div className="article-preview mb-3 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
+                                      <p style={{ fontSize: '14px', fontStyle: 'italic', color: '#555' }}>
+                                        {content.description}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {content.contentUrl ? (
+                                    <Button
+                                      color="primary"
+                                      size="sm"
+                                      onClick={() => window.open(content.contentUrl, '_blank', 'noopener,noreferrer')}
+                                      title="Read Article"
+                                    >
+                                      <i className="fa fa-external-link"></i> Read Full Article
+                                    </Button>
+                                  ) : (
+                                    <span>Article URL not available</span>
+                                  )}
+                                </div>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-3">No articles found.</p>
                         )}
                       </TabPane>
 

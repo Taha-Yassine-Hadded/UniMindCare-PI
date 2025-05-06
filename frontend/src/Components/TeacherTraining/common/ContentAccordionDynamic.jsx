@@ -1,5 +1,5 @@
 import React, { Fragment, useState } from 'react';
-import { Card, CardBody, Collapse, Table, Button } from 'reactstrap';
+import { Card, CardBody, Collapse, Table, Button, Badge } from 'reactstrap';
 import AccordianHeadingCommon from '../../UiKits/Accordian/common/AccordianHeadingCommon';
 import ContentService from '../../../Services/TeacherTraining/ContentService';
 import Swal from 'sweetalert2';
@@ -10,10 +10,12 @@ const ContentAccordionDynamic = ({ isOpen, toggle, contents, onDelete, onRefresh
   const [modal, setModal] = useState(false);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
 
+  // Updated categories - separated videos from articles and files
   const categories = [
-    { id: 1, title: 'Files and Videos', icon: 'fa fa-file-video-o', types: ['pdf', 'video'] },
-    { id: 2, title: 'Meetings', icon: 'fa fa-calendar', types: ['meet'] },
-    { id: 3, title: 'Quizzes', icon: 'fa fa-question-circle', types: ['quiz'] }
+    { id: 1, title: 'Videos', icon: 'fa fa-video-camera', types: ['video'] },
+    { id: 2, title: 'Articles & Documents', icon: 'fa fa-file-text-o', types: ['article', 'link', 'pdf'] },
+    { id: 3, title: 'Meetings', icon: 'fa fa-calendar', types: ['meet'] },
+    { id: 4, title: 'Quizzes', icon: 'fa fa-question-circle', types: ['quiz'] }
   ];
 
   const getContentByType = (types) => {
@@ -116,7 +118,7 @@ const ContentAccordionDynamic = ({ isOpen, toggle, contents, onDelete, onRefresh
       link.href = content.contentUrl;
       link.download = '';
       link.target = '_blank';
-      link.rel = 'noopener noreferrer'; // Fixed the syntax error here
+      link.rel = 'noopener noreferrer';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -124,137 +126,268 @@ const ContentAccordionDynamic = ({ isOpen, toggle, contents, onDelete, onRefresh
       Swal.fire('Error!', 'PDF URL not available.', 'error');
     }
   };
+  
+  // Helper function to get a type badge for content
+  const getTypeBadge = (type) => {
+    switch (type) {
+      case 'video':
+        return <Badge color="danger">Video</Badge>;
+      case 'article':
+        return <Badge color="info">Article</Badge>;
+      case 'link':
+        return <Badge color="primary">Web Link</Badge>;
+      case 'pdf':
+        return <Badge color="warning">PDF</Badge>;
+      case 'meet':
+        return <Badge color="success">Meeting</Badge>;
+      case 'quiz':
+        return <Badge color="dark">Quiz</Badge>;
+      default:
+        return <Badge color="secondary">{type}</Badge>;
+    }
+  };
+
+  // Function to truncate long URLs
+  const truncateUrl = (url, maxLength = 50) => {
+    if (!url) return '';
+    return url.length > maxLength ? url.substring(0, maxLength) + '...' : url;
+  };
 
   return (
     <Fragment>
       {categories.map((category) => (
-        <Card key={category.id}>
+        <Card key={category.id} className="mb-3">
           <AccordianHeadingCommon
             toggle={toggle}
             BtnSpanText={
               <>
                 <i className={category.icon} style={{ marginRight: '8px' }}></i>
-                {category.title}
+                {category.title} ({getContentByType(category.types).length})
               </>
             }
             BtnOnClickParameter={category.id}
-            CardHeaderClassName="bg-primary"
+            CardHeaderClassName="bg-primary" // Set all headers to blue (bg-primary)
           />
           <Collapse isOpen={isOpen === category.id}>
             <CardBody>
               {getContentByType(category.types).length > 0 ? (
-                <Table responsive>
-                  <thead>
-                    <tr>
-                      <th>Title</th>
-                      {category.types.includes('quiz') ? (
-                        <th>Questions</th>
-                      ) : category.types.includes('meet') ? (
-                        <>
-                          <th>Scheduled Date</th>
-                          <th>Join Meeting</th>
-                        </>
-                      ) : (
-                        <th>Content</th>
-                      )}
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getContentByType(category.types).map((content) => (
-                      <tr key={content._id || content.id}>
-                        <td>{content.title || 'Untitled'}</td>
-                        <td>
+                <>
+                  {/* Videos display */}
+                  {category.id === 1 && (
+                    <div className="row">
+                      {getContentByType(category.types).map((content) => (
+                        <div key={content._id || content.id} className="col-md-6 col-lg-4 mb-4">
+                          <div className="card h-100 shadow-sm">
+                            <div className="embed-responsive embed-responsive-16by9">
+                              {content.contentUrl ? (
+                                <iframe
+                                  className="card-img-top"
+                                  style={{ height: "200px" }}
+                                  src={getEmbedUrl(content.contentUrl)}
+                                  title={content.title}
+                                  frameBorder="0"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                ></iframe>
+                              ) : (
+                                <div className="text-center py-5 bg-light">Video not available</div>
+                              )}
+                            </div>
+                            <div className="card-body">
+                              <h6 className="card-title">{content.title || 'Untitled'}</h6>
+                              {content.description && (
+                                <p className="card-text small text-muted">{content.description}</p>
+                              )}
+                            </div>
+                            <div className="card-footer bg-white d-flex justify-content-between">
+                              <Button
+                                color="primary"
+                                size="sm"
+                                onClick={() => window.open(content.contentUrl, '_blank')}
+                              >
+                                <i className="fa fa-play me-1"></i> Watch
+                              </Button>
+                              <Button
+                                color="danger"
+                                size="sm"
+                                onClick={() => handleDelete(content._id || content.id)}
+                              >
+                                <i className="fa fa-trash"></i>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Articles & Documents display */}
+                  {category.id === 2 && (
+                    <Table responsive hover>
+                      <thead>
+                        <tr>
+                          <th style={{width: "40px"}}></th>
+                          <th>Title</th>
+                          <th>URL</th>
+                          <th style={{width: "100px"}}>Type</th>
+                          <th style={{width: "130px"}}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getContentByType(category.types).map((content) => (
+                          <tr key={content._id || content.id}>
+                            <td>
+                              <i className={`fa fa-${
+                                content.type === 'pdf' ? 'file-pdf-o text-danger' : 
+                                content.type === 'article' || content.type === 'link' ? 'file-text-o text-primary' : 
+                                'file-o text-muted'
+                              }`}></i>
+                            </td>
+                            <td>
+                              <div>
+                                <strong>{content.title || 'Untitled'}</strong>
+                                {content.description && (
+                                  <div className="small text-muted mt-1">{content.description.substring(0, 60)}{content.description.length > 60 ? '...' : ''}</div>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="text-truncate" style={{maxWidth: "250px"}}>
+                                <a 
+                                  href={content.contentUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="text-primary small"
+                                >
+                                  {truncateUrl(content.contentUrl)}
+                                </a>
+                              </div>
+                            </td>
+                            <td>{getTypeBadge(content.type)}</td>
+                            <td>
+                              <div className="d-flex">
+                                <Button
+                                  color="primary"
+                                  size="sm"
+                                  className="me-2"
+                                  onClick={() => window.open(content.contentUrl, '_blank')}
+                                  title="Open"
+                                >
+                                  <i className="fa fa-external-link"></i>
+                                </Button>
+                                {content.type === 'pdf' && (
+                                  <Button
+                                    color="success"
+                                    size="sm"
+                                    className="me-2"
+                                    onClick={() => handleDownloadPDF(content)}
+                                    title="Download"
+                                  >
+                                    <i className="fa fa-download"></i>
+                                  </Button>
+                                )}
+                                <Button
+                                  color="danger"
+                                  size="sm"
+                                  onClick={() => handleDelete(content._id || content.id)}
+                                  title="Delete"
+                                >
+                                  <i className="fa fa-trash"></i>
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+
+                  {/* Meetings & Quizzes display (keep existing table format) */}
+                  {(category.id === 3 || category.id === 4) && (
+                    <Table responsive>
+                      <thead>
+                        <tr>
+                          <th>Title</th>
                           {category.types.includes('quiz') ? (
-                            content.questions.length + ' questions'
+                            <th>Questions</th>
                           ) : category.types.includes('meet') ? (
-                            content.scheduledDate ? new Date(content.scheduledDate).toLocaleString() : 'N/A'
-                          ) : content.type === 'video' ? (
-                            content.contentUrl ? (
-                              <iframe
-                                width="320"
-                                height="240"
-                                src={getEmbedUrl(content.contentUrl)}
-                                title={content.title}
-                                frameBorder="0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                              ></iframe>
-                            ) : (
-                              'Video URL not available'
-                            )
-                          ) : (
-                            content.contentUrl ? (
-                              <Button
-                                color="primary"
-                                size="sm"
-                                onClick={() => handleDownloadPDF(content)}
-                                title="Download PDF"
-                              >
-                                <i className="fa fa-download"></i> Download PDF
-                              </Button>
-                            ) : (
-                              'PDF not available'
-                            )
-                          )}
-                        </td>
-                        {category.types.includes('meet') && (
-                          <td>
-                            {content.meetingLink ? (
-                              <Button
-                                color="primary"
-                                size="sm"
-                                className="me-2"
-                                href={content.meetingLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Join Meeting"
-                              >
-                                <i className="fa fa-link"></i>
-                              </Button>
-                            ) : (
-                              'N/A'
-                            )}
-                          </td>
-                        )}
-                        <td>
-                          {category.types.includes('quiz') && (
                             <>
-                              <Button
-                                color="warning"
-                                size="sm"
-                                className="me-2"
-                                onClick={() => handleViewQuiz(content)}
-                                title="View"
-                              >
-                                <i className="fa fa-eye"></i>
-                              </Button>
-                              <Button
-                                color="primary"
-                                size="sm"
-                                className="me-2"
-                                onClick={() => handleDownloadQuiz(content)}
-                                title="Download as PDF"
-                              >
-                                <i className="fa fa-download"></i>
-                              </Button>
+                              <th>Scheduled Date</th>
+                              <th>Join Meeting</th>
                             </>
-                          )}
-                          <Button
-                            color="danger"
-                            size="sm"
-                            onClick={() => handleDelete(content._id || content.id)}
-                            title="Delete"
-                          >
-                            <i className="fa fa-trash"></i>
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+                          ) : null}
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getContentByType(category.types).map((content) => (
+                          <tr key={content._id || content.id}>
+                            <td>{content.title || 'Untitled'}</td>
+                            {category.types.includes('quiz') ? (
+                              <td>{content.questions?.length || 0} questions</td>
+                            ) : category.types.includes('meet') ? (
+                              <>
+                                <td>{content.scheduledDate ? new Date(content.scheduledDate).toLocaleString() : 'N/A'}</td>
+                                <td>
+                                  {content.meetingLink ? (
+                                    <Button
+                                      color="success"
+                                      size="sm"
+                                      href={content.meetingLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <i className="fa fa-video-camera me-1"></i> Join
+                                    </Button>
+                                  ) : (
+                                    'N/A'
+                                  )}
+                                </td>
+                              </>
+                            ) : null}
+                            <td>
+                              {category.types.includes('quiz') && (
+                                <>
+                                  <Button
+                                    color="warning"
+                                    size="sm"
+                                    className="me-2"
+                                    onClick={() => handleViewQuiz(content)}
+                                    title="View"
+                                  >
+                                    <i className="fa fa-eye"></i>
+                                  </Button>
+                                  <Button
+                                    color="primary"
+                                    size="sm"
+                                    className="me-2"
+                                    onClick={() => handleDownloadQuiz(content)}
+                                    title="Download as PDF"
+                                  >
+                                    <i className="fa fa-download"></i>
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                color="danger"
+                                size="sm"
+                                onClick={() => handleDelete(content._id || content.id)}
+                                title="Delete"
+                              >
+                                <i className="fa fa-trash"></i>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </>
               ) : (
-                <p>No {category.title.toLowerCase()} found.</p>
+                <div className="text-center py-4">
+                  <i className={`${category.icon} fa-3x text-muted mb-3`}></i>
+                  <p>No {category.title.toLowerCase()} found.</p>
+                </div>
               )}
             </CardBody>
           </Collapse>

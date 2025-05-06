@@ -34,6 +34,15 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
     return meetRegex.test(url);
   };
 
+  const isValidUrl = (url) => {
+    try {
+      new URL(url);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const isValidQuiz = (questions) => {
     if (questions.length < 5) {
       return { valid: false, message: 'Quiz must contain at least 5 questions.' };
@@ -108,6 +117,11 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
         setError('Please provide a valid YouTube URL (e.g., youtube.com or youtu.be).');
         return;
       }
+    } else if (formData.type === 'article') {
+      if (!formData.contentUrl || !isValidUrl(formData.contentUrl)) {
+        setError('Please provide a valid URL for the web article.');
+        return;
+      }
     } else if (formData.type === 'meet') {
       if (!formData.meetingLink || !isValidGoogleMeetUrl(formData.meetingLink)) {
         setError('Please provide a valid Google Meet URL (e.g., https://meet.google.com/xxx-xxxx-xxx).');
@@ -135,6 +149,8 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
       contentData.append('type', formData.type);
 
       if (formData.type === 'video') {
+        contentData.append('contentUrl', formData.contentUrl);
+      } else if (formData.type === 'article') {
         contentData.append('contentUrl', formData.contentUrl);
       } else if (formData.type === 'meet') {
         contentData.append('meetingLink', formData.meetingLink);
@@ -212,6 +228,7 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
           onChange={handleChange}
         >
           <option value="video">Video</option>
+          <option value="article">Web Article</option>
           <option value="meet">Meeting</option>
           <option value="pdf">PDF</option>
           <option value="quiz">Quiz</option>
@@ -220,7 +237,7 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
 
       {formData.type === 'video' && (
         <FormGroup>
-          <Label for="contentUrl">Content URL (YouTube)</Label>
+          <Label for="contentUrl">Video URL (YouTube)</Label>
           <Input
             type="url"
             name="contentUrl"
@@ -230,6 +247,29 @@ const NewContent = ({ trainingProgramId, onContentAdded, toggler }) => {
             placeholder="e.g., https://www.youtube.com/watch?v=xxxx"
             required
           />
+        </FormGroup>
+      )}
+
+      {formData.type === 'article' && (
+        <FormGroup>
+          <Label for="contentUrl">Article URL</Label>
+          <InputGroup>
+            <InputGroupText>
+              <i className="fa fa-newspaper-o"></i>
+            </InputGroupText>
+            <Input
+              type="url"
+              name="contentUrl"
+              id="contentUrl"
+              value={formData.contentUrl}
+              onChange={handleChange}
+              placeholder="e.g., https://example.com/article"
+              required
+            />
+          </InputGroup>
+          <small className="text-muted">
+            Enter the full URL to the web article you want to include
+          </small>
         </FormGroup>
       )}
 

@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useRef } from 'react';
-import { Container, Row, Col, Card, CardBody, Input, Label, FormGroup } from 'reactstrap';
+import { Container, Row, Col, Card, CardBody, Input, Label, FormGroup, InputGroup, InputGroupText, Button, Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'reactstrap';
 import { Btn, Breadcrumbs, Image, H6, LI, UL, P } from '../../AbstractElements';
 import { useNavigate, Link } from 'react-router-dom';
 import ProgramService from '../../Services/TeacherTraining/ProgramService';
@@ -20,10 +20,12 @@ const ProgramList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('creationDate');
   const [userRole, setUserRole] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const navigate = useNavigate();
   const toggle = () => setModal(!modal);
   const toggleEditModal = () => setEditModal(!editModal);
+  const toggleDropdown = () => setDropdownOpen(prevState => !prevState);
   const formRef = useRef(null);
 
   // Fetch user role on component mount
@@ -179,6 +181,18 @@ const ProgramList = () => {
     });
   };
 
+  // Get sort option display name
+  const getSortDisplayName = () => {
+    switch (sortOption) {
+      case 'creationDate':
+        return 'Newest First';
+      case 'mostRecommended':
+        return 'Most Recommended';
+      default:
+        return 'Sort By';
+    }
+  };
+
   // Show loading state while fetching user role
   if (loading) {
     return (
@@ -201,34 +215,57 @@ const ProgramList = () => {
                     <i className="fa fa-plus"></i> Add Program
                   </Btn>
 
-                  <Row className="mb-4">
-                    <Col md="6">
-                      <FormGroup>
-                        <Label for="searchProgram">Search by Title</Label>
+                  {/* Enhanced Search and Sort Controls */}
+                  <div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
+                    <div className="search-container" style={styles.searchContainer}>
+                      <InputGroup className="search-form" style={styles.searchGroup}>
+                        <InputGroupText style={styles.searchIcon}>
+                          <i className="fa fa-search"></i>
+                        </InputGroupText>
                         <Input
                           type="text"
-                          id="searchProgram"
-                          placeholder="Enter program title..."
+                          style={styles.searchInput}
+                          placeholder="Search programs..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                      </FormGroup>
-                    </Col>
-                    <Col md="6">
-                      <FormGroup>
-                        <Label for="sortPrograms">Sort By</Label>
-                        <Input
-                          type="select"
-                          id="sortPrograms"
-                          value={sortOption}
-                          onChange={(e) => setSortOption(e.target.value)}
+                        {searchTerm && (
+                          <Button
+                            color="link"
+                            style={styles.clearButton}
+                            onClick={() => setSearchTerm('')}
+                          >
+                            <i className="fa fa-times"></i>
+                          </Button>
+                        )}
+                      </InputGroup>
+                      {searchTerm && (
+                        <div style={styles.searchResults}>
+                          <small>{filteredPrograms.length} program(s) found</small>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Dropdown isOpen={dropdownOpen} toggle={toggleDropdown} direction="down">
+                      <DropdownToggle caret style={styles.sortDropdownToggle}>
+                        <i className="fa fa-sort-amount-down me-1"></i> {getSortDisplayName()}
+                      </DropdownToggle>
+                      <DropdownMenu end style={styles.sortDropdownMenu}>
+                        <DropdownItem
+                          active={sortOption === 'creationDate'}
+                          onClick={() => setSortOption('creationDate')}
                         >
-                          <option value="creationDate">Creation Date (Newest First)</option>
-                          <option value="mostRecommended">Most Recommended</option>
-                        </Input>
-                      </FormGroup>
-                    </Col>
-                  </Row>
+                          <i className="fa fa-calendar-alt me-2"></i> Newest First
+                        </DropdownItem>
+                        <DropdownItem
+                          active={sortOption === 'mostRecommended'}
+                          onClick={() => setSortOption('mostRecommended')}
+                        >
+                          <i className="fa fa-thumbs-up me-2"></i> Most Recommended
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </div>
 
                   {loading ? (
                     <div>Loading programs...</div>
@@ -295,7 +332,11 @@ const ProgramList = () => {
                         ))
                       ) : (
                         <Col>
-                          <P>No programs found</P>
+                          <div style={styles.noResults}>
+                            <i className="fa fa-search" style={{ fontSize: '2rem', marginBottom: '10px' }}></i>
+                            <P>No programs found</P>
+                            <P className="text-muted">Try adjusting your search or filters</P>
+                          </div>
                         </Col>
                       )}
                     </Row>
@@ -360,7 +401,7 @@ const ProgramList = () => {
   );
 };
 
-// Reuse styles for the loading state
+// Enhanced styles
 const styles = {
   loading: {
     textAlign: "center",
@@ -368,6 +409,67 @@ const styles = {
     fontSize: "20px",
     color: "#718096",
     fontFamily: "'Inter', 'Poppins', sans-serif",
+  },
+  searchContainer: {
+    position: 'relative',
+    maxWidth: '450px',
+    width: '100%',
+  },
+  searchGroup: {
+    boxShadow: '0 3px 10px rgba(0, 0, 0, 0.08)',
+    borderRadius: '50px',
+    overflow: 'hidden',
+    border: '1px solid #e6e6e6',
+    transition: 'all 0.3s ease',
+  },
+  searchIcon: {
+    background: 'transparent',
+    border: 'none',
+    color: '#7366ff',
+    paddingLeft: '18px',
+  },
+  searchInput: {
+    border: 'none',
+    boxShadow: 'none',
+    padding: '12px 15px 12px 5px',
+    fontSize: '14px',
+    background: 'transparent',
+  },
+  clearButton: {
+    background: 'transparent',
+    border: 'none',
+    color: '#999',
+    padding: '0 15px',
+  },
+  searchResults: {
+    color: '#666',
+    marginTop: '8px',
+    marginLeft: '10px',
+  },
+  sortDropdownToggle: {
+    backgroundColor: '#f8f9fa',
+    color: '#7366ff',
+    borderColor: '#e9ecef',
+    borderRadius: '50px',
+    padding: '8px 20px',
+    fontSize: '14px',
+    fontWeight: 500,
+    boxShadow: '0 3px 10px rgba(0, 0, 0, 0.05)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+  },
+  sortDropdownMenu: {
+    minWidth: '200px',
+    padding: '8px 0',
+    boxShadow: '0 5px 15px rgba(0, 0, 0, 0.1)',
+    border: 'none',
+    borderRadius: '10px',
+  },
+  noResults: {
+    textAlign: 'center',
+    padding: '50px 0',
+    color: '#718096',
   },
 };
 
