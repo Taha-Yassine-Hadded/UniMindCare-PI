@@ -258,13 +258,29 @@ export const MENU = [
   {
     className: "menu-box",
     menu: [
+
+
+
       {
-        url: `${process.env.PUBLIC_URL}/teacher-training/my-programs`,
-        icon: <Monitor />,
         title: "Psychologist Dashboard",
+        icon: <Monitor />,
+        type: "sub",
         userRole: "psychiatre",
-        type: "link",
-        bookmark: true,
+        menu: [
+         
+          {
+            url: `${process.env.PUBLIC_URL}/teacher-training/my-programs`,
+            title: "Manage Programs",
+            type: "link",
+          },
+
+          {
+            url: `${process.env.PUBLIC_URL}/teacher-training/program-stats`,
+            title: "Statistics",
+            type: "link",
+            bookmark: true,
+          }
+        ],
       },
       {
         url: `${process.env.PUBLIC_URL}/teacher-training/all-programs`,

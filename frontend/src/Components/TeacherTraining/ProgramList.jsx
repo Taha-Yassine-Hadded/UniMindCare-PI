@@ -342,19 +342,6 @@ const ProgramList = () => {
                     </Row>
                   )}
 
-                  {/* Add Charts Section */}
-                  <div className="mt-5">
-                    <h5>Program Statistics</h5>
-                    <Row>
-                      <Col md="6">
-                        <ContentDistributionChart programs={programs} />
-                      </Col>
-                      <Col md="6">
-                        <QuizPerformanceChart programs={programs} />
-                      </Col>
-                    </Row>
-                  </div>
-
                   {/* Add Program Modal */}
                   <CommonModal
                     isOpen={modal}

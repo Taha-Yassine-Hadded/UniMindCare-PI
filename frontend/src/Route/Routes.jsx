@@ -150,6 +150,7 @@ import ChatModal from "../Components/ChatModal";
 import EvaluationHistoryContain from "../Components/Evaluation/EvaluationHistoryContain";
 import EvaluationDetails from '../Components/Evaluation/EvaluationDetails'; 
 import MeetingForm from "../Components/Meeting/MeetingForm"; // Nouveau composant
+import ProgramStat from "../Components/TeacherTraining/ProgramStat";
 
 export const routes = [
 
@@ -158,10 +159,13 @@ export const routes = [
   //Psychologist Training Dashboard
   { path: `${process.env.PUBLIC_URL}/teacher-training/my-programs`, Component: <ProgramList /> },
   { path: `${process.env.PUBLIC_URL}/teacher-training/program-details/:id`, Component: <ProgramDetails /> },
+  { path: `${process.env.PUBLIC_URL}/teacher-training/program-stats`, Component: <ProgramStat /> },
+
   
   //Psychologist Training Dashboard
   { path: `${process.env.PUBLIC_URL}/teacher-training/all-programs`, Component: <AllProgram /> },
   { path: `${process.env.PUBLIC_URL}/teacher-training/view-details/:id`, Component: <ViewProgramDetails /> },
+
 
 
    //Questionnaire History
