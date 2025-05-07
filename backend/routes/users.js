@@ -1,442 +1,350 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const User = require("../Models/Users");
-const { transporter } = require("../config/emailConfig");
-const loginLink = "http://localhost:3000/tivo/authentication/login-simple";
-const bcrypt = require("bcryptjs");
+const User = require('../Models/Users');
+const Post = require('../Models/Post');
+const InappropriateComment = require('../Models/InappropriateComment');
+const { transporter } = require('../config/emailConfig');
+const loginLink = 'http://localhost:3000/tivo/authentication/login-simple';
+const bcrypt = require('bcryptjs');
 const { validateToken } = require('../middleware/authentication');
 const multer = require('multer');
 const { bucket } = require('../firebase');
-const Post = require('../Models/Post');
 const passport = require('./passportConfig');
-const InappropriateComment = require('../Models/InappropriateComment');
 const validator = require('validator');
 
-// Multer config: only JPEG/PNG, 5MB max
+// Multer config: JPEG/PNG, 2MB max
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png'];
-    if (allowed.includes(file.mimetype)) return cb(null, true);
-    cb(new Error('Seules les images JPEG et PNG sont autorisées'));
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Seules les images JPEG et PNG sont autorisées'), false);
+    }
+    const buffer = file.buffer || Buffer.alloc(0);
+    const isValidImage =
+      (file.mimetype === 'image/jpeg' && buffer.slice(0, 3).toString('hex') === 'ffd8ff') ||
+      (file.mimetype === 'image/png' && buffer.slice(0, 8).toString('hex') === '89504e470d0a1a0a');
+    if (!isValidImage) {
+      return cb(new Error('Fichier image invalide ou corrompu'), false);
+    }
+    cb(null, true);
   },
 });
 
-// Helper: Validate email
-function isValidEspritEmail(email) {
-  return typeof email === 'string' && email.endsWith('@esprit.tn') && validator.isEmail(email);
-}
-
-// Helper: Validate password strength
-function isStrongPassword(password) {
-  return typeof password === 'string' && password.length >= 8;
-}
-
-// Helper: Validate phone number
-function isValidPhone(phone) {
-  return typeof phone === 'string' && validator.isMobilePhone(phone, 'any');
-}
-
-// Helper: Validate role
-function isValidRole(role) {
+// Validation helpers
+const isValidEspritEmail = (email) => typeof email === 'string' && email.endsWith('@esprit.tn') && validator.isEmail(email);
+const isStrongPassword = (password) => typeof password === 'string' && password.length >= 8;
+const isValidPhone = (phone) => typeof phone === 'string' && validator.isMobilePhone(phone, 'any');
+const isValidRole = (role) => {
   const allowed = ['student', 'admin', 'teacher', 'psychologist', 'psychiatre'];
-  if (Array.isArray(role)) return role.every(r => allowed.includes(r));
-  return allowed.includes(role);
-}
+  return Array.isArray(role) ? role.every(r => allowed.includes(r)) : allowed.includes(role);
+};
+const sanitizeInput = (input) => validator.escape(validator.trim(input));
 
-// GET /auth/me - Authenticated user info
-router.get('/auth/me', validateToken, async (req, res) => {
-  try {
-    res.json({ userId: req.user.userId });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+// Email helper
+const sendEmail = async (to, subject, content, isHtml = false) => {
+  const mailOptions = {
+    from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    [isHtml ? 'html' : 'text']: content,
+  };
+  await transporter.sendMail(mailOptions);
+};
+
+// Admin check helper
+const restrictToAdmin = (req, res, next) => {
+  if (!req.user?.Role?.includes('admin')) {
+    return res.status(403).json({ message: 'Accès non autorisé' });
   }
-});
+  next();
+};
 
-// POST /add - Add new user
-router.post("/add", async (req, res) => {
+// Error handling wrapper
+const handleAsync = (fn) => async (req, res, next) => {
   try {
-    const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber, Enabled = true } = req.body;
-
-    // Validate inputs
-    if (!Name || !Identifiant || !Email || !Password || !Role || !PhoneNumber) {
-      return res.status(400).json({ message: "Tous les champs requis doivent être fournis" });
-    }
-    if (!isValidEspritEmail(Email)) {
-      return res.status(400).json({ message: "L'email doit être une adresse esprit.tn valide" });
-    }
-    if (!isStrongPassword(Password)) {
-      return res.status(400).json({ message: "Le mot de passe doit contenir au moins 8 caractères" });
-    }
-    if (!isValidPhone(PhoneNumber)) {
-      return res.status(400).json({ message: "Numéro de téléphone invalide" });
-    }
-    if (!isValidRole(Role)) {
-      return res.status(400).json({ message: "Rôle invalide" });
-    }
-    if (!validator.isAlphanumeric(Identifiant)) {
-      return res.status(400).json({ message: "Identifiant doit être alphanumérique" });
-    }
-
-    // Check existing user
-    const existingUser = await User.findOne({ $or: [{ Email }, { Identifiant }] });
-    if (existingUser) {
-      return res.status(409).json({ message: "Un utilisateur avec cet email ou identifiant existe déjà" });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(Password, 10);
-
-    // Create user
-    const newUser = new User({
-      Name,
-      Identifiant,
-      Email,
-      Password: hashedPassword,
-      Classe: (Array.isArray(Role) ? Role : [Role]).includes("student") ? Classe : "",
-      Role: Array.isArray(Role) ? Role : [Role],
-      PhoneNumber,
-      imageUrl: "",
-      verified: true,
-      enabled: Enabled,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const savedUser = await newUser.save();
-
-    // Send email
-    const mailOptions = {
-      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
-      to: savedUser.Email,
-      subject: "Compte créé",
-      html: `<p>Votre compte a été créé avec succès. Cliquez ici pour vous connecter :</p><a href="${loginLink}">Connexion UniMindCare</a>`,
-    };
-    await transporter.sendMail(mailOptions);
-
-    res.status(201).json(savedUser);
+    await fn(req, res, next);
   } catch (error) {
-    console.error("Erreur ajout utilisateur:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error(`Erreur: ${error.message}`, error);
+    res.status(
+      error.message.includes('invalide') || error.message.includes('requis') ? 400 :
+      error.message.includes('non trouvé') ? 404 :
+      error.message.includes('existe déjà') ? 409 :
+      error.message.includes('incorrect') ? 401 :
+      error.message.includes('non autorisé') ? 403 : 500
+    ).json({ message: error.message });
   }
-});
+};
 
-// GET / - Get all users (admin)
-router.get("/", passport.authenticate('jwt', { session: false }), async (req, res) => {
-  try {
-    if (!req.user.Role || !req.user.Role.includes('admin')) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-    const users = await User.find({});
-    res.status(200).json(users);
-  } catch (error) {
-    console.error("Erreur récupération utilisateurs:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+// GET /auth/me
+router.get('/auth/me', validateToken, handleAsync(async (req, res) => {
+  res.json({ userId: req.user.userId });
+}));
+
+// POST /add
+router.post('/add', handleAsync(async (req, res) => {
+  const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber, Enabled = true } = req.body;
+
+  if (!Name || !Identifiant || !Email || !Password || !Role || !PhoneNumber) {
+    throw new Error('Tous les champs requis doivent être fournis');
   }
-});
-
-// GET /disabled - Get disabled users (admin)
-router.get("/disabled", passport.authenticate('jwt', { session: false }), async (req, res) => {
-  try {
-    if (!req.user.Role || !req.user.Role.includes('admin')) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-    const users = await User.find({ enabled: false });
-    res.status(200).json(users);
-  } catch (error) {
-    console.error("Erreur récupération utilisateurs désactivés:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+  if (!isValidEspritEmail(Email)) {
+    throw new Error("L'email doit être une adresse esprit.tn valide");
   }
-});
-
-// PUT /enable/:id - Enable user (admin)
-router.put("/enable/:id", passport.authenticate('jwt', { session: false }), async (req, res) => {
-  try {
-    if (!req.user.Role || !req.user.Role.includes('admin')) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: "ID invalide" });
-    }
-    const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
-      { $set: { enabled: true } },
-      { new: true }
-    );
-    if (!updatedUser) {
-      return res.status(404).json({ message: "Utilisateur non trouvé" });
-    }
-
-    // Send email
-    const mailOptions = {
-      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
-      to: updatedUser.Email,
-      subject: "Compte activé",
-      html: `<p>Cliquez ici pour accéder à votre compte :</p><a href="${loginLink}">Connexion UniMindCare</a>`,
-    };
-    await transporter.sendMail(mailOptions);
-
-    res.status(200).json(updatedUser);
-  } catch (error) {
-    console.error("Erreur activation utilisateur:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+  if (!isStrongPassword(Password)) {
+    throw new Error('Le mot de passe doit contenir au moins 8 caractères');
   }
-});
-
-// PUT /disable/:id - Disable user (admin)
-router.put("/disable/:id", passport.authenticate('jwt', { session: false }), async (req, res) => {
-  try {
-    if (!req.user.Role || !req.user.Role.includes('admin')) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: "ID invalide" });
-    }
-    const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
-      { $set: { enabled: false } },
-      { new: true }
-    );
-    if (!updatedUser) {
-      return res.status(404).json({ message: "Utilisateur non trouvé" });
-    }
-
-    // Send email
-    const mailOptions = {
-      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
-      to: updatedUser.Email,
-      subject: "Compte désactivé",
-      html: "<p>Votre compte a été désactivé par l'administration. Contactez-les pour plus d'informations.</p>",
-    };
-    await transporter.sendMail(mailOptions);
-
-    res.status(200).json(updatedUser);
-  } catch (error) {
-    console.error("Erreur désactivation utilisateur:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+  if (!isValidPhone(PhoneNumber)) {
+    throw new Error('Numéro de téléphone invalide');
   }
-});
-
-// PUT /:identifiant/upload-profile-picture - Upload profile picture
-router.put('/:identifiant/upload-profile-picture', validateToken, upload.single('profilePicture'), async (req, res) => {
-  try {
-    const { identifiant } = req.params;
-    if (!validator.isAlphanumeric(identifiant)) {
-      return res.status(400).json({ message: 'Identifiant invalide' });
-    }
-    if (!req.file) {
-      return res.status(400).json({ message: 'Aucune image fournie' });
-    }
-    const user = await User.findOne({ Identifiant: identifiant });
-    if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    }
-    const fileName = `users/${identifiant}/profile/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9.]/g, '')}`;
-    const file = bucket.file(fileName);
-    const stream = file.createWriteStream({
-      metadata: { contentType: req.file.mimetype },
-    });
-
-    stream.on('error', (err) => {
-      console.error('Erreur upload Firebase:', err);
-      res.status(500).json({ message: 'Erreur upload image' });
-    });
-    stream.on('finish', async () => {
-      await file.makePublic();
-      const imageUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-      user.imageUrl = imageUrl;
-      user.updatedAt = new Date();
-      const updatedUser = await user.save();
-      res.status(200).json(updatedUser);
-    });
-    stream.end(req.file.buffer);
-  } catch (error) {
-    console.error('Erreur mise à jour image profil:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  if (!isValidRole(Role)) {
+    throw new Error('Rôle invalide');
   }
-});
+  if (!validator.isAlphanumeric(Identifiant)) {
+    throw new Error('Identifiant doit être alphanumérique');
+  }
 
-// PUT /:identifiant - Update user password
-router.put("/:identifiant", validateToken, async (req, res) => {
-  try {
-    const { identifiant } = req.params;
-    const { currentPassword, newPassword } = req.body;
-    if (!validator.isAlphanumeric(identifiant)) {
-      return res.status(400).json({ message: 'Identifiant invalide' });
-    }
-    const user = await User.findOne({ Identifiant: identifiant });
-    if (!user) return res.status(404).json({ message: "Utilisateur non trouvé" });
+  const existingUser = await User.findOne({ $or: [{ Email }, { Identifiant: sanitizeInput(Identifiant) }] });
+  if (existingUser) {
+    throw new Error('Un utilisateur avec cet email ou identifiant existe déjà');
+  }
 
-    if (!newPassword) {
-      return res.status(400).json({ message: "Nouveau mot de passe requis" });
-    }
-    if (!currentPassword) {
-      return res.status(400).json({ message: "Mot de passe actuel requis" });
-    }
-    const isMatch = await bcrypt.compare(currentPassword, user.Password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Mot de passe actuel incorrect" });
-    }
-    if (!isStrongPassword(newPassword)) {
-      return res.status(400).json({ message: "Nouveau mot de passe doit contenir au moins 8 caractères" });
-    }
+  const hashedPassword = await bcrypt.hash(Password, 10);
+  const newUser = new User({
+    Name: sanitizeInput(Name),
+    Identifiant: sanitizeInput(Identifiant),
+    Email,
+    Password: hashedPassword,
+    Classe: (Array.isArray(Role) ? Role : [Role]).includes('student') ? sanitizeInput(Classe) : '',
+    Role: Array.isArray(Role) ? Role : [Role],
+    PhoneNumber: sanitizeInput(PhoneNumber),
+    imageUrl: '',
+    verified: true,
+    enabled: Enabled,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const savedUser = await newUser.save();
 
-    user.Password = await bcrypt.hash(newPassword, 10);
+  await sendEmail(savedUser.Email, 'Compte créé', `
+    <p>Votre compte a été créé avec succès. Cliquez ici pour vous connecter :</p>
+    <a href="${loginLink}">Connexion UniMindCare</a>
+  `, true);
+
+  res.status(201).json(savedUser);
+}));
+
+// GET /
+router.get('/', passport.authenticate('jwt', { session: false }), restrictToAdmin, handleAsync(async (req, res) => {
+  const users = await User.find({});
+  res.status(200).json(users);
+}));
+
+// GET /disabled
+router.get('/disabled', passport.authenticate('jwt', { session: false }), restrictToAdmin, handleAsync(async (req, res) => {
+  const users = await User.find({ enabled: false });
+  res.status(200).json(users);
+}));
+
+// PUT /enable/:id
+router.put('/enable/:id', passport.authenticate('jwt', { session: false }), restrictToAdmin, handleAsync(async (req, res) => {
+  if (!validator.isMongoId(req.params.id)) {
+    throw new Error('ID invalide');
+  }
+  const updatedUser = await User.findByIdAndUpdate(req.params.id, { $set: { enabled: true } }, { new: true });
+  if (!updatedUser) {
+    throw new Error('Utilisateur non trouvé');
+  }
+  await sendEmail(updatedUser.Email, 'Compte activé', `
+    <p>Cliquez ici pour accéder à votre compte :</p>
+    <a href="${loginLink}">Connexion UniMindCare</a>
+  `, true);
+  res.status(200).json(updatedUser);
+}));
+
+// PUT /disable/:id
+router.put('/disable/:id', passport.authenticate('jwt', { session: false }), restrictToAdmin, handleAsync(async (req, res) => {
+  if (!validator.isMongoId(req.params.id)) {
+    throw new Error('ID invalide');
+  }
+  const updatedUser = await User.findByIdAndUpdate(req.params.id, { $set: { enabled: false } }, { new: true });
+  if (!updatedUser) {
+    throw new Error('Utilisateur non trouvé');
+  }
+  await sendEmail(updatedUser.Email, 'Compte désactivé', `
+    <p>Votre compte a été désactivé par l'administration. Contactez-les pour plus d'informations.</p>
+  `, true);
+  res.status(200).json(updatedUser);
+}));
+
+// PUT /:identifiant/upload-profile-picture
+router.put('/:identifiant/upload-profile-picture', validateToken, upload.single('profilePicture'), handleAsync(async (req, res) => {
+  const { identifiant } = req.params;
+  if (!validator.isAlphanumeric(sanitizeInput(identifiant))) {
+    throw new Error('Identifiant invalide');
+  }
+  if (!req.file) {
+    throw new Error('Aucune image fournie');
+  }
+  const user = await User.findOne({ Identifiant: sanitizeInput(identifiant) });
+  if (!user) {
+    throw new Error('Utilisateur non trouvé');
+  }
+  const fileName = `users/${identifiant}/profile/${Date.now()}_${sanitizeInput(req.file.originalname.replace(/[^a-zA-Z0-9.]/g, ''))}`;
+  const file = bucket.file(fileName);
+  const stream = file.createWriteStream({ metadata: { contentType: req.file.mimetype } });
+
+  stream.on('error', () => {
+    throw new Error('Erreur upload image');
+  });
+  stream.on('finish', async () => {
+    await file.makePublic();
+    user.imageUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
     user.updatedAt = new Date();
-    const updated = await user.save();
-    res.status(200).json(updated);
-  } catch (error) {
-    console.error("Erreur mise à jour mot de passe:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    const updatedUser = await user.save();
+    res.status(200).json(updatedUser);
+  });
+  stream.end(req.file.buffer);
+}));
+
+// PUT /:identifiant
+router.put('/:identifiant', validateToken, handleAsync(async (req, res) => {
+  const { identifiant } = req.params;
+  const { currentPassword, newPassword } = req.body;
+  if (!validator.isAlphanumeric(sanitizeInput(identifiant))) {
+    throw new Error('Identifiant invalide');
   }
-});
-
-// GET /admin - Get users with inappropriate comment counts (admin)
-router.get('/admin', passport.authenticate('jwt', { session: false }), async (req, res) => {
-  try {
-    if (!req.user.Role || !req.user.Role.includes('admin')) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-    const users = await User.find({}, {
-      Name: 1,
-      Email: 1,
-      Role: 1,
-      enabled: 1,
-      inappropriateCommentsCount: 1,
-      lastInappropriateComment: 1,
-    }).sort({ inappropriateCommentsCount: -1 });
-    res.status(200).json(users);
-  } catch (error) {
-    console.error('Erreur récupération utilisateurs:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  const user = await User.findOne({ Identifiant: sanitizeInput(identifiant) });
+  if (!user) {
+    throw new Error('Utilisateur non trouvé');
   }
-});
-
-// GET /:id/bad-comments - Get bad comments for a user (admin)
-router.get('/:id/bad-comments', passport.authenticate('jwt', { session: false }), async (req, res) => {
-  try {
-    if (!req.user.Role || !req.user.Role.includes('admin')) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: 'ID invalide' });
-    }
-    const inappropriateComments = await InappropriateComment.find({ author: req.params.id }).sort({ createdAt: -1 });
-    const posts = await Post.find({ 'comments.author': req.params.id });
-    const flaggedComments = [];
-    posts.forEach(post => {
-      post.comments.forEach(comment => {
-        if (comment.author.toString() === req.params.id && comment.isInappropriate) {
-          flaggedComments.push({
-            _id: comment._id,
-            content: comment.content,
-            createdAt: comment.createdAt,
-            flaggedAt: comment.flaggedAt,
-            flagReason: comment.flagReason,
-            postId: post._id,
-            postTitle: post.title,
-          });
-        }
-      });
-    });
-    const allBadComments = [
-      ...inappropriateComments.map(comment => ({
-        _id: comment._id,
-        content: comment.content,
-        createdAt: comment.createdAt,
-        postId: comment.postId,
-        postTitle: comment.postTitle,
-        flagReason: comment.reason,
-        type: 'Bloqué',
-      })),
-      ...flaggedComments.map(comment => ({
-        ...comment,
-        type: 'Signalé',
-      })),
-    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Synchronous
-    res.status(200).json(allBadComments);
-  } catch (error) {
-    console.error('Erreur récupération commentaires inappropriés:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  if (!newPassword || !currentPassword) {
+    throw new Error('Mot de passe actuel et nouveau requis');
   }
-});
+  const isMatch = await bcrypt.compare(currentPassword, user.Password);
+  if (!isMatch) {
+    throw new Error('Mot de passe actuel incorrect');
+  }
+  if (!isStrongPassword(newPassword)) {
+    throw new Error('Nouveau mot de passe doit contenir au moins 8 caractères');
+  }
+  user.Password = await bcrypt.hash(newPassword, 10);
+  user.updatedAt = new Date();
+  const updated = await user.save();
+  res.status(200).json(updated);
+}));
 
-// PUT /:id/status - Toggle user status (admin)
-router.put('/:id/status', passport.authenticate('jwt', { session: false }), async (req, res) => {
-  try {
-    if (!req.user.Role || !req.user.Role.includes('admin')) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: 'ID invalide' });
-    }
-    const { enabled } = req.body;
-    if (enabled === undefined) {
-      return res.status(400).json({ message: 'Statut enabled requis' });
-    }
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    }
+// GET /admin
+router.get('/admin', passport.authenticate('jwt', { session: false }), restrictToAdmin, handleAsync(async (req, res) => {
+  const users = await User.find({}, {
+    Name: 1,
+    Email: 1,
+    Role: 1,
+    enabled: 1,
+    inappropriateCommentsCount: 1,
+    lastInappropriateComment: 1,
+  }).sort({ inappropriateCommentsCount: -1 });
+  res.status(200).json(users);
+}));
 
-    const isReactivation = !user.enabled && enabled === true; // Synchronous
-    user.enabled = enabled; // Synchronous
-    if (enabled === true) {
-      user.inappropriateCommentsCount = 0;
-      user.lastInappropriateComment = null;
-    }
-    await user.save();
-
-    if (isReactivation) {
-      try {
-        const mailOptions = {
-          from: `"UniMindCare Administration" <${process.env.EMAIL_USER}>`,
-          to: user.Email,
-          subject: 'Compte réactivé - AVERTISSEMENT',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-              <h2 style="color: #1976d2;">Compte réactivé</h2>
-              <p>Cher(e) ${user.Name},</p>
-              <p>Votre compte UniMindCare a été réactivé par l'administrateur.</p>
-              <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; color: #856404;">
-                <h3 style="margin-top: 0;">⚠️ AVERTISSEMENT</h3>
-                <p>Votre compte a été désactivé pour des commentaires inappropriés.</p>
-                <p>Tout contenu offensant ou nuisible est interdit.</p>
-                <p><strong>En cas de récidive :</strong></p>
-                <ul>
-                  <li>Compte définitivement désactivé</li>
-                  <li>Mesures disciplinaires supplémentaires</li>
-                </ul>
-              </div>
-              <p>Consultez nos <a href="http://localhost:3000/blog" style="color: #1976d2;">règles communautaires</a>.</p>
-              <p>Contactez l'administration pour toute question.</p>
-              <p style="margin-top: 20px;">Cordialement,<br>L'équipe UniMindCare</p>
-            </div>
-          `,
-        };
-        await transporter.sendMail(mailOptions);
-      } catch (emailError) {
-        console.error('Erreur envoi email réactivation:', emailError);
+// GET /:id/bad-comments
+router.get('/:id/bad-comments', passport.authenticate('jwt', { session: false }), restrictToAdmin, handleAsync(async (req, res) => {
+  if (!validator.isMongoId(req.params.id)) {
+    throw new Error('ID invalide');
+  }
+  const inappropriateComments = await InappropriateComment.find({ author: req.params.id }).sort({ createdAt: -1 });
+  const posts = await Post.find({ 'comments.author': req.params.id });
+  const flaggedComments = [];
+  posts.forEach(post => {
+    post.comments.forEach(comment => {
+      if (comment.author.toString() === req.params.id && comment.isInappropriate) {
+        flaggedComments.push({
+          _id: comment._id,
+          content: comment.content,
+          createdAt: comment.createdAt,
+          flaggedAt: comment.flaggedAt,
+          flagReason: comment.flagReason,
+          postId: post._id,
+          postTitle: post.title,
+        });
       }
-    }
-
-    res.status(200).json({
-      message: `Utilisateur ${enabled ? 'activé' : 'désactivé'} avec succès${enabled ? ' et compteur réinitialisé' : ''}`,
-      user: {
-        _id: user._id,
-        Name: user.Name,
-        Email: user.Email,
-        enabled: user.enabled,
-        inappropriateCommentsCount: user.inappropriateCommentsCount,
-        Role: user.Role,
-      },
     });
-  } catch (error) {
-    console.error('Erreur mise à jour statut:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  });
+  const allBadComments = [
+    ...inappropriateComments.map(comment => ({
+      _id: comment._id,
+      content: comment.content,
+      createdAt: comment.createdAt,
+      postId: comment.postId,
+      postTitle: comment.postTitle,
+      flagReason: comment.reason,
+      type: 'Bloqué',
+    })),
+    ...flaggedComments.map(comment => ({
+      ...comment,
+      type: 'Signalé',
+    })),
+  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.status(200).json(allBadComments);
+}));
+
+// PUT /:id/status
+router.put('/:id/status', passport.authenticate('jwt', { session: false }), restrictToAdmin, handleAsync(async (req, res) => {
+  if (!validator.isMongoId(req.params.id)) {
+    throw new Error('ID invalide');
   }
-});
+  const { enabled } = req.body;
+  if (enabled === undefined) {
+    throw new Error('Statut enabled requis');
+  }
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    throw new Error('Utilisateur non trouvé');
+  }
+  const isReactivation = !user.enabled && enabled === true;
+  user.enabled = enabled;
+  if (enabled === true) {
+    user.inappropriateCommentsCount = 0;
+    user.lastInappropriateComment = null;
+  }
+  await user.save();
+
+  if (isReactivation) {
+    await sendEmail(user.Email, 'Compte réactivé - AVERTISSEMENT', `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <h2 style="color: #1976d2;">Compte réactivé</h2>
+        <p>Cher(e) ${sanitizeInput(user.Name)},</p>
+        <p>Votre compte UniMindCare a été réactivé par l'administrateur.</p>
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; color: #856404;">
+          <h3 style="margin-top: 0;">⚠️ AVERTISSEMENT</h3>
+          <p>Votre compte a été désactivé pour des commentaires inappropriés.</p>
+          <p>Tout contenu offensant ou nuisible est interdit.</p>
+          <p><strong>En cas de récidive :</strong></p>
+          <ul>
+            <li>Compte définitivement désactivé</li>
+            <li>Mesures disciplinaires supplémentaires</li>
+          </ul>
+        </div>
+        <p>Consultez nos <a href="http://localhost:3000/blog" style="color: #1976d2;">règles communautaires</a>.</p>
+        <p>Contactez l'administration pour toute question.</p>
+        <p style="margin-top: 20px;">Cordialement,<br>L'équipe UniMindCare</p>
+      </div>
+    `, true);
+  }
+
+  res.status(200).json({
+    message: `Utilisateur ${enabled ? 'activé' : 'désactivé'} avec succès${enabled ? ' et compteur réinitialisé' : ''}`,
+    user: {
+      _id: user._id,
+      Name: user.Name,
+      Email: user.Email,
+      enabled: user.enabled,
+      inappropriateCommentsCount: user.inappropriateCommentsCount,
+      Role: user.Role,
+    },
+  });
+}));
 
 module.exports = router;

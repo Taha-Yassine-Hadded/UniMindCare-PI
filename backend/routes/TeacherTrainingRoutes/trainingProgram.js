@@ -6,24 +6,59 @@ const multer = require('multer');
 const path = require('path');
 const validator = require('validator');
 const sanitizePath = require('sanitize-filename');
-const { createHash } = require('crypto');
 
-// In-memory rate limiting (for demo; use express-rate-limit in production)
+// In-memory rate limiting
 const recommendationLimits = new Map();
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 const MAX_RECOMMENDATIONS = 5;
 
-// Configure multer for image uploads
+// Validation and error handling utilities
+const validateProgramInput = (title, description) => {
+  if (!validator.isLength(title, { min: 1, max: 100 }) || !validator.isLength(description, { min: 1, max: 1000 })) {
+    throw new Error('Titre (1-100 caractères) et description (1-1000 caractères) requis');
+  }
+};
+
+const validateMongoId = (id) => {
+  if (!validator.isMongoId(id)) {
+    throw new Error('ID programme invalide');
+  }
+};
+
+const handleAsync = (fn) => async (req, res, next) => {
+  try {
+    await fn(req, res, next);
+  } catch (error) {
+    console.error(`Erreur: ${error.message}`, error);
+    res.status(
+      error.message.includes('requis') || error.message.includes('invalide') ? 400 :
+      error.message.includes('non trouvé') || error.message.includes('not found') ? 404 :
+      error.message.includes('Limite') ? 429 : 500
+    ).json({ message: error.message });
+  }
+};
+
+const checkRateLimit = (userId) => {
+  const now = Date.now();
+  const userLimit = recommendationLimits.get(userId) || { count: 0, reset: now };
+  if (userLimit.reset < now - RATE_LIMIT_WINDOW) {
+    userLimit.count = 0;
+    userLimit.reset = now;
+  }
+  if (userLimit.count >= MAX_RECOMMENDATIONS) {
+    throw new Error('Limite de recommandations atteinte. Réessayez plus tard.');
+  }
+  userLimit.count += 1;
+  recommendationLimits.set(userId, userLimit);
+};
+
+// Multer configuration
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/program-images');
-    cb(null, uploadDir);
-  },
+  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads/program-images')),
   filename: (req, file, cb) => {
     const sanitizedName = sanitizePath(file.originalname.replace(/[^a-zA-Z0-9.]/g, '_'));
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(sanitizedName).toLowerCase();
-    cb(null, `program-${uniqueSuffix}${ext}`);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random * 1E9);
+    cb(null, `program-${uniqueSuffix}${path.extname(sanitizedName).toLowerCase()}`);
   },
 });
 
@@ -32,7 +67,6 @@ const fileFilter = (req, file, cb) => {
   if (!allowedMimes.includes(file.mimetype)) {
     return cb(new Error('Seules les images JPEG, PNG ou GIF sont autorisées'), false);
   }
-  // Basic content validation (check magic bytes)
   const buffer = file.buffer || Buffer.alloc(0);
   const isValidImage =
     (file.mimetype === 'image/jpeg' && buffer.slice(0, 3).toString('hex') === 'ffd8ff') ||
@@ -44,210 +78,103 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
-});
+const upload = multer({ storage, fileFilter, limits: { fileSize: 2 * 1024 * 1024 } });
 
-// POST / - Create new program (psychologist only)
-router.post('/', validateToken, authorizeRoles(['psychologist']), upload.single('programImage'), async (req, res) => {
-  try {
-    const { title, description } = req.body;
-    if (!validator.isLength(title, { min: 1, max: 100 }) || !validator.isLength(description, { min: 1, max: 1000 })) {
-      return res.status(400).json({ message: 'Titre (1-100 caractères) et description (1-1000 caractères) requis' });
-    }
+// Routes
+router.post('/', validateToken, authorizeRoles(['psychologist']), upload.single('programImage'), handleAsync(async (req, res) => {
+  const { title, description } = req.body;
+  validateProgramInput(title, description);
 
-    const imgUrl = req.file
-      ? path.posix.join('/uploads/program-images', sanitizePath(req.file.filename))
-      : null;
+  const imgUrl = req.file ? path.posix.join('/uploads/program-images', sanitizePath(req.file.filename)) : null;
+  const program = new TrainingProgram({ title, description, psychologistId: req.user.userId, imgUrl });
+  await program.save();
+  res.status(201).json(program);
+}));
 
-    const program = new TrainingProgram({
-      title,
-      description,
-      psychologistId: req.user.userId,
-      imgUrl,
-    });
+router.get('/my-programs', validateToken, handleAsync(async (req, res) => {
+  const programs = await TrainingProgram.find({ psychologistId: req.user.userId });
+  const programsWithContents = await Promise.all(
+    programs.map(async (program) => ({
+      ...program.toObject(),
+      contents: await TrainingContent.find({ trainingProgramId: program._id }),
+    }))
+  );
+  res.json(programsWithContents);
+}));
 
-    await program.save();
-    res.status(201).json(program);
-  } catch (error) {
-    console.error('Erreur création programme:', error);
-    res.status(400).json({ message: error.message });
+router.get('/all-programs', validateToken, handleAsync(async (req, res) => {
+  const programs = await TrainingProgram.find();
+  res.json(programs);
+}));
+
+router.get('/:id', validateToken, handleAsync(async (req, res) => {
+  validateMongoId(req.params.id);
+  const program = await TrainingProgram.findById(req.params.id);
+  if (!program) {
+    throw new Error('Program not found');
   }
-});
+  res.json(program);
+}));
 
-// GET /my-programs - Get user's programs
-router.get('/my-programs', validateToken, async (req, res) => {
-  try {
-    const programs = await TrainingProgram.find({ psychologistId: req.user.userId });
-    const programsWithContents = await Promise.all(
-      programs.map(async (program) => {
-        const contents = await TrainingContent.find({ trainingProgramId: program._id });
-        return { ...program.toObject(), contents };
-      })
-    );
-    res.json(programsWithContents);
-  } catch (error) {
-    console.error('Erreur récupération programmes:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+router.put('/:id', validateToken, authorizeRoles(['psychologist']), upload.single('programImage'), handleAsync(async (req, res) => {
+  const { id } = req.params;
+  const { title, description } = req.body;
+  validateMongoId(id);
+  validateProgramInput(title, description);
+
+  const existingProgram = await TrainingProgram.findOne({ _id: id, psychologistId: req.user.userId });
+  if (!existingProgram) {
+    throw new Error('Programme non trouvé ou non autorisé');
   }
-});
 
-// GET /all-programs - Get all programs
-router.get('/all-programs', validateToken, async (req, res) => {
-  try {
-    const programs = await TrainingProgram.find();
-    res.json(programs);
-  } catch (error) {
-    console.error('Erreur récupération tous programmes:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  const updateData = { title, description };
+  if (req.file) {
+    updateData.imgUrl = path.posix.join('/uploads/program-images', sanitizePath(req.file.filename));
   }
-});
+  const updatedProgram = await TrainingProgram.findByIdAndUpdate(id, updateData, { new: true });
+  res.json(updatedProgram);
+}));
 
-// GET /:id - Get program details
-router.get('/:id', validateToken, async (req, res) => {
-  try {
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: 'ID programme invalide' });
-    }
-    const program = await TrainingProgram.findById(req.params.id);
-    if (!program) {
-      return res.status(404).json({ message: 'Program not found' });
-    }
-    res.json(program);
-  } catch (error) {
-    console.error('Erreur récupération programme:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+router.delete('/:id', validateToken, authorizeRoles(['psychologist']), handleAsync(async (req, res) => {
+  validateMongoId(req.params.id);
+  const program = await TrainingProgram.findOne({ _id: req.params.id, psychologistId: req.user.userId });
+  if (!program) {
+    throw new Error('Programme non trouvé ou non autorisé');
   }
-});
+  await program.deleteOne();
+  res.json({ message: 'Programme supprimé avec succès' });
+}));
 
-// PUT /:id - Update program (psychologist only)
-router.put('/:id', validateToken, authorizeRoles(['psychologist']), upload.single('programImage'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, description } = req.body;
-    if (!validator.isMongoId(id)) {
-      return res.status(400).json({ message: 'ID programme invalide' });
-    }
-    if (!validator.isLength(title, { min: 1, max: 100 }) || !validator.isLength(description, { min: 1, max: 1000 })) {
-      return res.status(400).json({ message: 'Titre (1-100 caractères) et description (1-1000 caractères) requis' });
-    }
+router.post('/:id/recommend', validateToken, handleAsync(async (req, res) => {
+  validateMongoId(req.params.id);
+  checkRateLimit(req.user.userId);
 
-    const existingProgram = await TrainingProgram.findOne({ _id: id, psychologistId: req.user.userId });
-    if (!existingProgram) {
-      return res.status(404).json({ message: 'Programme non trouvé ou non autorisé' });
-    }
-
-    const updateData = { title, description };
-    if (req.file) {
-      updateData.imgUrl = path.posix.join('/Uploads/program-images', sanitizePath(req.file.filename));
-    }
-
-    const updatedProgram = await TrainingProgram.findByIdAndUpdate(id, updateData, { new: true });
-    res.json(updatedProgram);
-  } catch (error) {
-    console.error('Erreur mise à jour programme:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  const program = await TrainingProgram.findById(req.params.id);
+  if (!program) {
+    throw new Error('Programme non trouvé');
   }
-});
-
-// DELETE /:id - Delete program (psychologist only)
-router.delete('/:id', validateToken, authorizeRoles(['psychologist']), async (req, res) => {
-  try {
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: 'ID programme invalide' });
-    }
-    const program = await TrainingProgram.findOne({
-      _id: req.params.id,
-      psychologistId: req.user.userId,
-    });
-    if (!program) {
-      return res.status(404).json({ message: 'Programme non trouvé ou non autorisé' });
-    }
-
-    await program.deleteOne();
-    res.json({ message: 'Programme supprimé avec succès' });
-  } catch (error) {
-    console.error('Erreur suppression programme:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  if (program.recommendedBy.includes(req.user.userId)) {
+    throw new Error('Vous avez déjà recommandé ce programme');
   }
-});
+  program.recommendedBy.push(req.user.userId);
+  await program.save();
+  res.json({ message: 'Programme recommandé avec succès', program });
+}));
 
-// POST /:id/recommend - Recommend a program
-router.post('/:id/recommend', validateToken, async (req, res) => {
-  try {
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: 'ID programme invalide' });
-    }
+router.post('/:id/unrecommend', validateToken, handleAsync(async (req, res) => {
+  validateMongoId(req.params.id);
+  checkRateLimit(req.user.userId);
 
-    // Rate limiting
-    const userId = req.user.userId;
-    const now = Date.now();
-    const userLimit = recommendationLimits.get(userId) || { count: 0, reset: now };
-    if (userLimit.reset < now - RATE_LIMIT_WINDOW) {
-      userLimit.count = 0;
-      userLimit.reset = now;
-    }
-    if (userLimit.count >= MAX_RECOMMENDATIONS) {
-      return res.status(429).json({ message: 'Limite de recommandations atteinte. Réessayez plus tard.' });
-    }
-    userLimit.count += 1;
-    recommendationLimits.set(userId, userLimit);
-
-    const program = await TrainingProgram.findById(req.params.id);
-    if (!program) {
-      return res.status(404).json({ message: 'Programme non trouvé' });
-    }
-    if (program.recommendedBy.includes(userId)) {
-      return res.status(400).json({ message: 'Vous avez déjà recommandé ce programme' });
-    }
-
-    program.recommendedBy.push(userId);
-    await program.save();
-    res.json({ message: 'Programme recommandé avec succès', program });
-  } catch (error) {
-    console.error('Erreur recommandation programme:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  const program = await TrainingProgram.findById(req.params.id);
+  if (!program) {
+    throw new Error('Programme non trouvé');
   }
-});
-
-// POST /:id/unrecommend - Unrecommend a program
-router.post('/:id/unrecommend', validateToken, async (req, res) => {
-  try {
-    if (!validator.isMongoId(req.params.id)) {
-      return res.status(400).json({ message: 'ID programme invalide' });
-    }
-
-    // Rate limiting
-    const userId = req.user.userId;
-    const now = Date.now();
-    const userLimit = recommendationLimits.get(userId) || { count: 0, reset: now };
-    if (userLimit.reset < now - RATE_LIMIT_WINDOW) {
-      userLimit.count = 0;
-      userLimit.reset = now;
-    }
-    if (userLimit.count >= MAX_RECOMMENDATIONS) {
-      return res.status(429).json({ message: 'Limite de recommandations atteinte. Réessayez plus tard.' });
-    }
-    userLimit.count += 1;
-    recommendationLimits.set(userId, userLimit);
-
-    const program = await TrainingProgram.findById(req.params.id);
-    if (!program) {
-      return res.status(404).json({ message: 'Programme non trouvé' });
-    }
-    if (!program.recommendedBy.includes(userId)) {
-      return res.status(400).json({ message: 'Vous n\'avez pas recommandé ce programme' });
-    }
-
-    program.recommendedBy = program.recommendedBy.filter(id => id.toString() !== userId);
-    await program.save();
-    res.json({ message: 'Recommandation retirée avec succès', program });
-  } catch (error) {
-    console.error('Erreur retrait recommandation:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+  if (!program.recommendedBy.includes(req.user.userId)) {
+    throw new Error('Vous n\'avez pas recommandé ce programme');
   }
-});
+  program.recommendedBy = program.recommendedBy.filter(id => id.toString() !== req.user.userId);
+  await program.save();
+  res.json({ message: 'Recommandation retirée avec succès', program });
+}));
 
 module.exports = router;

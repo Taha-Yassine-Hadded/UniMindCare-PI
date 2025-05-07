@@ -42,6 +42,8 @@ const authMiddleware = require('./middleware/auth');
 const http = require('http');
 const { Server } = require('socket.io');
 const validator = require('validator');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 // Validate environment variables
 if (!process.env.JWT_SECRET || !process.env.EMAIL_USER || !process.env.EMAIL_PASS || !process.env.SESSION_SECRET || !process.env.MONGO_URI) {
@@ -57,6 +59,25 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+});
+
+// Security middleware
+app.use(helmet()); // Add HTTP security headers
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", 'data:'],
+    connectSrc: ["'self'", 'http://localhost:3000'],
+  },
+}));
+
+// Rate limiting for sensitive endpoints
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: 'Trop de requêtes, réessayez plus tard',
 });
 
 // Configure CORS
@@ -76,7 +97,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
-app.use('/uploads', express.static(path.join(__dirname, 'Uploads')));
+app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 app.use(bodyParser.json());
 app.use((req, res, next) => {
   req.io = io;
@@ -94,20 +115,56 @@ app.use(session({
   resave: false,
   saveUninitialized: true,
   store: memoryStore,
+  cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true },
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Utility functions
+const sanitizeInput = (input) => validator.escape(validator.trim(input));
+const validateEmail = (email) => /^[a-zA-Z0-9._%+-]+@esprit\.tn$/.test(email);
+const validateAndFindUser = async (email, identifiant) => {
+  const sanitizedEmail = sanitizeInput(email);
+  if (!validator.isEmail(sanitizedEmail)) throw new Error('Email invalide');
+  const query = identifiant ? { Identifiant: sanitizeInput(identifiant) } : { Email: new RegExp(`^${sanitizedEmail}$`, 'i') };
+  const user = await User.findOne(query);
+  if (!user) throw new Error('Utilisateur non trouvé');
+  return user;
+};
+const sendEmail = async (to, subject, content, isHtml = false) => {
+  const mailOptions = {
+    from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    [isHtml ? 'html' : 'text']: content,
+  };
+  await transporter.sendMail(mailOptions);
+};
+const handleAsync = (fn) => async (req, res, next) => {
+  try {
+    await fn(req, res, next);
+  } catch (error) {
+    console.error(`Erreur: ${error.message}`, error);
+    res.status(
+      error.message.includes('invalide') || error.message.includes('requis') ? 400 :
+      error.message.includes('non trouvé') ? 404 :
+      error.message.includes('Trop de requêtes') ? 429 : 500
+    ).json({ message: error.message });
+  }
+};
 
 // Socket.IO middleware
 const onlineUsers = new Set();
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
-    if (!token) return next(new Error('Authentification requise'));
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!token) throw new Error('Authentification requise');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (!decoded.identifiant) throw new Error('Token invalide');
     socket.user = decoded;
     next();
   } catch (error) {
+    console.error('Socket.IO auth error:', error.message);
     next(new Error('Token invalide'));
   }
 });
@@ -120,88 +177,81 @@ io.on('connection', (socket) => {
   }
 
   socket.on('join', (identifiant) => {
-    socket.join(identifiant);
+    if (validator.isAlphanumeric(identifiant)) socket.join(identifiant);
   });
 
-  socket.on('sendMessage', async (messageData, callback) => {
-    try {
-      const senderUser = await User.findOne({ Identifiant: messageData.sender });
-      const receiverUser = await User.findOne({ Identifiant: messageData.receiver });
-      if (!senderUser || !receiverUser) {
-        return callback({ error: 'Utilisateur ou destinataire introuvable' });
-      }
-      if (messageData.sender !== socket.user.identifiant) {
-        return callback({ error: 'Non autorisé' });
-      }
+  socket.on('sendMessage', handleAsync(async (messageData, callback) => {
+    const senderUser = await validateAndFindUser(null, messageData.sender);
+    const receiverUser = await validateAndFindUser(null, messageData.receiver);
+    if (messageData.sender !== socket.user.identifiant) throw new Error('Non autorisé');
 
-      const newMessage = new Message({
-        sender: senderUser.Identifiant,
-        receiver: receiverUser.Identifiant,
-        message: messageData.message,
-        type: messageData.type || 'text',
-        fileName: messageData.fileName,
-        timestamp: new Date(),
-        read: false,
-      });
-      await newMessage.save();
+    const newMessage = new Message({
+      sender: senderUser.Identifiant,
+      receiver: receiverUser.Identifiant,
+      message: sanitizeInput(messageData.message),
+      type: messageData.type || 'text',
+      fileName: messageData.fileName ? sanitizeInput(messageData.fileName) : undefined,
+      timestamp: new Date(),
+      read: false,
+    });
+    await newMessage.save();
 
-      const unreadCount = await Message.countDocuments({
-        receiver: receiverUser.Identifiant,
-        sender: senderUser.Identifiant,
-        read: false,
-      });
+    const unreadCount = await Message.countDocuments({
+      receiver: receiverUser.Identifiant,
+      sender: senderUser.Identifiant,
+      read: false,
+    });
 
-      io.to(messageData.receiver).emit('receiveMessage', newMessage);
-      io.to(messageData.receiver).emit('unreadCount', {
-        sender: senderUser.Identifiant,
-        count: unreadCount,
-      });
-      io.to(messageData.sender).emit('receiveMessage', newMessage);
-      callback({ success: true });
-    } catch (error) {
-      callback({ error: 'Erreur lors de l\'envoi du message' });
-    }
-  });
+    io.to(messageData.receiver).emit('receiveMessage', newMessage);
+    io.to(messageData.receiver).emit('unreadCount', {
+      sender: senderUser.Identifiant,
+      count: unreadCount,
+    });
+    io.to(messageData.sender).emit('receiveMessage', newMessage);
+    callback({ success: true });
+  }));
 
-  socket.on('markAsRead', async ({ sender, receiver }) => {
-    try {
-      await Message.updateMany(
-        {
-          $or: [
-            { sender, receiver, read: false },
-            { sender: receiver, receiver: sender, read: false },
-          ],
-        },
-        { $set: { read: true } }
-      );
-      const unreadCount = await Message.countDocuments({
-        receiver,
-        read: false,
-      });
-      io.to(receiver).emit('unreadCount', { sender, count: unreadCount });
-    } catch (error) {
-      console.error('Erreur lors du marquage des messages comme lus:', error);
-    }
-  });
+  socket.on('markAsRead', handleAsync(async ({ sender, receiver }) => {
+    if (!validator.isAlphanumeric(sender) || !validator.isAlphanumeric(receiver)) throw new Error('Identifiants invalides');
+    await Message.updateMany(
+      {
+        $or: [
+          { sender, receiver, read: false },
+          { sender: receiver, receiver: sender, read: false },
+        ],
+      },
+      { $set: { read: true } }
+    );
+    const unreadCount = await Message.countDocuments({ receiver, read: false });
+    io.to(receiver).emit('unreadCount', { sender, count: unreadCount });
+  }));
 
   socket.on('startVideoCall', ({ to, from }) => {
-    io.to(to).emit('startVideoCall', { from });
+    if (validator.isAlphanumeric(to) && validator.isAlphanumeric(from)) {
+      io.to(to).emit('startVideoCall', { from });
+    }
   });
 
   socket.on('offer', ({ offer, to, from }) => {
-    io.to(to).emit('offer', { offer, from });
+    if (validator.isAlphanumeric(to) && validator.isAlphanumeric(from)) {
+      io.to(to).emit('offer', { offer, from });
+    }
   });
 
   socket.on('answer', ({ answer, to, from }) => {
-    io.to(to).emit('answer', { answer, from });
+    if (validator.isAlphanumeric(to) && validator.isAlphanumeric(from)) {
+      io.to(to).emit('answer', { answer, from });
+    }
   });
 
   socket.on('ice-candidate', ({ candidate, to, from }) => {
-    io.to(to).emit('ice-candidate', { candidate, from });
+    if (validator.isAlphanumeric(to) && validator.isAlphanumeric(from)) {
+      io.to(to).emit('ice-candidate', { candidate, from });
+    }
   });
 
   socket.on('endCall', ({ to }) => {
-    if (to) io.to(to).emit('endCall');
+    if (to && validator.isAlphanumeric(to)) io.to(to).emit('endCall');
   });
 
   socket.on('disconnect', () => {
@@ -235,28 +285,56 @@ conn.once('open', () => {
 const storage = new GridFsStorage({
   url: process.env.MONGO_URI,
   file: (req, file) => ({
-    filename: `${Date.now()}-${file.originalname}`,
+    filename: `${Date.now()}-${sanitizeInput(file.originalname)}`,
     bucketName: 'Uploads',
   }),
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('Type de fichier non supporté'), false);
+    }
+    const buffer = file.buffer || Buffer.alloc(0);
+    const isValidImage =
+      (file.mimetype === 'image/jpeg' && buffer.slice(0, 3).toString('hex') === 'ffd8ff') ||
+      (file.mimetype === 'image/png' && buffer.slice(0, 8).toString('hex') === '89504e470d0a1a0a') ||
+      (file.mimetype === 'application/pdf' && buffer.slice(0, 4).toString('ascii') === '%PDF');
+    if (!isValidImage) {
+      return cb(new Error('Fichier invalide ou corrompu'), false);
+    }
+    cb(null, true);
+  },
+});
 
 const storageLocal = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'Uploads/'),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    cb(null, uniqueSuffix + path.extname(sanitizeInput(file.originalname)));
   },
 });
 const uploadLocal = multer({
   storage: storageLocal,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'audio/webm', 'audio/mpeg'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Type de fichier non supporté'), false);
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('Type de fichier non supporté'), false);
     }
+    const buffer = file.buffer || Buffer.alloc(0);
+    const isValidFile =
+      (file.mimetype === 'image/jpeg' && buffer.slice(0, 3).toString('hex') === 'ffd8ff') ||
+      (file.mimetype === 'image/png' && buffer.slice(0, 8).toString('hex') === '89504e470d0a1a0a') ||
+      (file.mimetype === 'application/pdf' && buffer.slice(0, 4).toString('ascii') === '%PDF') ||
+      (file.mimetype === 'audio/webm' && buffer.slice(0, 4).toString('hex').startsWith('1a45dfa3')) ||
+      (file.mimetype === 'audio/mpeg' && buffer.slice(0, 2).toString('hex').startsWith('fff'));
+    if (!isValidFile) {
+      return cb(new Error('Fichier invalide ou corrompu'), false);
+    }
+    cb(null, true);
   },
 });
 
@@ -298,271 +376,173 @@ app.use('/api/notes', notesRoutes.router);
 // Email configuration
 const transporterHoussine = nodemailer.createTransport({
   service: 'gmail',
-  secure: false,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  pool: true,
 });
-
-// Validate email
-const validateEmail = (email) => {
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@esprit\.tn$/;
-  return emailRegex.test(email);
-};
 
 // File upload endpoint
-app.post('/api/upload', uploadLocal.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'Aucun fichier sélectionné' });
-  }
+app.post('/api/upload', authRateLimiter, uploadLocal.single('file'), handleAsync(async (req, res) => {
+  if (!req.file) throw new Error('Aucun fichier sélectionné');
   const fileUrl = `http://localhost:5000/uploads/${req.file.filename}`;
   res.status(200).json({ fileUrl });
-});
+}));
 
-// Meeting endpoint (refactored to reduce complexity)
-app.post('/api/meeting', authMiddleware, async (req, res) => {
-  try {
-    const { meetLink, date, reason, duration } = req.body;
-    if (!validator.isURL(meetLink) || !validator.isISO8601(date) || !validator.isLength(reason, { min: 1, max: 255 }) || !validator.isInt(duration, { min: 1 })) {
-      return res.status(400).json({ message: 'Champs invalides' });
-    }
-
-    const user = await User.findOne({ Identifiant: req.user.identifiant });
-    if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
-
-    const userRole = Array.isArray(req.user.Role) ? req.user.Role : [req.user.Role];
-    if (!userRole.includes('teacher')) {
-      return res.status(403).json({ message: 'Seuls les enseignants peuvent planifier des réunions' });
-    }
-
-    const meeting = new Meeting({
-      meetLink,
-      date: new Date(date),
-      reason,
-      duration: parseInt(duration),
-      createdBy: req.user.identifiant,
-    });
-    await meeting.save();
-
-    const users = await User.find({}, 'Email');
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: users.map(u => u.Email).join(','),
-      subject: 'Nouvelle réunion planifiée',
-      text: `Une nouvelle réunion a été planifiée.\n\nRaison: ${reason}\nLien: ${meetLink}\nDate: ${new Date(date).toLocaleString()}\nDurée: ${duration} minutes`,
-    };
-    transporter.sendMail(mailOptions); // Removed await as it's non-critical
-
-    res.status(201).json({ message: 'Réunion planifiée avec succès', meeting });
-  } catch (error) {
-    console.error('Erreur lors de la planification de la réunion:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+// Meeting endpoint
+app.post('/api/meeting', authRateLimiter, authMiddleware, handleAsync(async (req, res) => {
+  const { meetLink, date, reason, duration } = req.body;
+  if (!validator.isURL(meetLink) || !validator.isISO8601(date) || !validator.isLength(sanitizeInput(reason), { min: 1, max: 255 }) || !validator.isInt(duration.toString(), { min: 1 })) {
+    throw new Error('Champs invalides');
   }
-});
+
+  const user = await validateAndFindUser(null, req.user.identifiant);
+  const userRole = Array.isArray(req.user.Role) ? req.user.Role : [req.user.Role];
+  if (!userRole.includes('teacher')) throw new Error('Seuls les enseignants peuvent planifier des réunions');
+
+  const meeting = new Meeting({
+    meetLink,
+    date: new Date(date),
+    reason: sanitizeInput(reason),
+    duration: parseInt(duration),
+    createdBy: req.user.identifiant,
+  });
+  await meeting.save();
+
+  const users = await User.find({}, 'Email');
+  await sendEmail(
+    users.map(u => u.Email).join(','),
+    'Nouvelle réunion planifiée',
+    `Une nouvelle réunion a été planifiée.\n\nRaison: ${reason}\nLien: ${meetLink}\nDate: ${new Date(date).toLocaleString()}\nDurée: ${duration} minutes`
+  );
+
+  res.status(201).json({ message: 'Réunion planifiée avec succès', meeting });
+}));
 
 // Forgot password endpoint
-app.post('/api/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!validator.isEmail(email)) {
-      return res.status(400).json({ message: 'Email invalide' });
-    }
+app.post('/api/forgot-password', authRateLimiter, handleAsync(async (req, res) => {
+  const { email } = req.body;
+  const user = await validateAndFindUser(email);
+  const otp = crypto.randomInt(1000, 9999).toString();
+  user.otp = otp;
+  user.otpExpires = Date.now() + 10 * 60 * 1000;
+  await user.save();
 
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
-
-    const otp = crypto.randomInt(1000, 9999).toString();
-    const otpExpires = Date.now() + 10 * 60 * 1000;
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    await user.save();
-
-    const mailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="background-color: #4a6fdc; color: white; padding: 20px; text-align: center;">UniMindCare</h1>
-        <div style="padding: 20px; border: 1px solid #ddd;">
-          <p>Bonjour ${user.Name || ''},</p>
-          <p>Votre code de vérification : <strong style="font-size: 32px; color: #4a6fdc;">${otp}</strong></p>
-          <p>Valable 10 minutes.</p>
-          <p>Cordialement,<br>L'équipe UniMindCare</p>
-        </div>
+  const mailHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="background-color: #4a6fdc; color: white; padding: 20px; text-align: center;">UniMindCare</h1>
+      <div style="padding: 20px; border: 1px solid #ddd;">
+        <p>Bonjour ${sanitizeInput(user.Name || '')},</p>
+        <p>Votre code de vérification : <strong style="font-size: 32px; color: #4a6fdc;">${otp}</strong></p>
+        <p>Valable 10 minutes.</p>
+        <p>Cordialement,<br>L'équipe UniMindCare</p>
       </div>
-    `;
-
-    const mailOptions = {
-      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Réinitialisation de mot de passe',
-      html: mailHtml,
-    };
-    transporterHoussine.sendMail(mailOptions); // Removed await
-
-    res.status(200).json({ message: 'OTP envoyé par email' });
-  } catch (error) {
-    console.error('Erreur lors de l\'envoi de l\'OTP:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+    </div>
+  `;
+  await sendEmail(email, 'Réinitialisation de mot de passe', mailHtml, true);
+  res.status(200).json({ message: 'OTP envoyé par email' });
+}));
 
 // Verify OTP endpoint
-app.post('/api/verify-otp', async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    if (!validator.isEmail(email) || !validator.isNumeric(otp)) {
-      return res.status(400).json({ message: 'Email ou OTP invalide' });
-    }
-
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: 'OTP invalide ou expiré' });
-    }
-
-    res.status(200).json({ message: 'OTP valide' });
-  } catch (error) {
-    console.error('Erreur lors de la vérification de l\'OTP:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+app.post('/api/verify-otp', authRateLimiter, handleAsync(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!validator.isEmail(email) || !validator.isNumeric(otp)) throw new Error('Email ou OTP invalide');
+  const user = await validateAndFindUser(email);
+  if (user.otp !== otp || user.otpExpires < Date.now()) throw new Error('OTP invalide ou expiré');
+  res.status(200).json({ message: 'OTP valide' });
+}));
 
 // Reset password endpoint
-app.post('/api/reset-password', async (req, res) => {
-  try {
-    const { email, otp, newPassword } = req.body;
-    if (!validator.isEmail(email) || !validator.isNumeric(otp) || !validator.isLength(newPassword, { min: 6 })) {
-      return res.status(400).json({ message: 'Entrées invalides' });
-    }
-
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(400).json({ message: 'OTP invalide ou expiré' });
-    }
-
-    user.Password = await bcrypt.hash(newPassword, 10);
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    await user.save();
-
-    res.status(200).json({ message: 'Mot de passe réinitialisé avec succès' });
-  } catch (error) {
-    console.error('Erreur lors de la réinitialisation du mot de passe:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
+app.post('/api/reset-password', authRateLimiter, handleAsync(async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  if (!validator.isEmail(email) || !validator.isNumeric(otp) || !validator.isLength(newPassword, { min: 6 })) {
+    throw new Error('Entrées invalides');
   }
-});
+  const user = await validateAndFindUser(email);
+  if (user.otp !== otp || user.otpExpires < Date.now()) throw new Error('OTP invalide ou expiré');
+  user.Password = await bcrypt.hash(newPassword, 10);
+  user.otp = undefined;
+  user.otpExpires = undefined;
+  await user.save();
+  res.status(200).json({ message: 'Mot de passe réinitialisé avec succès' });
+}));
 
 // Register endpoint
-app.post('/register', upload.single('imageFile'), async (req, res) => {
-  try {
-    const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber } = req.body;
-    if (!validator.isAlphanumeric(Identifiant) || !validator.isEmail(Email) || !validator.isLength(Password, { min: 6 }) ||
-        !validator.isLength(Name, { min: 1 }) || !['student', 'teacher', 'psychiatre'].includes(Role)) {
-      return res.status(400).json({ message: 'Entrées invalides' });
-    }
-    if (!validateEmail(Email)) {
-      return res.status(400).json({ message: 'L\'email doit être au format @esprit.tn' });
-    }
-
-    const existingUser = await User.findOne({ $or: [{ Identifiant }, { Email }] });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Identifiant ou Email déjà utilisé' });
-    }
-
-    const hashedPassword = await bcrypt.hash(Password, 10);
-    const imageUrl = req.file ? req.file.filename : '';
-
-    const newUser = new User({
-      Name,
-      Identifiant,
-      Email,
-      Password: hashedPassword,
-      Classe: Role === 'student' ? Classe : '',
-      Role,
-      PhoneNumber,
-      imageUrl,
-      verified: false,
-    });
-    const savedUser = await newUser.save();
-
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    const newVerification = new UserVerification({
-      userId: savedUser._id,
-      code: verificationCode,
-      expiresAt,
-    });
-    await newVerification.save();
-
-    const htmlTemplate = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="background-color: #4a6fdc; color: white; padding: 20px; text-align: center;">UniMindCare</h1>
-        <div style="padding: 20px; border: 1px solid #ddd;">
-          <h2>Bonjour ${savedUser.Name},</h2>
-          <p>Votre code de vérification : <strong style="font-size: 38px; color: #4a6fdc;">${verificationCode}</strong></p>
-          <p>Ce code expirera dans 15 minutes.</p>
-          <p>© ${new Date().getFullYear()} UniMindCare.</p>
-        </div>
-      </div>
-    `;
-
-    const mailOptions = {
-      from: `"UniMindCare" <${process.env.EMAIL_USER}>`,
-      to: savedUser.Email,
-      subject: 'Vérification de votre compte UniMindCare',
-      html: htmlTemplate,
-    };
-    transporter.sendMail(mailOptions); // Removed await
-
-    res.status(201).json({ message: 'Utilisateur enregistré. Vérifiez votre email.' });
-  } catch (err) {
-    console.error('Erreur lors de l\'enregistrement:', err);
-    res.status(500).json({ message: 'Erreur lors de l\'enregistrement' });
+app.post('/register', authRateLimiter, upload.single('imageFile'), handleAsync(async (req, res) => {
+  const { Name, Identifiant, Email, Password, Classe, Role, PhoneNumber } = req.body;
+  if (
+    !validator.isAlphanumeric(Identifiant) ||
+    !validator.isEmail(Email) ||
+    !validator.isLength(Password, { min: 6 }) ||
+    !validator.isLength(sanitizeInput(Name), { min: 1 }) ||
+    !['student', 'teacher', 'psychiatre'].includes(Role)
+  ) {
+    throw new Error('Entrées invalides');
   }
-});
+  if (!validateEmail(Email)) throw new Error('L\'email doit être au format @esprit.tn');
+
+  const existingUser = await User.findOne({ $or: [{ Identifiant: sanitizeInput(Identifiant) }, { Email: new RegExp(`^${sanitizeInput(Email)}$`, 'i') }] });
+  if (existingUser) throw new Error('Identifiant ou Email déjà utilisé');
+
+  const hashedPassword = await bcrypt.hash(Password, 10);
+  const imageUrl = req.file ? req.file.filename : '';
+
+  const newUser = new User({
+    Name: sanitizeInput(Name),
+    Identifiant: sanitizeInput(Identifiant),
+    Email,
+    Password: hashedPassword,
+    Classe: Role === 'student' ? sanitizeInput(Classe) : '',
+    Role,
+    PhoneNumber: validator.isMobilePhone(PhoneNumber) ? sanitizeInput(PhoneNumber) : undefined,
+    imageUrl,
+    verified: false,
+  });
+  const savedUser = await newUser.save();
+
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  await new UserVerification({ userId: savedUser._id, code: verificationCode, expiresAt }).save();
+
+  const htmlTemplate = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="background-color: #4a6fdc; color: white; padding: 20px; text-align: center;">UniMindCare</h1>
+      <div style="padding: 20px; border: 1px solid #ddd;">
+        <h2>Bonjour ${sanitizeInput(savedUser.Name)},</h2>
+        <p>Votre code de vérification : <strong style="font-size: 38px; color: #4a6fdc;">${verificationCode}</strong></p>
+        <p>Ce code expirera dans 15 minutes.</p>
+        <p>© ${new Date().getFullYear()} UniMindCare.</p>
+      </div>
+    </div>
+  `;
+  await sendEmail(savedUser.Email, 'Vérification de votre compte UniMindCare', htmlTemplate, true);
+  res.status(201).json({ message: 'Utilisateur enregistré. Vérifiez votre email.' });
+}));
 
 // Verify email endpoint
-app.post('/verify-email', async (req, res) => {
-  try {
-    const { email, code } = req.body;
-    if (!validator.isEmail(email) || !validator.isNumeric(code)) {
-      return res.status(400).json({ message: 'Email ou code invalide' });
-    }
-
-    const user = await User.findOne({ Email: new RegExp(`^${email}$`, 'i') });
-    if (!user) {
-      return res.status(400).json({ message: 'Utilisateur non trouvé' });
-    }
-
-    const verificationRecord = await UserVerification.findOne({ userId: user._id, code });
-    if (!verificationRecord || verificationRecord.expiresAt < new Date()) {
-      return res.status(400).json({ message: 'Code invalide ou expiré' });
-    }
-
-    await User.findByIdAndUpdate(user._id, { verified: true });
-    await UserVerification.findByIdAndDelete(verificationRecord._id);
-
-    res.status(200).json({ message: 'Compte vérifié avec succès' });
-  } catch (err) {
-    console.error('Erreur lors de la vérification:', err);
-    res.status(500).json({ message: 'Erreur lors de la vérification' });
-  }
-});
+app.post('/verify-email', authRateLimiter, handleAsync(async (req, res) => {
+  const { email, code } = req.body;
+  if (!validator.isEmail(email) || !validator.isNumeric(code)) throw new Error('Email ou code invalide');
+  const user = await validateAndFindUser(email);
+  const verificationRecord = await UserVerification.findOne({ userId: user._id, code });
+  if (!verificationRecord || verificationRecord.expiresAt < new Date()) throw new Error('Code invalide ou expiré');
+  await User.findByIdAndUpdate(user._id, { verified: true });
+  await UserVerification.findByIdAndDelete(verificationRecord._id);
+  res.status(200).json({ message: 'Compte vérifié avec succès' });
+}));
 
 // Register FaceID user
-app.post('/api/registerUserFaceID', async (req, res) => {
-  try {
-    const { name, identifiant } = req.body;
-    if (!validator.isLength(name, { min: 1 }) || !validator.isAlphanumeric(identifiant)) {
-      return res.status(400).json({ message: 'Nom et identifiant requis' });
-    }
-
-    const newUser = new FaceIDUser({ name, identifiant });
-    await newUser.save();
-    res.status(200).json({ message: 'Utilisateur enregistré avec succès' });
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de l\'enregistrement' });
+app.post('/api/registerUserFaceID', authRateLimiter, handleAsync(async (req, res) => {
+  const { name, identifiant } = req.body;
+  if (!validator.isLength(sanitizeInput(name), { min: 1 }) || !validator.isAlphanumeric(sanitizeInput(identifiant))) {
+    throw new Error('Nom et identifiant requis');
   }
-});
+  await new FaceIDUser({ name: sanitizeInput(name), identifiant: sanitizeInput(identifiant) }).save();
+  res.status(200).json({ message: 'Utilisateur enregistré avec succès' });
+}));
 
 // Sensor data endpoint
 const DataSchema = new mongoose.Schema({
@@ -572,173 +552,116 @@ const DataSchema = new mongoose.Schema({
 });
 const Data = mongoose.model('Data', DataSchema);
 
-app.post('/api/ajouter-donnees', async (req, res) => {
-  try {
-    const { temperature, humidity, date } = req.body;
-    if (!validator.isFloat(temperature.toString()) || !validator.isFloat(humidity.toString()) || !validator.isISO8601(date)) {
-      return res.status(400).json({ message: 'Données invalides' });
-    }
-
-    const newData = new Data({ temperature, humidity, date });
-    await newData.save();
-    res.status(200).json({ message: 'Données ajoutées avec succès' });
-  } catch (err) {
-    console.error('Erreur lors de l\'ajout des données:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
+app.post('/api/ajouter-donnees', handleAsync(async (req, res) => {
+  const { temperature, humidity, date } = req.body;
+  if (!validator.isFloat(temperature.toString()) || !validator.isFloat(humidity.toString()) || !validator.isISO8601(date)) {
+    throw new Error('Données invalides');
   }
-});
+  await new Data({ temperature, humidity, date }).save();
+  res.status(200).json({ message: 'Données ajoutées avec succès' });
+}));
 
 // Image endpoint
-app.get('/image/:filename', async (req, res) => {
-  try {
-    const file = await gfs.files.findOne({ filename: req.params.filename });
-    if (!file) {
-      return res.status(404).json({ message: 'Image non trouvée' });
-    }
-    const readstream = gfs.createReadStream(file.filename);
-    readstream.pipe(res);
-  } catch (err) {
-    res.status(500).json({ message: 'Erreur lors du chargement de l\'image' });
-  }
-});
+app.get('/image/:filename', handleAsync(async (req, res) => {
+  const filename = sanitizeInput(req.params.filename);
+  const file = await gfs.files.findOne({ filename });
+  if (!file) throw new Error('Image non trouvée');
+  const readstream = gfs.createReadStream(filename);
+  readstream.pipe(res);
+}));
 
 // Messages endpoint
-app.get('/messages/:userId1/:userId2', authMiddleware, async (req, res) => {
-  try {
-    const { userId1, userId2 } = req.params;
-    if (!validator.isAlphanumeric(userId1) || !validator.isAlphanumeric(userId2)) {
-      return res.status(400).json({ message: 'Identifiants invalides' });
-    }
-
-    const messages = await Message.find({
-      $or: [
-        { sender: userId1, receiver: userId2 },
-        { sender: userId2, receiver: userId1 },
-      ],
-    }).sort({ timestamp: 1 });
-
-    const messagesWithRead = messages.map(msg => ({
-      ...msg._doc,
-      read: msg.read !== undefined ? msg.read : false,
-    }));
-
-    res.json(messagesWithRead);
-  } catch (error) {
-    console.error('Erreur lors de la récupération des messages:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+app.get('/messages/:userId1/:userId2', authMiddleware, handleAsync(async (req, res) => {
+  const { userId1, userId2 } = req.params;
+  if (!validator.isAlphanumeric(userId1) || !validator.isAlphanumeric(userId2)) throw new Error('Identifiants invalides');
+  const messages = await Message.find({
+    $or: [
+      { sender: userId1, receiver: userId2 },
+      { sender: userId2, receiver: userId1 },
+    ],
+  }).sort({ timestamp: 1 });
+  res.json(messages.map(msg => ({ ...msg._doc, read: msg.read !== undefined ? msg.read : false })));
+}));
 
 // Last messages endpoint
-app.get('/last-messages/:userId', authMiddleware, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    if (!validator.isAlphanumeric(userId)) {
-      return res.status(400).json({ message: 'Identifiant invalide' });
-    }
-
-    const conversations = await Message.aggregate([
-      { $match: { $or: [{ sender: userId }, { receiver: userId }] } },
-      { $sort: { timestamp: -1 } },
-      {
-        $group: {
-          _id: { $cond: [{ $eq: ['$sender', userId] }, '$receiver', '$sender'] },
-          lastMessage: { $first: '$message' },
-          timestamp: { $first: '$timestamp' },
-        },
+app.get('/last-messages/:userId', authMiddleware, handleAsync(async (req, res) => {
+  const { userId } = req.params;
+  if (!validator.isAlphanumeric(userId)) throw new Error('Identifiant invalide');
+  const conversations = await Message.aggregate([
+    { $match: { $or: [{ sender: userId }, { receiver: userId }] } },
+    { $sort: { timestamp: -1 } },
+    {
+      $group: {
+        _id: { $cond: [{ $eq: ['$sender', userId] }, '$receiver', '$sender'] },
+        lastMessage: { $first: '$message' },
+        timestamp: { $first: '$timestamp' },
       },
-    ]);
-
-    const lastMessages = await Promise.all(
-      conversations.map(async conv => {
-        const otherUser = await User.findOne({ Identifiant: conv._id }, 'Name Email Identifiant');
-        return {
-          user: otherUser,
-          lastMessage: conv.lastMessage,
-          timestamp: conv.timestamp,
-        };
-      })
-    );
-
-    res.json(lastMessages);
-  } catch (error) {
-    console.error('Erreur lors de la récupération des derniers messages:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+    },
+  ]);
+  const lastMessages = await Promise.all(
+    conversations.map(async conv => {
+      const otherUser = await User.findOne({ Identifiant: conv._id }, 'Name Email Identifiant');
+      return { user: otherUser, lastMessage: conv.lastMessage, timestamp: conv.timestamp };
+    })
+  );
+  res.json(lastMessages);
+}));
 
 // Predictions endpoint
-app.get('/predictions', async (req, res) => {
-  try {
-    const users = await User.find().lean();
-    if (!users.length) {
-      return res.status(404).json({ error: 'Aucun utilisateur trouvé' });
-    }
+app.get('/predictions', handleAsync(async (req, res) => {
+  const users = await User.find().lean();
+  if (!users.length) throw new Error('Aucun utilisateur trouvé');
+  const formattedUsers = users.map(user => ({
+    ...user,
+    createdAt: user.createdAt.toISOString(),
+  }));
 
-    const formattedUsers = users.map(user => ({
-      ...user,
-      createdAt: user.createdAt.toISOString(),
-    }));
+  // Validate script path
+  const scriptPath = path.join(__dirname, 'predict.py');
+  if (!scriptPath.startsWith(__dirname)) throw new Error('Chemin de script invalide');
 
-    const pythonProcess = spawn('python', [path.join(__dirname, 'predict.py')]);
-    let output = '';
-    let errorOutput = '';
+  const pythonProcess = spawn('python', [scriptPath]);
+  let output = '';
+  let errorOutput = '';
 
-    pythonProcess.stdin.write(JSON.stringify(formattedUsers));
-    pythonProcess.stdin.end();
+  pythonProcess.stdin.write(JSON.stringify(formattedUsers));
+  pythonProcess.stdin.end();
 
-    pythonProcess.stdout.on('data', data => {
-      output += data.toString();
-    });
-
-    pythonProcess.stderr.on('data', data => {
-      errorOutput += data.toString();
-    });
-
-    pythonProcess.on('close', code => {
-      if (code === 0) {
-        try {
-          const predictions = JSON.parse(output);
-          res.json(predictions);
-        } catch (parseError) {
-          res.status(500).json({ error: 'Erreur de parsing des prédictions' });
-        }
-      } else {
-        res.status(500).json({ error: 'Échec du script de prédiction', details: errorOutput });
+  pythonProcess.stdout.on('data', data => { output += data.toString(); });
+  pythonProcess.stderr.on('data', data => { errorOutput += data.toString(); });
+  pythonProcess.on('close', code => {
+    if (code === 0) {
+      try {
+        const predictions = JSON.parse(output);
+        res.json(predictions);
+      } catch (parseError) {
+        throw new Error('Erreur de parsing des prédictions');
       }
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Erreur lors de la récupération des utilisateurs' });
-  }
-});
+    } else {
+      throw new Error(`Échec du script de prédiction: ${errorOutput}`);
+    }
+  });
+}));
 
 // Cleanup function
 app.closeAll = async () => {
   try {
     await mongoose.connection.close();
     console.log('Mongoose connection closed');
-    if (storage.client) {
-      await storage.client.close();
-      console.log('GridFsStorage client closed');
-    } else if (storage.db) {
-      await storage.db.close();
-      console.log('GridFsStorage db closed');
-    }
+    if (storage.client) await storage.client.close();
+    else if (storage.db) await storage.db.close();
+    console.log('GridFsStorage closed');
   } catch (err) {
     console.error('Erreur lors du nettoyage:', err);
   }
 };
 
 // Error handler
-app.use((req, res, next) => {
-  next(createError(404));
-});
-
+app.use((req, res, next) => next(createError(404)));
 app.use((err, req, res, next) => {
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
-  res.status(err.status || 500);
-  res.render('error');
+  res.status(err.status || 500).render('error');
 });
 
 // Start server
