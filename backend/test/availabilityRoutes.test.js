@@ -1,19 +1,35 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
-const { app } = require('../app'); // <-- Correction ici
+const { MongoMemoryServer } = require('mongodb-memory-server');
+const express = require('express');
+const availabilityRoutes = require('../routes/availabilityRoutes');
 const Availability = require('../Models/Availability');
+
+let mongod;
+let app;
 
 describe('Availability Routes', () => {
   let psychologistId;
   let availabilityId;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    // Start in-memory MongoDB
+    mongod = await MongoMemoryServer.create();
+    const uri = mongod.getUri();
+    await mongoose.connect(uri);
+
+    // Setup Express app for testing
+    app = express();
+    app.use(express.json());
+    app.use('/api/availability', availabilityRoutes);
+
     psychologistId = new mongoose.Types.ObjectId();
   });
 
   afterAll(async () => {
     await Availability.deleteMany({});
     await mongoose.connection.close();
+    await mongod.stop();
   });
 
   it('should add a new availability slot', async () => {
@@ -30,11 +46,10 @@ describe('Availability Routes', () => {
     availabilityId = res.body._id;
   });
 
-
   it('should get availability for a psychologist', async () => {
     const res = await request(app)
       .get('/api/availability')
-      .query({ psychologistId: psychologistId.toString() }); // <-- Correction ici
+      .query({ psychologistId: psychologistId.toString() });
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeGreaterThan(0);
