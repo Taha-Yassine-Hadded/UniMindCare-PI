@@ -42,7 +42,7 @@ const UserList = () => {
   };
 
   useEffect(() => {
-    const socketInstance = io('http://localhost:5000', {
+    const socketInstance = io(`${process.env.REACT_APP_API_URL}`, {
       auth: { token },
       withCredentials: true,
       transports: ['websocket', 'polling'],
@@ -140,7 +140,7 @@ const UserList = () => {
           setTimeout(() => navigate('/login'), 2000);
           return;
         }
-        const res = await axios.get('http://localhost:5000/api/users/all', {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/all`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         console.log('Utilisateurs récupérés:', res.data);
@@ -174,7 +174,7 @@ const UserList = () => {
     const fetchMessages = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
+          `${process.env.REACT_APP_API_URL}/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         console.log('Messages récupérés:', response.data);
@@ -187,7 +187,7 @@ const UserList = () => {
             receiver: currentUser.Identifiant,
           }, async () => {
             const updatedResponse = await axios.get(
-              `http://localhost:5000/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
+              `${process.env.REACT_APP_API_URL}/messages/${currentUser.Identifiant}/${selectedUser.Identifiant}`,
               { headers: { Authorization: `Bearer ${token}` } }
             );
             setMessages(updatedResponse.data);
@@ -369,7 +369,7 @@ const UserList = () => {
     formData.append('file', file);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/upload', formData, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/upload`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -427,7 +427,7 @@ const UserList = () => {
         formData.append('file', audioBlob, `voice-message-${Date.now()}.webm`);
 
         try {
-          const response = await axios.post('http://localhost:5000/api/upload', formData, {
+          const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/upload`, formData, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'multipart/form-data',
