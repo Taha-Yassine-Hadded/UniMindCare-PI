@@ -23,7 +23,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
       return;
     }
 
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io(`${process.env.REACT_APP_API_URL}`, {
       auth: { token },
       withCredentials: true,
       transports: ['websocket', 'polling'],
@@ -42,7 +42,7 @@ const ChatModal = ({ receiverUser, onClose }) => {
     const fetchMessages = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/messages/${currentUser.Identifiant}/${receiverUser.Identifiant}`,
+          `${process.env.REACT_APP_API_URL}/messages/${currentUser.Identifiant}/${receiverUser.Identifiant}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setMessages(response.data);
