@@ -220,7 +220,7 @@ const SupportElement = () => {
         }
         
         // Récupérer les questions
-        const response = await fetch('http://localhost:5000/api/questionnaire/questions', {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/questionnaire/questions`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -392,7 +392,7 @@ const SupportElement = () => {
         answer: value
       }));
 
-      const response = await fetch('http://localhost:5000/api/questionnaire/submit', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/questionnaire/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
