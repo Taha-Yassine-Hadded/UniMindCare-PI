@@ -70,7 +70,7 @@ const WeatherDashboard = () => {
           startDate = null;
         }
         
-        let url = 'http://localhost:5000/api/weather/period';
+        let url = `${process.env.REACT_APP_API_URL}/api/weather/period`;
         if (startDate) {
           url += `?startDate=${startDate}`;
         }
