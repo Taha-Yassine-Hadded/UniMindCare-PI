@@ -35,7 +35,7 @@ const AddFeedback = () => {
           navigate("/login");
           return;
         }
-        const userResponse = await fetch("http://localhost:5000/api/users/me", {
+        const userResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/users/me`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -46,7 +46,7 @@ const AddFeedback = () => {
         const userData = await userResponse.json();
         setUserRole(userData.Role && userData.Role.includes("student") ? "student" : null);
 
-        const teachersResponse = await fetch("http://localhost:5000/api/teachers", {
+        const teachersResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/teachers`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -104,7 +104,7 @@ const AddFeedback = () => {
         navigate("/login");
         return;
       }
-      const response = await fetch("http://localhost:5000/api/feedback", {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/feedback`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -130,7 +130,7 @@ const AddFeedback = () => {
     try {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       if (token) {
-        await fetch("http://localhost:5000/users/logout", {
+        await fetch(`${process.env.REACT_APP_API_URL}/users/logout`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         });
