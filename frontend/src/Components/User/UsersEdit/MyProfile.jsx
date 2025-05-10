@@ -32,7 +32,7 @@ const MyProfileEdit = () => {
       const formData = new FormData();
       formData.append('profilePicture', file);
 
-      const response = await fetch(`http://localhost:5000/api/users/${identifiant}/upload-profile-picture`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${identifiant}/upload-profile-picture`, {
         method: 'PUT',
         headers: {
           "Authorization": `Bearer ${token}`,
